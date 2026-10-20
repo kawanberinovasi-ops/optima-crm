@@ -1,0 +1,1260 @@
+{
+  "generated_from": "assets/data.js seed()",
+  "departments": [
+    "Executive",
+    "Commercial",
+    "Customer Service",
+    "Digital Campaign",
+    "Creative & Media",
+    "CampusNet",
+    "DietPartner",
+    "Business Operation"
+  ],
+  "access": {
+    "Executive": {
+      "nilai": "Ya",
+      "rate": "Ya",
+      "lead": "M",
+      "client": "M",
+      "community": "M",
+      "kol": "M",
+      "media": "M",
+      "interaksi": "M",
+      "deal": "M"
+    },
+    "Commercial": {
+      "nilai": "Ya*",
+      "rate": "R*",
+      "lead": "M",
+      "client": "M",
+      "community": "R",
+      "kol": "R",
+      "media": "R",
+      "interaksi": "C",
+      "deal": "M"
+    },
+    "Customer Service": {
+      "nilai": "Tidak",
+      "rate": "Tidak",
+      "lead": "R",
+      "client": "R",
+      "community": "R",
+      "kol": "R",
+      "media": "R",
+      "interaksi": "M",
+      "deal": "R"
+    },
+    "Digital Campaign": {
+      "nilai": "Tidak",
+      "rate": "M",
+      "lead": "C",
+      "client": "R",
+      "community": "R",
+      "kol": "M",
+      "media": "R",
+      "interaksi": "C",
+      "deal": "N"
+    },
+    "Creative & Media": {
+      "nilai": "Tidak",
+      "rate": "Tidak",
+      "lead": "R",
+      "client": "R",
+      "community": "R",
+      "kol": "R",
+      "media": "M",
+      "interaksi": "C",
+      "deal": "N"
+    },
+    "CampusNet": {
+      "nilai": "Tidak",
+      "rate": "Tidak",
+      "lead": "C",
+      "client": "R",
+      "community": "M",
+      "kol": "R",
+      "media": "C",
+      "interaksi": "C",
+      "deal": "N"
+    },
+    "DietPartner": {
+      "nilai": "Tidak",
+      "rate": "Tidak",
+      "lead": "C",
+      "client": "R",
+      "community": "M",
+      "kol": "R",
+      "media": "C",
+      "interaksi": "C",
+      "deal": "N"
+    },
+    "Business Operation": {
+      "nilai": "Lihat*",
+      "rate": "Tidak",
+      "lead": "R",
+      "client": "R",
+      "community": "R",
+      "kol": "R",
+      "media": "R",
+      "interaksi": "R",
+      "deal": "R"
+    }
+  },
+  "options": {
+    "segments": [
+      "Korporat",
+      "Pendidikan",
+      "Kesehatan",
+      "Komunitas",
+      "UMKM",
+      "F&B",
+      "Retail",
+      "Media lokal",
+      "Radio",
+      "Online",
+      "Lifestyle",
+      "Kuliner",
+      "Travel"
+    ],
+    "sources": [
+      "Referensi",
+      "Website",
+      "Event",
+      "Media sosial",
+      "Kunjungan",
+      "Lainnya"
+    ],
+    "intTypes": [
+      "Telepon",
+      "Email",
+      "WhatsApp",
+      "Meeting",
+      "Kunjungan",
+      "Lainnya"
+    ],
+    "lostReasons": [
+      "Harga di atas anggaran",
+      "Pilih vendor lain",
+      "Kebutuhan berubah",
+      "Ga ada respons",
+      "Waktu ga cocok",
+      "Lainnya"
+    ]
+  },
+  "users": [
+    {
+      "name": "Admin Uji",
+      "email": "admin@contoh.test",
+      "department": "Executive",
+      "role": "Super Admin",
+      "active": true
+    },
+    {
+      "name": "Rina Pratama",
+      "email": "rina@contoh.test",
+      "department": "Commercial",
+      "role": "Kepala Department",
+      "active": true
+    },
+    {
+      "name": "Ayu Safitri",
+      "email": "ayu@contoh.test",
+      "department": "Commercial",
+      "role": "Koordinator",
+      "active": true
+    },
+    {
+      "name": "Dimas Aksara",
+      "email": "dimas@contoh.test",
+      "department": "Commercial",
+      "role": "Staf",
+      "active": true
+    },
+    {
+      "name": "Dewi Wulandari",
+      "email": "dewi@contoh.test",
+      "department": "Digital Campaign",
+      "role": "Staf",
+      "active": true
+    },
+    {
+      "name": "Bayu Nugroho",
+      "email": "bayu@contoh.test",
+      "department": "Customer Service",
+      "role": "Staf",
+      "active": true
+    },
+    {
+      "name": "Sari Melati",
+      "email": "sari@contoh.test",
+      "department": "Business Operation",
+      "role": "Viewer",
+      "active": true
+    }
+  ],
+  "pipelines": [
+    {
+      "name": "Umum",
+      "stages": [
+        "Lead",
+        "Qualified",
+        "Meeting",
+        "Proposal",
+        "Negotiation",
+        "Closing"
+      ]
+    }
+  ],
+  "client_partners": [
+    {
+      "code": "CP-0001",
+      "name": "PT Sinar Kreasi Nusantara",
+      "category": "Client",
+      "segment": "Korporat",
+      "pic": "rina@contoh.test",
+      "department": "Commercial",
+      "source": "Referensi",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -120,
+      "updated_days": -30,
+      "contacts": [
+        {
+          "name": "Andi Wirawan",
+          "title": "Head of Marketing",
+          "email": "andi.wirawan@contoh.test",
+          "phone": "0812-0000-1000",
+          "is_primary": true
+        },
+        {
+          "name": "Lina Marlina",
+          "title": "Procurement",
+          "email": "lina.marlina@contoh.test",
+          "phone": "0812-0000-2201",
+          "is_primary": false
+        }
+      ]
+    },
+    {
+      "code": "CP-0002",
+      "name": "Komunitas Lari Pagi Bandung",
+      "category": "Community",
+      "segment": "Komunitas",
+      "pic": "dimas@contoh.test",
+      "department": "Commercial",
+      "source": "Event",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -115,
+      "updated_days": -29,
+      "contacts": [
+        {
+          "name": "Fajar Ramadhan",
+          "title": "Ketua",
+          "email": "fajar.ramadhan@contoh.test",
+          "phone": "0812-0000-1037",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0003",
+      "name": "CV Arunika Media",
+      "category": "Media",
+      "segment": "Media lokal",
+      "pic": "ayu@contoh.test",
+      "department": "Commercial",
+      "source": "Media sosial",
+      "city": "Jakarta",
+      "note": null,
+      "rate_card": null,
+      "created_days": -110,
+      "updated_days": -28,
+      "contacts": [
+        {
+          "name": "Laras Ayu",
+          "title": "Owner",
+          "email": "laras.ayu@contoh.test",
+          "phone": "0812-0000-1074",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0004",
+      "name": "Yayasan Tunas Cerdas",
+      "category": "Client",
+      "segment": "Pendidikan",
+      "pic": "ayu@contoh.test",
+      "department": "Commercial",
+      "source": "Kunjungan",
+      "city": "Cimahi",
+      "note": null,
+      "rate_card": null,
+      "created_days": -105,
+      "updated_days": -27,
+      "contacts": [
+        {
+          "name": "Hendra Wijaya",
+          "title": "Sekretaris",
+          "email": "hendra.wijaya@contoh.test",
+          "phone": "0812-0000-1111",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0005",
+      "name": "PT Lintas Data Mandiri",
+      "category": "Lead",
+      "segment": "Korporat",
+      "pic": "rina@contoh.test",
+      "department": "Commercial",
+      "source": "Website",
+      "city": "Jakarta",
+      "note": null,
+      "rate_card": null,
+      "created_days": -100,
+      "updated_days": -26,
+      "contacts": [
+        {
+          "name": "Maya Kartika",
+          "title": "IT Manager",
+          "email": "maya.kartika@contoh.test",
+          "phone": "0812-0000-1148",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0006",
+      "name": "Klinik Sehat Sentosa",
+      "category": "Client",
+      "segment": "Kesehatan",
+      "pic": "dimas@contoh.test",
+      "department": "Commercial",
+      "source": "Referensi",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -95,
+      "updated_days": -25,
+      "contacts": [
+        {
+          "name": "dr. Putra",
+          "title": "Direktur",
+          "email": "dr.putra@contoh.test",
+          "phone": "0812-0000-1185",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0007",
+      "name": "Pasar Kreatif Cimahi",
+      "category": "Community",
+      "segment": "UMKM",
+      "pic": "dimas@contoh.test",
+      "department": "Commercial",
+      "source": "Event",
+      "city": "Cimahi",
+      "note": null,
+      "rate_card": null,
+      "created_days": -90,
+      "updated_days": -24,
+      "contacts": [
+        {
+          "name": "Nina Sari",
+          "title": "Koordinator",
+          "email": "nina.sari@contoh.test",
+          "phone": "0812-0000-1222",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0008",
+      "name": "Dimas Kreatif Studio",
+      "category": "KOL/KOC",
+      "segment": "Lifestyle",
+      "pic": "dewi@contoh.test",
+      "department": "Digital Campaign",
+      "source": "Media sosial",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": {
+        "rate": 9000000
+      },
+      "created_days": -85,
+      "updated_days": -23,
+      "contacts": [
+        {
+          "name": "Dimas K.",
+          "title": "Kreator",
+          "email": "dimas.k@contoh.test",
+          "phone": "0812-0000-1259",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0009",
+      "name": "Kopi Senja Group",
+      "category": "Lead",
+      "segment": "F&B",
+      "pic": "ayu@contoh.test",
+      "department": "Commercial",
+      "source": "Website",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -80,
+      "updated_days": -22,
+      "contacts": [
+        {
+          "name": "Rizky Pratama",
+          "title": "Brand Manager",
+          "email": "rizky.pratama@contoh.test",
+          "phone": "0812-0000-1296",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0010",
+      "name": "Universitas Cakrawala",
+      "category": "Lead",
+      "segment": "Pendidikan",
+      "pic": "rina@contoh.test",
+      "department": "Commercial",
+      "source": "Referensi",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -75,
+      "updated_days": -21,
+      "contacts": [
+        {
+          "name": "Dr. Lestari",
+          "title": "Wakil Rektor",
+          "email": "dr.lestari@contoh.test",
+          "phone": "0812-0000-1333",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0011",
+      "name": "Nadia Rahma",
+      "category": "KOL/KOC",
+      "segment": "Kuliner",
+      "pic": "dewi@contoh.test",
+      "department": "Digital Campaign",
+      "source": "Media sosial",
+      "city": "Jakarta",
+      "note": null,
+      "rate_card": {
+        "rate": 7500000
+      },
+      "created_days": -70,
+      "updated_days": -20,
+      "contacts": [
+        {
+          "name": "Nadia Rahma",
+          "title": "Kreator",
+          "email": "nadia.rahma@contoh.test",
+          "phone": "0812-0000-1370",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0012",
+      "name": "Radio Suara Kota",
+      "category": "Media",
+      "segment": "Radio",
+      "pic": "ayu@contoh.test",
+      "department": "Commercial",
+      "source": "Kunjungan",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -65,
+      "updated_days": -19,
+      "contacts": [
+        {
+          "name": "Bagus H.",
+          "title": "Program Director",
+          "email": "bagus.h@contoh.test",
+          "phone": "0812-0000-1407",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0013",
+      "name": "PT Hijau Lestari Agro",
+      "category": "Client",
+      "segment": "Korporat",
+      "pic": "rina@contoh.test",
+      "department": "Commercial",
+      "source": "Event",
+      "city": "Subang",
+      "note": null,
+      "rate_card": null,
+      "created_days": -60,
+      "updated_days": -18,
+      "contacts": [
+        {
+          "name": "Sinta Dewi",
+          "title": "HR Manager",
+          "email": "sinta.dewi@contoh.test",
+          "phone": "0812-0000-1444",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0014",
+      "name": "Komunitas Sepeda Kota",
+      "category": "Community",
+      "segment": "Komunitas",
+      "pic": "dimas@contoh.test",
+      "department": "Commercial",
+      "source": "Media sosial",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -55,
+      "updated_days": -17,
+      "contacts": [
+        {
+          "name": "Yoga P.",
+          "title": "Ketua",
+          "email": "yoga.p@contoh.test",
+          "phone": "0812-0000-1481",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0015",
+      "name": "Toko Buku Pelita",
+      "category": "Lead",
+      "segment": "Retail",
+      "pic": "dimas@contoh.test",
+      "department": "Commercial",
+      "source": "Kunjungan",
+      "city": "Garut",
+      "note": null,
+      "rate_card": null,
+      "created_days": -50,
+      "updated_days": -16,
+      "contacts": [
+        {
+          "name": "Ibu Wati",
+          "title": "Pemilik",
+          "email": "ibu.wati@contoh.test",
+          "phone": "0812-0000-1518",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0016",
+      "name": "Bimbel Juara",
+      "category": "Client",
+      "segment": "Pendidikan",
+      "pic": "ayu@contoh.test",
+      "department": "Commercial",
+      "source": "Referensi",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": null,
+      "created_days": -45,
+      "updated_days": -15,
+      "contacts": [
+        {
+          "name": "Agus S.",
+          "title": "Direktur",
+          "email": "agus.s@contoh.test",
+          "phone": "0812-0000-1555",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0017",
+      "name": "Portal Berita Priangan",
+      "category": "Media",
+      "segment": "Online",
+      "pic": "dewi@contoh.test",
+      "department": "Digital Campaign",
+      "source": "Website",
+      "city": "Tasikmalaya",
+      "note": null,
+      "rate_card": null,
+      "created_days": -40,
+      "updated_days": -14,
+      "contacts": [
+        {
+          "name": "Reza F.",
+          "title": "Redaktur",
+          "email": "reza.f@contoh.test",
+          "phone": "0812-0000-1592",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0018",
+      "name": "Raka Adventure",
+      "category": "KOL/KOC",
+      "segment": "Travel",
+      "pic": "dewi@contoh.test",
+      "department": "Digital Campaign",
+      "source": "Media sosial",
+      "city": "Bandung",
+      "note": null,
+      "rate_card": {
+        "rate": 6000000
+      },
+      "created_days": -35,
+      "updated_days": -13,
+      "contacts": [
+        {
+          "name": "Raka",
+          "title": "Kreator",
+          "email": "raka@contoh.test",
+          "phone": "0812-0000-1629",
+          "is_primary": true
+        }
+      ]
+    },
+    {
+      "code": "CP-0019",
+      "name": "Sinar Kreasi Nusantara",
+      "category": "Lead",
+      "segment": "Korporat",
+      "pic": "dimas@contoh.test",
+      "department": "Commercial",
+      "source": "Event",
+      "city": "Bandung",
+      "note": "Contoh data ganda buat dicoba fitur gabung data",
+      "rate_card": null,
+      "created_days": -30,
+      "updated_days": -12,
+      "contacts": [
+        {
+          "name": "Andi Wirawan",
+          "title": "Marketing",
+          "email": "andi.wirawan@contoh.test",
+          "phone": "0812-0000-1666",
+          "is_primary": true
+        }
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "code": "INT-0001",
+      "client_partner": "CP-0001",
+      "user": "rina@contoh.test",
+      "type": "Meeting",
+      "result": "Presentasi proposal Website & CRM ke tim marketing",
+      "next_action": "Kirim revisi proposal",
+      "occurred_days": -12,
+      "followup_days": -4
+    },
+    {
+      "code": "INT-0002",
+      "client_partner": "CP-0002",
+      "user": "dimas@contoh.test",
+      "type": "WhatsApp",
+      "result": "Bahas ide fun run bareng sponsor",
+      "next_action": "Konfirmasi jadwal meeting kolaborasi",
+      "occurred_days": -9,
+      "followup_days": -3
+    },
+    {
+      "code": "INT-0003",
+      "client_partner": "CP-0003",
+      "user": "ayu@contoh.test",
+      "type": "Telepon",
+      "result": "Tanya paket konten Q4",
+      "next_action": "Follow up penawaran paket konten",
+      "occurred_days": -5,
+      "followup_days": 0
+    },
+    {
+      "code": "INT-0004",
+      "client_partner": "CP-0004",
+      "user": "ayu@contoh.test",
+      "type": "Kunjungan",
+      "result": "Survey lokasi seminar",
+      "next_action": "Telepon PIC buat brief kegiatan",
+      "occurred_days": -6,
+      "followup_days": 0
+    },
+    {
+      "code": "INT-0005",
+      "client_partner": "CP-0008",
+      "user": "dewi@contoh.test",
+      "type": "WhatsApp",
+      "result": "Minta rate card terbaru",
+      "next_action": "Kirim brief campaign",
+      "occurred_days": -2,
+      "followup_days": 0
+    },
+    {
+      "code": "INT-0006",
+      "client_partner": "CP-0005",
+      "user": "rina@contoh.test",
+      "type": "Email",
+      "result": "Kirim company profile",
+      "next_action": "Meeting discovery kebutuhan ERP",
+      "occurred_days": -3,
+      "followup_days": 2
+    },
+    {
+      "code": "INT-0007",
+      "client_partner": "CP-0009",
+      "user": "ayu@contoh.test",
+      "type": "Telepon",
+      "result": "Perkenalan layanan event",
+      "next_action": "Kirim contoh portofolio",
+      "occurred_days": -1,
+      "followup_days": 5
+    },
+    {
+      "code": "INT-0008",
+      "client_partner": "CP-0006",
+      "user": "dimas@contoh.test",
+      "type": "Meeting",
+      "result": "Serah terima aplikasi booking",
+      "next_action": null,
+      "occurred_days": -20,
+      "followup_days": null
+    },
+    {
+      "code": "INT-0009",
+      "client_partner": "CP-0010",
+      "user": "rina@contoh.test",
+      "type": "Email",
+      "result": "Undangan diskusi digitalisasi kampus",
+      "next_action": "Jadwalkan presentasi",
+      "occurred_days": -2,
+      "followup_days": 7
+    },
+    {
+      "code": "INT-0010",
+      "client_partner": "CP-0013",
+      "user": "rina@contoh.test",
+      "type": "Meeting",
+      "result": "Gathering karyawan, bahas konsep",
+      "next_action": "Kirim proposal gathering",
+      "occurred_days": -7,
+      "followup_days": -1
+    },
+    {
+      "code": "INT-0011",
+      "client_partner": "CP-0016",
+      "user": "ayu@contoh.test",
+      "type": "WhatsApp",
+      "result": "Tanya promo semester",
+      "next_action": "Kirim penawaran video promosi",
+      "occurred_days": -4,
+      "followup_days": 3
+    },
+    {
+      "code": "INT-0012",
+      "client_partner": "CP-0012",
+      "user": "ayu@contoh.test",
+      "type": "Kunjungan",
+      "result": "Kenalan dengan tim program",
+      "next_action": null,
+      "occurred_days": -15,
+      "followup_days": null
+    },
+    {
+      "code": "INT-0013",
+      "client_partner": "CP-0007",
+      "user": "dimas@contoh.test",
+      "type": "Telepon",
+      "result": "Bazar akhir tahun",
+      "next_action": "Kirim rundown bazar",
+      "occurred_days": -3,
+      "followup_days": 1
+    },
+    {
+      "code": "INT-0014",
+      "client_partner": "CP-0011",
+      "user": "dewi@contoh.test",
+      "type": "WhatsApp",
+      "result": "Diskusi konten kuliner",
+      "next_action": "Kirim brief konten",
+      "occurred_days": -1,
+      "followup_days": 4
+    }
+  ],
+  "deals": [
+    {
+      "code": "DL-0001",
+      "title": "Website & CRM",
+      "service": "Website & CRM",
+      "client_partner": "CP-0001",
+      "pipeline": "Umum",
+      "stage": "Negotiation",
+      "status": "Open",
+      "owner": "rina@contoh.test",
+      "offer_value": 120000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -25,
+      "target_days": 20,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0002",
+      "title": "ERP gudang",
+      "service": "ERP gudang",
+      "client_partner": "CP-0005",
+      "pipeline": "Umum",
+      "stage": "Meeting",
+      "status": "Open",
+      "owner": "rina@contoh.test",
+      "offer_value": 210000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -75,
+      "target_days": 45,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0003",
+      "title": "Portal siswa",
+      "service": "Portal siswa",
+      "client_partner": "CP-0016",
+      "pipeline": "Umum",
+      "stage": "Qualified",
+      "status": "Open",
+      "owner": "ayu@contoh.test",
+      "offer_value": 48000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -20,
+      "target_days": 30,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0004",
+      "title": "Digitalisasi kampus",
+      "service": "Digitalisasi kampus",
+      "client_partner": "CP-0010",
+      "pipeline": "Umum",
+      "stage": "Lead",
+      "status": "Open",
+      "owner": "rina@contoh.test",
+      "offer_value": 180000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -110,
+      "target_days": 60,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0005",
+      "title": "Landing page kopi",
+      "service": "Landing page kopi",
+      "client_partner": "CP-0009",
+      "pipeline": "Umum",
+      "stage": "Lead",
+      "status": "Open",
+      "owner": "ayu@contoh.test",
+      "offer_value": 18000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -8,
+      "target_days": 40,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0006",
+      "title": "Aplikasi booking",
+      "service": "Aplikasi booking",
+      "client_partner": "CP-0006",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "dimas@contoh.test",
+      "offer_value": 36000000,
+      "deal_value": 36000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -60,
+      "target_days": -10,
+      "closed_days": -10,
+      "review_days": null
+    },
+    {
+      "code": "DL-0007",
+      "title": "Lari Pagi Bandung",
+      "service": "Lari Pagi Bandung",
+      "client_partner": "CP-0002",
+      "pipeline": "Umum",
+      "stage": "Qualified",
+      "status": "Open",
+      "owner": "dimas@contoh.test",
+      "offer_value": 85000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -14,
+      "target_days": 12,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0008",
+      "title": "Gathering karyawan",
+      "service": "Gathering karyawan",
+      "client_partner": "CP-0013",
+      "pipeline": "Umum",
+      "stage": "Proposal",
+      "status": "Open",
+      "owner": "rina@contoh.test",
+      "offer_value": 42000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -40,
+      "target_days": 25,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0009",
+      "title": "Seminar pendidikan",
+      "service": "Seminar pendidikan",
+      "client_partner": "CP-0004",
+      "pipeline": "Umum",
+      "stage": "Negotiation",
+      "status": "Open",
+      "owner": "ayu@contoh.test",
+      "offer_value": 28000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -3,
+      "target_days": 10,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0010",
+      "title": "Bazar akhir tahun",
+      "service": "Bazar akhir tahun",
+      "client_partner": "CP-0007",
+      "pipeline": "Umum",
+      "stage": "Lead",
+      "status": "Open",
+      "owner": "dimas@contoh.test",
+      "offer_value": 19000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -95,
+      "target_days": 50,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0011",
+      "title": "Video promosi semester",
+      "service": "Video promosi semester",
+      "client_partner": "CP-0016",
+      "pipeline": "Umum",
+      "stage": "Proposal",
+      "status": "Open",
+      "owner": "ayu@contoh.test",
+      "offer_value": 24000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -5,
+      "target_days": 18,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0012",
+      "title": "Paket konten Q4",
+      "service": "Paket konten Q4",
+      "client_partner": "CP-0003",
+      "pipeline": "Umum",
+      "stage": "Meeting",
+      "status": "Open",
+      "owner": "ayu@contoh.test",
+      "offer_value": 32000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": null,
+      "created_days": -30,
+      "target_days": 15,
+      "closed_days": null,
+      "review_days": null
+    },
+    {
+      "code": "DL-0013",
+      "title": "Jingle radio",
+      "service": "Jingle radio",
+      "client_partner": "CP-0012",
+      "pipeline": "Umum",
+      "stage": "Proposal",
+      "status": "On Hold",
+      "owner": "ayu@contoh.test",
+      "offer_value": 15000000,
+      "deal_value": null,
+      "lost_reason": null,
+      "hold_reason": "Menunggu anggaran tahun depan",
+      "created_days": -50,
+      "target_days": 30,
+      "closed_days": null,
+      "review_days": 21
+    },
+    {
+      "code": "DL-H001",
+      "title": "Event tahunan",
+      "service": null,
+      "client_partner": "CP-0013",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "rina@contoh.test",
+      "offer_value": 22000000,
+      "deal_value": 22000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 9,
+        "day": 8
+      }
+    },
+    {
+      "code": "DL-H002",
+      "title": "Fun run sponsor",
+      "service": null,
+      "client_partner": "CP-0002",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "dimas@contoh.test",
+      "offer_value": 31000000,
+      "deal_value": 31000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 8,
+        "day": 9
+      }
+    },
+    {
+      "code": "DL-H003",
+      "title": "Konten promosi",
+      "service": null,
+      "client_partner": "CP-0003",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "ayu@contoh.test",
+      "offer_value": 18000000,
+      "deal_value": 18000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 7,
+        "day": 10
+      }
+    },
+    {
+      "code": "DL-H004",
+      "title": "Sistem absensi",
+      "service": null,
+      "client_partner": "CP-0001",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "rina@contoh.test",
+      "offer_value": 40000000,
+      "deal_value": 40000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 6,
+        "day": 11
+      }
+    },
+    {
+      "code": "DL-H005",
+      "title": "Seminar",
+      "service": null,
+      "client_partner": "CP-0004",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "ayu@contoh.test",
+      "offer_value": 36000000,
+      "deal_value": 36000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 5,
+        "day": 12
+      }
+    },
+    {
+      "code": "DL-H006",
+      "title": "Iklan radio",
+      "service": null,
+      "client_partner": "CP-0012",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "ayu@contoh.test",
+      "offer_value": 28000000,
+      "deal_value": 28000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 4,
+        "day": 13
+      }
+    },
+    {
+      "code": "DL-H007",
+      "title": "Website sekolah",
+      "service": null,
+      "client_partner": "CP-0016",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "rina@contoh.test",
+      "offer_value": 45000000,
+      "deal_value": 45000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 3,
+        "day": 14
+      }
+    },
+    {
+      "code": "DL-H008",
+      "title": "Bazar",
+      "service": null,
+      "client_partner": "CP-0007",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "dimas@contoh.test",
+      "offer_value": 38000000,
+      "deal_value": 38000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 2,
+        "day": 15
+      }
+    },
+    {
+      "code": "DL-H009",
+      "title": "Dashboard klinik",
+      "service": null,
+      "client_partner": "CP-0006",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "ayu@contoh.test",
+      "offer_value": 41000000,
+      "deal_value": 41000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 1,
+        "day": 16
+      }
+    },
+    {
+      "code": "DL-H010",
+      "title": "Gowes bareng",
+      "service": null,
+      "client_partner": "CP-0014",
+      "pipeline": "Umum",
+      "stage": "Closing",
+      "status": "Won",
+      "owner": "dimas@contoh.test",
+      "offer_value": 15000000,
+      "deal_value": 15000000,
+      "lost_reason": null,
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 0,
+        "day": 17
+      }
+    },
+    {
+      "code": "DL-H011",
+      "title": "Proposal lama",
+      "service": null,
+      "client_partner": "CP-0015",
+      "pipeline": "Umum",
+      "stage": "Proposal",
+      "status": "Lost",
+      "owner": "rina@contoh.test",
+      "offer_value": 20000000,
+      "deal_value": null,
+      "lost_reason": "Harga di atas anggaran",
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 5,
+        "day": 18
+      }
+    },
+    {
+      "code": "DL-H012",
+      "title": "Proposal lama",
+      "service": null,
+      "client_partner": "CP-0011",
+      "pipeline": "Umum",
+      "stage": "Proposal",
+      "status": "Lost",
+      "owner": "ayu@contoh.test",
+      "offer_value": 20000000,
+      "deal_value": null,
+      "lost_reason": "Pilih vendor lain",
+      "hold_reason": null,
+      "history_month": {
+        "months_ago": 2,
+        "day": 19
+      }
+    }
+  ],
+  "news": [
+    "Template data klien udah bisa diisi",
+    "Mode uji: semua data di sini contoh dan cuma tersimpan di browser ini",
+    "Stage tiap lini bisnis bisa ditambah dari halaman Pipeline",
+    "Akses & Audit ada di menu profil"
+  ]
+}
