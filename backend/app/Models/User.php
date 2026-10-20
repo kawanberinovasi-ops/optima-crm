@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['name', 'email', 'employee_no', 'job_title', 'department_id', 'role', 'active', 'sso_subject', 'last_login_at', 'deactivated_at'])]
 #[Hidden(['password', 'remember_token', 'sso_subject'])]
@@ -34,6 +35,16 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /** Pengguna yang dinonaktifkan langsung keluar dari sistem (SRS bagian 3): semua sesinya dihapus. */
+    protected static function booted(): void
+    {
+        static::updated(function (User $user) {
+            if ($user->wasChanged('active') && ! $user->active) {
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+            }
+        });
     }
 
     public function department(): BelongsTo

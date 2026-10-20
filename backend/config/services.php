@@ -28,6 +28,16 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Login SSO lewat Google Workspace (SRS 4.1, 8.2). Tahap awal memakai akun pengembangan Campus Innovate;
+    // pindah ke akun OPTIMA cukup dengan mengganti nilai di .env.
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL').'/api/auth/google/callback'),
+        // Opsional: batasi ke satu domain Workspace, misalnya campusinnovate.id.
+        'hosted_domain' => env('GOOGLE_HOSTED_DOMAIN'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
