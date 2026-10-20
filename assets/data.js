@@ -88,22 +88,23 @@ function seed() {
     ['r11', 'WhatsApp', 'Diskusi konten kuliner', 'Kirim brief konten', 4, 'u5', -1]
   ];
   const interactions = I.map((x, i) => ({ id: 'i' + (i + 1), code: 'INT-' + String(i + 1).padStart(4, '0'), recordId: x[0], type: x[1], result: x[2], next: x[3], fuDate: x[4] === null ? '' : addDays(x[4]), done: false, cancelled: false, by: x[5], date: addDays(x[6]) }));
+  // kolom: judul, data, lini, stage, status, penawaran (jt), nilai (jt), PIC, target (hari), dibuat (hari)
   const D = [
-    ['Website & CRM', 'r1', 'um', 'ums5', 'Open', 120, '', 'u2', 20],
-    ['ERP gudang', 'r5', 'um', 'ums3', 'Open', 210, '', 'u2', 45],
-    ['Portal siswa', 'r16', 'um', 'ums2', 'Open', 48, '', 'u3', 30],
-    ['Digitalisasi kampus', 'r10', 'um', 'ums1', 'Open', 180, '', 'u2', 60],
-    ['Landing page kopi', 'r9', 'um', 'ums1', 'Open', 18, '', 'u3', 40],
-    ['Aplikasi booking', 'r6', 'um', 'ums6', 'Won', 36, 36, 'u4', -10],
-    ['Lari Pagi Bandung', 'r2', 'um', 'ums2', 'Open', 85, '', 'u4', 12],
-    ['Gathering karyawan', 'r13', 'um', 'ums4', 'Open', 42, '', 'u2', 25],
-    ['Seminar pendidikan', 'r4', 'um', 'ums5', 'Open', 28, '', 'u3', 10],
-    ['Bazar akhir tahun', 'r7', 'um', 'ums1', 'Open', 19, '', 'u4', 50],
-    ['Video promosi semester', 'r16', 'um', 'ums4', 'Open', 24, '', 'u3', 18],
-    ['Paket konten Q4', 'r3', 'um', 'ums3', 'Open', 32, '', 'u3', 15],
-    ['Jingle radio', 'r12', 'um', 'ums4', 'On Hold', 15, '', 'u3', 30]
+    ['Website & CRM', 'r1', 'um', 'ums5', 'Open', 120, '', 'u2', 20, -25],
+    ['ERP gudang', 'r5', 'um', 'ums3', 'Open', 210, '', 'u2', 45, -75],
+    ['Portal siswa', 'r16', 'um', 'ums2', 'Open', 48, '', 'u3', 30, -20],
+    ['Digitalisasi kampus', 'r10', 'um', 'ums1', 'Open', 180, '', 'u2', 60, -110],
+    ['Landing page kopi', 'r9', 'um', 'ums1', 'Open', 18, '', 'u3', 40, -8],
+    ['Aplikasi booking', 'r6', 'um', 'ums6', 'Won', 36, 36, 'u4', -10, -60],
+    ['Lari Pagi Bandung', 'r2', 'um', 'ums2', 'Open', 85, '', 'u4', 12, -14],
+    ['Gathering karyawan', 'r13', 'um', 'ums4', 'Open', 42, '', 'u2', 25, -40],
+    ['Seminar pendidikan', 'r4', 'um', 'ums5', 'Open', 28, '', 'u3', 10, -3],
+    ['Bazar akhir tahun', 'r7', 'um', 'ums1', 'Open', 19, '', 'u4', 50, -95],
+    ['Video promosi semester', 'r16', 'um', 'ums4', 'Open', 24, '', 'u3', 18, -5],
+    ['Paket konten Q4', 'r3', 'um', 'ums3', 'Open', 32, '', 'u3', 15, -30],
+    ['Jingle radio', 'r12', 'um', 'ums4', 'On Hold', 15, '', 'u3', 30, -50]
   ];
-  const deals = D.map((x, i) => ({ id: 'dl' + (i + 1), code: 'DL-' + String(i + 1).padStart(4, '0'), title: x[0], recordId: x[1], lineId: x[2], stageId: x[3], status: x[4], offer: x[5] * 1e6, value: x[6] === '' ? '' : x[6] * 1e6, ownerId: x[7], target: addDays(x[8]), closedAt: x[4] === 'Won' ? addDays(x[8]) : '', reason: x[4] === 'On Hold' ? 'Menunggu anggaran tahun depan' : '', reviewDate: x[4] === 'On Hold' ? addDays(21) : '', lostReason: '', service: x[0], createdAt: addDays(-40 + i) }));
+  const deals = D.map((x, i) => ({ id: 'dl' + (i + 1), code: 'DL-' + String(i + 1).padStart(4, '0'), title: x[0], recordId: x[1], lineId: x[2], stageId: x[3], status: x[4], offer: x[5] * 1e6, value: x[6] === '' ? '' : x[6] * 1e6, ownerId: x[7], target: addDays(x[8]), closedAt: x[4] === 'Won' ? addDays(x[8]) : '', reason: x[4] === 'On Hold' ? 'Menunggu anggaran tahun depan' : '', reviewDate: x[4] === 'On Hold' ? addDays(21) : '', lostReason: '', service: x[0], createdAt: addDays(x[9]) }));
   // riwayat closing 10 bulan terakhir buat grafik
   const hist = [[9, 'um', 22, 'u2'], [8, 'um', 31, 'u4'], [7, 'um', 18, 'u3'], [6, 'um', 40, 'u2'], [5, 'um', 36, 'u3'], [4, 'um', 28, 'u3'], [3, 'um', 45, 'u2'], [2, 'um', 38, 'u4'], [1, 'um', 41, 'u3'], [0, 'um', 15, 'u4'], [5, 'um', 0, 'u2'], [2, 'um', 0, 'u3']];
   const recIds = ['r13', 'r2', 'r3', 'r1', 'r4', 'r12', 'r16', 'r7', 'r6', 'r14', 'r15', 'r11'];
