@@ -9,6 +9,7 @@ use App\Enums\Role;
 use App\Models\AccessGrant;
 use App\Models\ClientPartner;
 use App\Models\Deal;
+use App\Models\Interaction;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -177,6 +178,22 @@ class Access
 
         return $this->canEditDeal($user, $deal)
             && ($deal->owner_id === $user->id || ($user->role->isLead() && $sameDept));
+    }
+
+    /** Interaksi terlihat kalau boleh melihat interaksi dan data Client & Partner-nya. */
+    public function canViewInteraction(User $user, Interaction $interaction): bool
+    {
+        return $this->can($user, 'interaksi', AccessLevel::R)
+            && $interaction->clientPartner !== null
+            && $this->canViewRecord($user, $interaction->clientPartner);
+    }
+
+    /** Membatalkan catatan interaksi: pencatatnya sendiri, atau pengelola interaksi (level M). */
+    public function canCancelInteraction(User $user, Interaction $interaction): bool
+    {
+        return $interaction->cancelled_at === null
+            && ($interaction->user_id === $user->id || $this->level($user, 'interaksi') === AccessLevel::M)
+            && $this->can($user, 'interaksi', AccessLevel::C);
     }
 
     /** Mengatur pipeline dan stage tanpa developer (SRS 4.3). */

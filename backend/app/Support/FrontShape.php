@@ -2,8 +2,14 @@
 
 namespace App\Support;
 
+use App\Enums\DealStatus;
 use App\Models\ClientPartner;
 use App\Models\Contact;
+use App\Models\Deal;
+use App\Models\DealHistory;
+use App\Models\Interaction;
+use App\Models\Pipeline;
+use App\Models\Stage;
 use App\Models\User;
 use App\Services\Access;
 
@@ -30,6 +36,75 @@ class FrontShape
             'dept' => $user->department?->name,
             'role' => $user->role->value,
             'active' => $user->active,
+        ];
+    }
+
+    /** Pipeline dengan stage berurutan; stage Closing selalu yang terakhir. */
+    public static function line(Pipeline $p): array
+    {
+        return [
+            'id' => (string) $p->id,
+            'name' => $p->name,
+            'stages' => $p->stages->sortBy('position')->values()->map(fn (Stage $s) => ['id' => (string) $s->id, 'name' => $s->name])->all(),
+        ];
+    }
+
+    /** Deal. Nilai penawaran dan nilai deal dikosongkan untuk pengguna tanpa izin (SRS bagian 3). */
+    public static function deal(Deal $d, User $viewer, Access $access): array
+    {
+        $see = $access->canSeeDealValue($viewer, $d);
+        $money = fn ($v) => $see && $v !== null ? (int) round((float) $v) : '';
+
+        return [
+            'id' => (string) $d->id,
+            'code' => $d->code,
+            'title' => $d->title,
+            'service' => (string) $d->service,
+            'recordId' => (string) $d->client_partner_id,
+            'lineId' => (string) $d->pipeline_id,
+            'stageId' => (string) $d->stage_id,
+            'status' => $d->status->value,
+            'offer' => $money($d->offer_value),
+            'value' => $money($d->deal_value),
+            'valueHidden' => ! $see,
+            'ownerId' => (string) $d->owner_id,
+            'target' => $d->target_closing?->toDateString() ?? '',
+            'closedAt' => $d->closed_at?->toDateString() ?? '',
+            'lostReason' => (string) $d->lost_reason,
+            'reason' => (string) ($d->status === DealStatus::OnHold ? $d->hold_reason : $d->lost_note),
+            'reviewDate' => $d->review_date?->toDateString() ?? '',
+            'createdAt' => $d->created_at?->toDateString(),
+            'history' => $d->histories->map(fn (DealHistory $h) => [
+                'at' => $h->created_at?->toIso8601String(),
+                'by' => (string) $h->user_id,
+                'from' => (string) $h->from_stage_name,
+                'to' => (string) $h->to_stage_name,
+                'status' => $h->status->value,
+                'note' => (string) $h->note,
+            ])->values()->all(),
+        ];
+    }
+
+    /** Interaksi dan follow-up. */
+    public static function interaction(Interaction $i): array
+    {
+        return [
+            'id' => (string) $i->id,
+            'code' => $i->code,
+            'recordId' => (string) $i->client_partner_id,
+            'dealId' => $i->deal_id ? (string) $i->deal_id : '',
+            'type' => $i->type,
+            'date' => $i->occurred_on?->toDateString(),
+            'result' => $i->result,
+            'next' => (string) $i->next_action,
+            'fuDate' => $i->followup_on?->toDateString() ?? '',
+            'done' => $i->followup_done_at !== null,
+            'doneAt' => $i->followup_done_at?->toIso8601String() ?? '',
+            'cancelled' => $i->cancelled_at !== null,
+            'cancelledAt' => $i->cancelled_at?->toIso8601String() ?? '',
+            'cancelledBy' => $i->cancelled_by ? (string) $i->cancelled_by : '',
+            'cancelReason' => (string) $i->cancel_reason,
+            'by' => (string) $i->user_id,
         ];
     }
 

@@ -11,7 +11,9 @@ use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
 use App\Services\Duplicates;
+use App\Support\Codes;
 use App\Support\FrontShape;
+use App\Support\Notify;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -91,12 +93,11 @@ class ClientPartnerController extends Controller
         }
 
         $record = DB::transaction(function () use ($data, $category, $me, $pic) {
-            $id = (int) DB::selectOne("select nextval('client_partners_id_seq') as id")->id;
-            // Kode CP-#### mengikuti id, jadi id diambil dulu dari sequence.
+            [$id, $code] = Codes::next('client_partners', 'CP');
             $record = new ClientPartner;
             $record->forceFill([
                 'id' => $id,
-                'code' => 'CP-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT),
+                'code' => $code,
                 'name' => trim($data['name']),
                 'category' => $category,
                 'segment' => $data['segment'] ?? null,
@@ -117,7 +118,7 @@ class ClientPartnerController extends Controller
             }
             $this->audit->log('Tambah', self::ENTITY, $record->id, $record->name.' ('.$record->code.')', null, $record->getAttributes());
             if ($pic->id !== $me->id) {
-                $this->notify($pic, $me->name.' menjadikan kamu PIC '.$record->name, 'rec:'.$record->id);
+                Notify::send($pic, $me->name.' menjadikan kamu PIC '.$record->name, 'rec:'.$record->id);
             }
 
             return $record;
@@ -226,7 +227,7 @@ class ClientPartnerController extends Controller
         $original = $clientPartner->getRawOriginal();
         $clientPartner->update(['pic_id' => (int) $data['picId']]);
         $this->audit->changed(self::ENTITY, $clientPartner, $original, 'Pindah PIC: '.$data['reason']);
-        $this->notify(User::find($data['picId']), $me->name.' menjadikan kamu PIC '.$clientPartner->name, 'rec:'.$clientPartner->id);
+        Notify::send(User::find($data['picId']), $me->name.' menjadikan kamu PIC '.$clientPartner->name, 'rec:'.$clientPartner->id);
 
         return $this->respond($me, $clientPartner);
     }
@@ -355,11 +356,6 @@ class ClientPartnerController extends Controller
     private function authorizeView(User $user, ClientPartner $record): void
     {
         abort_unless($this->access->canViewRecord($user, $record) && $record->merged_into_id === null, 403, 'Kamu ga punya akses ke data ini.');
-    }
-
-    private function notify(User $user, string $text, string $link): void
-    {
-        DB::table('user_notifications')->insert(['user_id' => $user->id, 'text' => $text, 'link' => $link, 'created_at' => now()]);
     }
 
     private function invalid(string $field, string $message): JsonResponse

@@ -1,8 +1,7 @@
 /* OPTIMA CRM · sambungan ke backend Laravel (G1).
    Aktif hanya kalau halaman disajikan backend (window.OPTIMA_API). Tanpa backend, prototipe jalan seperti biasa.
-   Store.db tetap dipakai sebagai cache tampilan: login, pengguna, hak akses, daftar pilihan, dan Client & Partner
-   diisi dari server, dan semua perubahan Client & Partner dikirim ke server dulu. Deal, interaksi, dan pipeline
-   masih tersimpan di browser sampai G2. */
+   Store.db tetap dipakai sebagai cache tampilan: login, pengguna, hak akses, daftar pilihan, Client & Partner,
+   pipeline, deal, dan interaksi diisi dari server, dan setiap perubahan dikirim ke server dulu. */
 (() => {
   'use strict';
   if (!window.OPTIMA_API) return;
@@ -82,6 +81,8 @@
     db.users = b.users.map(u => Object.assign(u, prof[u.email.toLowerCase()] ? { profile: prof[u.email.toLowerCase()] } : {}));
     db.departments = b.departments; db.access = b.access; db.overrides = b.overrides; db.options = b.options;
     db.records = b.records.map(ensureRec);
+    // Sejak G2 pipeline, deal, dan interaksi juga datang dari server.
+    db.lines = b.lines; db.deals = b.deals; db.interactions = b.interactions;
     // Data yang direferensikan deal atau interaksi lokal tapi tidak boleh dilihat: tampil sebagai data tersembunyi.
     const ids = new Set(db.records.map(r => r.id));
     const missing = new Set([].concat((db.deals || []).map(d => d.recordId), (db.interactions || []).map(i => i.recordId)).filter(id => id && !ids.has(id)));
@@ -209,7 +210,89 @@
   Actions.cprimary = async (el) => { try { putRecord((await Api.post('contacts/' + el.dataset.c + '/primary')).data); render(); } catch (e) { fail(e); } };
   Actions.cremove = (el) => { const r = recById(el.dataset.v); const c = r.contacts.find(x => x.id === el.dataset.c); confirmApi({ title: 'Lepas kontak ' + esc(c.name) + '?', text: 'Kontak ini ga muncul lagi di data ' + esc(r.name) + '. Perubahannya tercatat di riwayat.', ok: 'Lepas' }, () => Api.del('contacts/' + c.id), () => toast('Kontak dilepas', c.name + ' ga muncul lagi di ' + r.name + '.', 'info')); };
 
-  /* ---------- fitur yang belum tersambung ke server (menyusul di G2) ---------- */
+  /* ---------- pipeline, deal, dan interaksi lewat API (G2) ---------- */
+  const putIn = (key, item) => { const list = Store.db[key]; const i = list.findIndex(x => x.id === item.id); if (i >= 0) list[i] = item; else list.push(item); Store.save(); return item; };
+  const putDeal = (d) => putIn('deals', d);
+  const putInt = (x) => putIn('interactions', x);
+  const putLine = (l) => putIn('lines', l);
+  const fmErr = (m, o, err) => { if (Object.keys(err).length) { Object.assign(m, { err, val: Object.assign({}, m.val, o), still: true }); render(); return true; } return false; };
+
+  const _moveDeal = moveDeal;
+  moveDeal = function (id, toStage) {
+    const d = findDeal(id); if (!d || !canEditDeal(d) || d.stageId === toStage) return;
+    const line = lineById(d.lineId);
+    // Deal yang bukan Open atau tujuan Closing tetap lewat form (buka kembali / Won) seperti biasa.
+    if (d.status !== 'Open' || isClosingStage(line, toStage)) return _moveDeal(id, toStage);
+    Api.post('deals/' + id + '/move', { stageId: Number(toStage) }).then(res => { putDeal(res.data); render(); }).catch(e => fail(e));
+  };
+  Forms.deal = async (o) => {
+    const m = App.modal; const err = {};
+    if (!o.title) err.title = 'Judul wajib diisi.'; if (!o.recordId) err.recordId = 'Pilih Client & Partner.';
+    if (fmErr(m, o, err)) return;
+    const body = {}; ['title', 'recordId', 'lineId', 'stageId', 'ownerId', 'target', 'service'].forEach(k => { if (o[k] !== undefined && o[k] !== '') body[k] = o[k]; });
+    if (o.offer !== undefined) body.offer = o.offer === '' ? null : num(o.offer);
+    try {
+      const res = m.deal ? await Api.patch('deals/' + m.deal.id, body) : await Api.post('deals', body);
+      const d = putDeal(res.data); App.modal = null; if (!m.deal) App.ui.pl.line = d.lineId; render();
+      toast(m.deal ? 'Tersimpan!' : 'Deal masuk!', m.deal ? d.title + ' diperbarui.' : d.title + ' ada di ' + ((stageOf(d) || {}).name || '') + '.');
+    } catch (e) { fail(e, m); }
+  };
+  Forms.closing = async (o) => {
+    const m = App.modal; const err = {};
+    if (!num(o.value)) err.value = 'Nilai deal wajib diisi buat Won.'; if (!o.closedAt) err.closedAt = 'Tanggal closing wajib diisi.';
+    if (Object.keys(err).length) { m.err = err; m.value = o.value; m.closedAt = o.closedAt; m.still = true; render(); return; }
+    try { const d = putDeal((await Api.post('deals/' + m.dealId + '/won', { value: num(o.value), closedAt: o.closedAt })).data); App.modal = null; render(); toast('Deal won. Keren!', d.title + (canSeeValue(d) ? ', ' + fmtRp(d.value) : '') + '.'); } catch (e) { m.value = o.value; m.closedAt = o.closedAt; fail(e, m); }
+  };
+  Forms.dstatus = async (o) => {
+    const m = App.modal; const st = m.st; Object.assign(m, o);
+    const req = (keys, msg) => { const err = {}; keys.forEach(k => { if (!o[k]) err[k] = msg[k]; }); if (Object.keys(err).length) { m.err = err; m.still = true; render(); return true; } return false; };
+    try {
+      let res, note;
+      if (st === 'Lost') { if (req(['lostReason'], { lostReason: 'Pilih alasan gagal.' })) return; res = await Api.post('deals/' + m.dealId + '/lost', { lostReason: o.lostReason, note: o.reason || '' }); note = ['Dicatat Lost', ' keluar dari papan aktif.', 'info']; }
+      else if (st === 'On Hold') { if (req(['reason', 'reviewDate'], { reason: 'Isi alasannya.', reviewDate: 'Isi tanggal tinjau ulang.' })) return; res = await Api.post('deals/' + m.dealId + '/hold', { reason: o.reason, reviewDate: o.reviewDate }); note = ['Ditunda dulu', ' diingatkan lagi ' + fmtShort(o.reviewDate) + '.', 'info']; }
+      else { res = await Api.post('deals/' + m.dealId + '/reopen', { toStage: Number(o.toStage), reason: o.reason || '' }); note = ['Deal aktif lagi', ' balik ke Open.', 'info']; }
+      const d = putDeal(res.data); App.modal = null; render(); toast(note[0], d.title + note[1], note[2]);
+    } catch (e) { fail(e, m); }
+  };
+  Forms.int = async (o) => {
+    const m = App.modal; const err = {};
+    if (!o.recordId) err.recordId = 'Cari lalu pilih Client & Partner.'; if (!o.result) err.result = 'Isi hasil pembicaraan.';
+    if (o.fuDate && o.date && o.fuDate < o.date) err.fuDate = 'Follow-up ga bisa sebelum tanggal interaksi.';
+    if (o.dealId === 'new' && !o.dealTitle) err.dealTitle = 'Kasih judul deal-nya.';
+    if (fmErr(m, o, err)) return;
+    const body = { recordId: o.recordId, type: o.type, date: o.date || today(), result: o.result, next: o.next || '', fuDate: o.fuDate || null, dealId: o.dealId || '' };
+    if (o.dealTitle) body.dealTitle = o.dealTitle; if (o.lineId) body.lineId = o.lineId; if (o.toStage) body.toStage = o.toStage;
+    try {
+      const res = await Api.post('interactions', body);
+      putInt(res.data); if (res.deal) putDeal(res.deal);
+      if (res.needsClosing && res.deal) { App.modal = { kind: 'closing', dealId: res.deal.id, st: 'Won' }; render(); toast('Kecatat!', 'Sekarang isi hasil closing ' + res.deal.title + '.', 'info'); return; }
+      App.modal = null; render();
+      toast('Kecatat!', res.deal ? res.deal.title + ': ' + (res.data.next.split(':')[0] || '').toLowerCase() + '.' : (o.fuDate ? 'Follow-up ' + fmtShort(o.fuDate) + ' masuk antrian.' : 'Interaksi tersimpan.'));
+    } catch (e) { fail(e, m); }
+  };
+  Actions.fudone = async (el) => {
+    try { const i = putInt((await Api.post('interactions/' + el.dataset.v + '/done')).data); render(); toast('Nice, beres!', ((recById(i.recordId) || {}).name || 'Follow-up') + ' ditandai selesai.'); } catch (e) { fail(e); }
+  };
+  Forms.cancelint = async (o) => {
+    const m = App.modal; if (!o.reason) { m.err = { reason: 'Isi alasan pembatalan.' }; m.still = true; render(); return; }
+    try { putInt((await Api.post('interactions/' + m.id + '/cancel', { reason: o.reason })).data); App.modal = null; render(); toast('Catatan dibatalkan', 'Tetap kelihatan di riwayat dengan tanda batal.', 'info'); } catch (e) { fail(e, m); }
+  };
+  Forms.stage = async (o) => {
+    const m = App.modal; if (!o.name) { m.err = { name: 'Nama stage wajib diisi.' }; m.still = true; render(); return; }
+    try {
+      const res = m.stageId ? await Api.patch('stages/' + m.stageId, { name: o.name }) : await Api.post('pipelines/' + App.ui.pl.line + '/stages', { name: o.name, after: o.after || null });
+      putLine(res.data); App.modal = null; App.anim = true; render(); if (!m.stageId) toast('Stage baru!', o.name + ' siap dipakai.');
+    } catch (e) { fail(e, m); }
+  };
+  Forms.line = async (o) => {
+    const m = App.modal; if (!o.name) { m.err = { name: 'Nama wajib diisi.' }; m.still = true; render(); return; }
+    try { const l = putLine((await Api.post('pipelines', { name: o.name, stages: o.stages || '' })).data); App.ui.pl.line = l.id; App.modal = null; go('pipeline'); toast('Pipeline baru!', l.name + ' udah ada.'); } catch (e) { fail(e, m); }
+  };
+  Actions.delstage = async (el) => {
+    try { putLine((await Api.del('stages/' + el.dataset.v)).data); App.modal = null; render(); } catch (e) { fail(e, App.modal); }
+  };
+
+  /* ---------- fitur yang belum tersambung ke server ---------- */
   const later = (what) => () => toast(what + ' belum tersambung', 'Bagian ini masuk tahap berikutnya (G2). Data di server ga berubah.', 'info');
   Actions.mergerec = later('Gabung data ganda');
   window.readImport = later('Import data');

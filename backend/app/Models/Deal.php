@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /** Deal di pipeline (SRS 4.3). Nilai deal hanya dikirim ke pengguna yang berizin. */
-#[Fillable(['code', 'title', 'service', 'client_partner_id', 'pipeline_id', 'stage_id', 'status', 'owner_id', 'offer_value', 'deal_value', 'target_closing', 'closed_at', 'lost_reason', 'hold_reason', 'review_date', 'created_by'])]
+#[Fillable(['code', 'title', 'service', 'client_partner_id', 'pipeline_id', 'stage_id', 'status', 'owner_id', 'offer_value', 'deal_value', 'target_closing', 'closed_at', 'lost_reason', 'lost_note', 'hold_reason', 'review_date', 'created_by'])]
 class Deal extends Model
 {
     protected function casts(): array
