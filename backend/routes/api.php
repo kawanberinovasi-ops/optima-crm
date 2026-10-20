@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\ClientPartnerController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DealController;
 use App\Http\Controllers\InteractionController;
+use App\Http\Controllers\MeController;
 use App\Http\Controllers\PipelineController;
 use Illuminate\Support\Facades\Route;
 
@@ -60,4 +62,24 @@ Route::middleware('crm')->group(function () {
     Route::post('interactions', [InteractionController::class, 'store']);
     Route::post('interactions/{interaction}/done', [InteractionController::class, 'done']);
     Route::post('interactions/{interaction}/cancel', [InteractionController::class, 'cancel']);
+
+    // Pemberitahuan dan tampilan tersimpan milik pengguna
+    Route::post('notifications/read', [MeController::class, 'readNotifications']);
+    Route::post('saved-views', [MeController::class, 'storeView']);
+    Route::delete('saved-views/{view}', [MeController::class, 'destroyView']);
+
+    // Akses & Audit (SRS bagian 3)
+    Route::post('users', [AdminController::class, 'storeUser']);
+    Route::patch('users/{user}', [AdminController::class, 'updateUser']);
+    Route::post('departments', [AdminController::class, 'storeDepartment']);
+    Route::patch('departments/{department}', [AdminController::class, 'updateDepartment']);
+    Route::delete('departments/{department}', [AdminController::class, 'destroyDepartment']);
+    Route::put('access-grants', [AdminController::class, 'updateGrant']);
+    Route::post('access-overrides', [AdminController::class, 'storeOverride']);
+    Route::delete('access-overrides/{override}', [AdminController::class, 'destroyOverride']);
+    Route::post('option-lists', [AdminController::class, 'storeOption']);
+    Route::delete('option-lists', [AdminController::class, 'destroyOption']);
+    Route::get('audit-logs', [AdminController::class, 'auditLogs']);
+    Route::get('audit-logs/export', [AdminController::class, 'exportAudit']);
+    Route::get('changes', [AdminController::class, 'changes']);
 });

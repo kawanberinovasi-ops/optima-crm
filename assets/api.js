@@ -83,6 +83,7 @@
     db.records = b.records.map(ensureRec);
     // Sejak G2 pipeline, deal, dan interaksi juga datang dari server.
     db.lines = b.lines; db.deals = b.deals; db.interactions = b.interactions;
+    db.notifs = b.notifs; db.views = b.views; db.audit = b.audit; db.changes = b.changes;
     // Data yang direferensikan deal atau interaksi lokal tapi tidak boleh dilihat: tampil sebagai data tersembunyi.
     const ids = new Set(db.records.map(r => r.id));
     const missing = new Set([].concat((db.deals || []).map(d => d.recordId), (db.interactions || []).map(i => i.recordId)).filter(id => id && !ids.has(id)));
@@ -292,13 +293,53 @@
     try { putLine((await Api.del('stages/' + el.dataset.v)).data); App.modal = null; render(); } catch (e) { fail(e, App.modal); }
   };
 
+  /* ---------- Akses & Audit, pemberitahuan, tampilan tersimpan lewat API (G2) ---------- */
+  // Setelah pengaturan admin berubah, isi Store dimuat ulang supaya hak akses di layar sama dengan di server.
+  const refresh = async (okTitle, okText) => { await loadBootstrap(); App.modal = null; render(); if (okTitle) toast(okTitle, okText || '', 'info'); };
+  const adminCall = (call, okTitle, okText, m) => call().then(() => refresh(okTitle, okText)).catch(e => { fail(e, m); render(); });
+  Forms.user = (o) => {
+    const m = App.modal; const err = {}; if (!o.name) err.name = 'Nama wajib diisi.'; if (!emailOk(o.email || '')) err.email = 'Format email belum benar.';
+    if (fmErr(m, o, err)) return;
+    adminCall(() => Api.post('users', { name: o.name, email: o.email, dept: o.dept, role: o.role }), 'Pengguna masuk!', o.name + ' bisa login lewat SSO.', m);
+  };
+  Actions.toggleuser = (el) => { const u = userById(el.dataset.v); adminCall(() => Api.patch('users/' + u.id, { active: !u.active }), u.active ? 'Dinonaktifkan' : 'Diaktifkan', u.name + (u.active ? ' langsung keluar dari sistem.' : ' bisa login lagi.')); };
+  Changes.udept = (el) => adminCall(() => Api.patch('users/' + el.dataset.v, { dept: el.value }), 'Tersimpan', 'Department diganti.');
+  Changes.urole = (el) => adminCall(() => Api.patch('users/' + el.dataset.v, { role: el.value }), 'Tersimpan', 'Role diganti.');
+  Changes.acc = (el) => adminCall(() => req('PUT', 'access-grants', { dept: el.dataset.d, entity: el.dataset.k, level: el.value }), 'Hak akses diubah', el.dataset.d + ' · ' + el.dataset.k + ': ' + el.value);
+  Forms.dept = (o) => {
+    const m = App.modal; if (!o.name) { m.err = { name: 'Nama wajib diisi.' }; m.still = true; render(); return; }
+    adminCall(() => m.id ? Api.patch('departments/' + m.id, { name: o.name }) : Api.post('departments', { name: o.name }), 'Tersimpan', o.name, m);
+  };
+  Actions.deldept = (el) => adminCall(() => Api.del('departments/' + el.dataset.v), 'Department dihapus');
+  Forms.override = (o) => {
+    const m = App.modal; m.val = o; const err = {}; if (!o.userId) err.userId = 'Pilih pengguna.'; if (!o.reason) err.reason = 'Isi alasannya.';
+    if (fmErr(m, o, err)) return;
+    adminCall(() => Api.post('access-overrides', { userId: o.userId, key: o.key, value: o.value, reason: o.reason }), 'Pengecualian disimpan', userName(o.userId) + ' · ' + (KEY_LABEL[o.key] || o.key) + ' ' + o.value, m);
+  };
+  Actions.ovdel = (el) => adminCall(() => Api.del('access-overrides/' + el.dataset.v), 'Pengecualian dicabut');
+  Forms.optadd = async (o) => { if (!o.v) return; try { Store.db.options = (await Api.post('option-lists', { list: o.k, value: o.v })).data; Store.save(); render(); toast('Ditambah', o.v + ' masuk daftar.', 'info'); } catch (e) { fail(e); } };
+  Actions.optdel = async (el) => { try { Store.db.options = (await req('DELETE', 'option-lists', { list: el.dataset.k, value: el.dataset.v })).data; Store.save(); render(); } catch (e) { fail(e); } };
+  Actions.exportaudit = () => { location.href = BASE + '/audit-logs/export'; };
+  Actions.notifall = async () => { try { Store.db.notifs = (await Api.post('notifications/read')).data; Store.save(); render(); } catch (e) { fail(e); } };
+  const _notifopen = Actions.notifopen;
+  Actions.notifopen = (el) => { Api.post('notifications/read', { id: Number(el.dataset.v) }).catch(() => {}); _notifopen(el); };
+  Forms.view = async (o) => {
+    const m = App.modal; if (!o.name) { m.err = { name: 'Kasih nama tampilannya.' }; m.still = true; render(); return; }
+    const ui = App.ui.cp;
+    try { Store.db.views = (await Api.post('saved-views', { name: o.name, filter: { cat: ui.cat, dept: ui.dept, q: ui.q, sort: ui.sort, arch: !!ui.arch } })).data; Store.save(); App.modal = null; render(); toast('Tampilan disimpan', o.name + ' bisa dipakai kapan aja.'); } catch (e) { fail(e, m); }
+  };
+  Actions.viewdel = async (el) => { try { Store.db.views = (await Api.del('saved-views/' + el.dataset.v)).data; Store.save(); render(); } catch (e) { fail(e); } };
+  // Audit log dan riwayat data dimuat ulang setiap kali halaman Akses & Audit dibuka.
+  window.addEventListener('hashchange', () => {
+    if (!me() || !/^#\/akses/.test(location.hash) || !canViewAdmin()) return;
+    Promise.all([Api.get('audit-logs'), Api.get('changes')]).then(([a, c]) => { Store.db.audit = a.data; Store.db.changes = c.data; Store.save(); render(); }).catch(() => {});
+  });
+
   /* ---------- fitur yang belum tersambung ke server ---------- */
-  const later = (what) => () => toast(what + ' belum tersambung', 'Bagian ini masuk tahap berikutnya (G2). Data di server ga berubah.', 'info');
+  const later = (what) => () => toast(what + ' belum tersambung', 'Bagian ini masih disiapkan. Data di server ga berubah.', 'info');
   Actions.mergerec = later('Gabung data ganda');
   window.readImport = later('Import data');
-  ['toggleuser', 'deldept', 'ovdel', 'optdel', 'resetdata'].forEach(k => { if (Actions[k]) Actions[k] = later('Pengaturan admin'); });
-  ['user', 'dept', 'override', 'optadd'].forEach(k => { if (Forms[k]) Forms[k] = () => { App.modal = null; later('Pengaturan admin')(); render(); }; });
-  ['udept', 'urole', 'acc'].forEach(k => { if (Changes[k]) Changes[k] = () => { later('Pengaturan admin')(); render(); }; });
+  Actions.resetdata = () => toast('Reset data contoh', 'Cuma ada di mode lokal tanpa server.', 'info');
 
   /* ---------- boot ---------- */
   async function boot() {

@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Category;
-use App\Models\AuditLog;
 use App\Models\ClientPartner;
 use App\Models\Contact;
 use App\Models\Department;
 use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
+use App\Services\ChangeHistory;
 use App\Services\Duplicates;
 use App\Support\Codes;
 use App\Support\FrontShape;
@@ -246,52 +246,12 @@ class ClientPartnerController extends Controller
     }
 
     /** Riwayat perubahan satu data (FR-AUD-02), dalam bentuk "changes" yang dipakai frontend. */
-    public function history(Request $request, ClientPartner $clientPartner): JsonResponse
+    public function history(Request $request, ClientPartner $clientPartner, ChangeHistory $history): JsonResponse
     {
         $this->authorizeView($request->user(), $clientPartner);
-        $seeRate = $this->access->canSeeRateCard($request->user());
-        $users = User::pluck('name', 'id');
-        $depts = Department::pluck('name', 'id');
-        $show = function (string $field, $value) use ($users, $depts, $seeRate) {
-            return match (true) {
-                $value === null || $value === '' => '',
-                $field === 'pic_id' => $users[$value] ?? '',
-                $field === 'department_id' => $depts[$value] ?? '',
-                $field === 'archived_at' => 'Diarsipkan',
-                $field === 'rate_card' => $seeRate ? 'Rp '.number_format((float) ((is_array($value) ? $value : json_decode((string) $value, true))['rate'] ?? 0), 0, ',', '.') : 'Rp ···',
-                default => is_scalar($value) ? (string) $value : json_encode($value),
-            };
-        };
 
-        $rows = [];
-        foreach (AuditLog::where('entity_type', self::ENTITY)->where('entity_id', $clientPartner->id)->orderByDesc('id')->get() as $log) {
-            $base = ['at' => $log->created_at->toIso8601String(), 'by' => (string) $log->user_id, 'kind' => 'record', 'refId' => (string) $clientPartner->id, 'note' => (string) $log->summary];
-            $fields = array_intersect_key($log->after ?? [], FrontShape::RECORD_LABELS + self::CONTACT_LABELS);
-            if ($log->action === 'Tambah' || $fields === []) {
-                // Tanpa field yang berubah (misalnya data dibuat): tampilkan ringkasannya sebagai isi baru.
-                $rows[] = ['id' => (string) $log->id, 'field' => $log->action === 'Tambah' ? 'Data dibuat' : $log->action, 'before' => '', 'after' => (string) $log->summary] + $base;
-                $rows[array_key_last($rows)]['note'] = '';
-
-                continue;
-            }
-            foreach ($fields as $field => $after) {
-                $before = ($log->before ?? [])[$field] ?? null;
-                $label = FrontShape::RECORD_LABELS[$field] ?? self::CONTACT_LABELS[$field];
-                $rows[] = $base + [
-                    'id' => $log->id.'-'.$field, 'field' => $label,
-                    'before' => $field === 'archived_at' ? ($before ? 'Diarsipkan' : 'Aktif') : $show($field, $before),
-                    'after' => $field === 'archived_at' ? ($after ? 'Diarsipkan' : 'Aktif') : $show($field, $after),
-                ];
-            }
-        }
-
-        return response()->json(['data' => $rows]);
+        return response()->json(['data' => $history->forEntity(self::ENTITY, $clientPartner->id, $request->user())]);
     }
-
-    public const CONTACT_LABELS = [
-        'contact.name' => 'Nama kontak', 'contact.title' => 'Jabatan kontak', 'contact.email' => 'Email kontak',
-        'contact.phone' => 'Telepon kontak', 'contact.primary' => 'Kontak utama', 'contact' => 'Kontak',
-    ];
 
     /** Field kontak utama dari form utama (contact, title, cEmail, phone). */
     private function updatePrimaryContact(ClientPartner $record, array $data): void

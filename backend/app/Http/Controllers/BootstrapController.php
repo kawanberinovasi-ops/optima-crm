@@ -5,14 +5,15 @@ namespace App\Http\Controllers;
 use App\Enums\AccessLevel;
 use App\Models\AccessGrant;
 use App\Models\AccessOverride;
+use App\Models\AuditLog;
 use App\Models\ClientPartner;
 use App\Models\Deal;
 use App\Models\Department;
 use App\Models\Interaction;
-use App\Models\OptionList;
 use App\Models\Pipeline;
 use App\Models\User;
 use App\Services\Access;
+use App\Services\ChangeHistory;
 use App\Support\FrontShape;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,8 +21,6 @@ use Illuminate\Http\Request;
 /** Data awal frontend: info halaman login (publik) dan isi Store setelah login. */
 class BootstrapController extends Controller
 {
-    private const OPTION_KEYS = ['segments' => 'segments', 'sources' => 'sources', 'interaction_types' => 'intTypes', 'lost_reasons' => 'lostReasons'];
-
     /** Publik: apa saja cara login yang tersedia. Daftar akun uji hanya ada di APP_ENV=local. */
     public function session(Request $request): JsonResponse
     {
@@ -37,7 +36,7 @@ class BootstrapController extends Controller
         ]);
     }
 
-    public function bootstrap(Request $request, Access $access): JsonResponse
+    public function bootstrap(Request $request, Access $access, ChangeHistory $history): JsonResponse
     {
         $me = $request->user()->load('department');
 
@@ -52,10 +51,7 @@ class BootstrapController extends Controller
             ->map(fn (AccessOverride $o) => ['id' => (string) $o->id, 'userId' => (string) $o->user_id, 'key' => $o->entity, 'value' => $o->level, 'reason' => (string) $o->reason])
             ->values();
 
-        $options = array_fill_keys(array_values(self::OPTION_KEYS), []);
-        foreach (OptionList::where('active', true)->orderBy('position')->get() as $o) {
-            $options[self::OPTION_KEYS[$o->list]][] = $o->value;
-        }
+        $options = AdminController::optionsShape();
 
         $records = $access->scopeClientPartners(ClientPartner::query(), $me)
             ->with(['contacts', 'department'])
@@ -85,6 +81,11 @@ class BootstrapController extends Controller
             'overrides' => $overrides,
             'options' => $options,
             'records' => $records,
+            'notifs' => MeController::notifications($me->id),
+            'views' => MeController::views($me->id),
+            // Audit log dan riwayat data hanya untuk yang boleh membuka Akses & Audit.
+            'audit' => $access->canViewAdmin($me) ? AdminController::auditShape(AuditLog::orderByDesc('id')->limit(500)->get()) : [],
+            'changes' => $access->canViewAdmin($me) ? $history->latest($me) : [],
             'session' => [
                 'loginAt' => (int) $request->session()->get('login_at'),
                 'idleMinutes' => (int) config('session.lifetime'),
