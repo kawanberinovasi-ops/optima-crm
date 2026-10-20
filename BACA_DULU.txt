@@ -1,0 +1,63 @@
+OPTIMA CRM, versi uji lokal (Expressive Glossy)
+================================================
+
+Cara buka lewat terminal
+  Mac / Linux:   cd optima-crm && ./start.sh
+  Windows:       cd optima-crm  lalu  start.bat
+  Pakai Node:    cd optima-crm && npm start
+Lalu buka http://localhost:5173 (biasanya kebuka otomatis).
+Klik "Masuk dengan SSO OPTIMA", lalu pilih akun uji. Ctrl+C buat berhenti.
+
+Tanpa terminal: klik dua kali index.html juga bisa.
+
+Ga perlu install apa pun. Font diambil dari Google Fonts, jadi tampilannya
+paling pas kalau lagi online. Kalau offline, aplikasi tetap jalan pakai
+font bawaan perangkat.
+
+Akun uji (tanpa password)
+- Admin Uji, Super Admin, Executive: akses penuh, termasuk Akses & Audit
+- Rina Pratama, Kepala Department, Commercial
+- Ayu Safitri, Koordinator, Commercial
+- Dimas Aksara, Staf, Commercial
+- Dewi Wulandari, Staf, Digital Campaign
+- Bayu Nugroho, Staf, Customer Service
+- Sari Melati, Viewer, Business Operation: cuma bisa lihat
+
+Ganti akun kapan aja lewat tombol department di kiri atas (sebelah logo).
+Hak akses tiap akun mengikuti matriks di SRS bagian 3 dan bisa diubah
+Super Admin di menu profil > Akses & Audit > Hak akses.
+
+Yang bisa dicoba
+- My Work: antrian follow-up, tandai Done, catat interaksi.
+- Client & Partner: tambah, edit, hapus, cari, filter, detail, riwayat.
+  Import pakai assets/Contoh_Import_CRM_OPTIMA.xlsx (format sama dengan
+  template klien). Ada satu baris yang sengaja salah supaya pengecekan
+  kelihatan. Coba import pakai akun Admin Uji supaya semua kategori masuk.
+- Pipeline: pindah stage dengan drag atau tombol panah, Closing minta hasil
+  Won, Lost, atau On Hold. Tambah, ganti nama, atau hapus stage. Tambah lini
+  bisnis baru. Filter bulan, quarter, dan tahun.
+- Dashboard: angka per periode, grafik 12 bulan, funnel, dan tim.
+- Akses & Audit: pengguna, department, matriks hak akses, dan audit log
+  (bisa diunduh CSV).
+- Pencarian cepat: tekan Ctrl+K (Windows) atau Cmd+K (Mac).
+
+Fitur tambahan (versi 3, sesuai SRS v0.2)
+- Data ga dihapus, tapi diarsipkan dan bisa dipulihkan (tab Arsip).
+- Catatan interaksi dibatalkan dengan alasan, bukan dihapus.
+- Closing berarti Won. Lost dan On Hold diatur dari detail deal, stage terakhir
+  tetap tersimpan. Buka kembali deal sesuai role. Riwayat stage ada di detail deal.
+- Banyak kontak per data, Jadikan Client, Pindah PIC, cek data ganda, gabung
+  data ganda, tampilan tersimpan, riwayat perubahan, dan batalkan import.
+- Pipeline tampilan Papan dan Daftar, Dashboard pipeline dan Dashboard CRM.
+- Akses & Audit: pengecualian hak akses per orang, daftar pilihan, riwayat data.
+- Sesi berakhir setelah 60 menit ga aktif atau 12 jam. Coba lewat menu profil >
+  Coba sesi berakhir.
+- Pemberitahuan di lonceng, halaman 404, dan tampilan sedang memuat.
+Catatan: data contoh di browser direset sekali karena struktur datanya berubah.
+
+Catatan penting
+- Semua data adalah data contoh, dan cuma tersimpan di browser yang dipakai.
+  Tiap orang dan tiap browser punya data sendiri-sendiri.
+- Reset ke data awal lewat menu profil > Reset data contoh (akun Admin Uji).
+- Ini prototipe buat dicoba alurnya. Login SSO, database server, dan
+  pengiriman email belum tersambung.

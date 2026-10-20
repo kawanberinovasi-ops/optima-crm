@@ -1,0 +1,9 @@
+{
+  "name": "optima-crm-lokal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OPTIMA CRM versi uji lokal (data contoh)",
+  "scripts": {
+    "start": "npx --yes serve -l 5173 ."
+  }
+}
