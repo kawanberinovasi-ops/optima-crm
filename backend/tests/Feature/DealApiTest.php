@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\Category;
 use App\Enums\DealStatus;
 use App\Enums\Role;
+use App\Models\AccessOverride;
 use App\Models\AuditLog;
 use App\Models\ClientPartner;
 use App\Models\Deal;
@@ -112,7 +113,7 @@ class DealApiTest extends TestCase
         $deal = $this->newDeal($this->user());
         $other = $this->user('Executive', Role::Staf);
         // Executive punya deal M, jadi pakai pengecualian C untuk menguji aturan "punya sendiri".
-        \App\Models\AccessOverride::create(['user_id' => $other->id, 'entity' => 'deal', 'level' => 'C']);
+        AccessOverride::create(['user_id' => $other->id, 'entity' => 'deal', 'level' => 'C']);
 
         $this->as($other)->postJson('/api/deals/'.$deal['id'].'/move', ['stageId' => $this->stage('Meeting')])->assertForbidden();
     }

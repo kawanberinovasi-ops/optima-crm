@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AccessLevel;
 use App\Enums\Role;
 use App\Models\AccessGrant;
 use App\Models\Department;
@@ -84,13 +85,13 @@ class AdminApiTest extends TestCase
     public function test_access_grant_change_takes_effect_and_is_audited(): void
     {
         $staff = $this->user('Digital Campaign');
-        $this->assertFalse(app(Access::class)->can($staff, 'deal', \App\Enums\AccessLevel::R));
+        $this->assertFalse(app(Access::class)->can($staff, 'deal', AccessLevel::R));
 
         $this->as($this->admin())->putJson('/api/access-grants', ['dept' => 'Digital Campaign', 'entity' => 'deal', 'level' => 'R'])->assertOk();
         $this->as($this->admin())->putJson('/api/access-grants', ['dept' => 'Digital Campaign', 'entity' => 'nilai', 'level' => 'M'])->assertStatus(422);
 
         app(Access::class)->forget();
-        $this->assertTrue(app(Access::class)->can($staff, 'deal', \App\Enums\AccessLevel::R));
+        $this->assertTrue(app(Access::class)->can($staff, 'deal', AccessLevel::R));
         $this->assertDatabaseHas('audit_logs', ['entity_type' => 'Hak akses', 'summary' => 'Digital Campaign · deal: N jadi R']);
     }
 

@@ -1,9 +1,10 @@
 # Persiapan backend OPTIMA CRM
 
 Acuan: SRS CRM & SSO Foundation OPTIMA v0.2 (13 Okt 2026) dan prototipe di folder ini (`assets/*.js`).
-Status: G0 dan G1 sudah ada di `backend/` (skema, hak akses, login SSO Google, aturan sesi, API Client & Partner, 65 test).
-Frontend sudah memakai API untuk login, pengguna, hak akses, dan Client & Partner. Deal, interaksi, pipeline, dashboard,
-import, dan pengaturan admin masih di browser sampai G2.
+Status: G0, G1, dan G2 sudah ada di `backend/` (106 test). Semua data dan perubahan di frontend lewat API: login SSO
+Google, sesi, Client & Partner, kontak, data ganda, gabung data, pipeline dan stage, deal, interaksi dan follow-up,
+import dan batalkan import, Akses & Audit, pemberitahuan, tampilan tersimpan, dan email ringkasan 08.00.
+Yang belum: login cadangan kode email (FR-AUT-04, Should), tes login Google sungguhan, dan persiapan deploy.
 
 ## 1. Keputusan
 
@@ -172,13 +173,23 @@ dengan data contoh terpisah.
 - Folder `assets/` disajikan lewat symlink `backend/public/assets -> ../../assets`. Untuk deploy ke Laravel Cloud,
   folder frontend perlu disalin ke `public/` saat build. Ini dibereskan sebelum G0 di hosting.
 
-Yang masih di browser sampai G2 (perubahannya tidak dikirim ke server):
+Email ringkasan 08.00 WIB (`php artisan optima:daily-digest`, coba dulu dengan `--dry-run`):
 
-- Deal, pipeline, interaksi, follow-up, dashboard, notifikasi, tampilan tersimpan, profil, dan tema.
-- Gabung data ganda, import, dan pengaturan admin (pengguna, department, hak akses, daftar pilihan) menampilkan
-  pesan "belum tersambung" supaya tidak ada perubahan yang hanya tersimpan di satu browser.
-- Halaman Client & Partner memuat semua data yang boleh dilihat sekaligus. Untuk target 20.000 data (SRS §8.1)
-  daftar perlu pindah ke halaman dari server (endpoint `GET /api/client-partners` sudah mendukung `page`).
+- Di server perlu cron `* * * * * php artisan schedule:run` (Laravel Cloud punya pengaturan scheduler sendiri).
+- `OPTIMA_MAIL_ALLOWED_DOMAINS` (default `contoh.test`) membatasi alamat tujuan selama tahap awal, sesuai SRS 8.2.
+  Alamat di luar daftar tetap dapat pemberitahuan di aplikasi, tapi tidak dikirimi email.
+- `OPTIMA_MAIL_DAILY_LIMIT` (default 200) membatasi jumlah email per hari.
+- Selama `MAIL_MAILER=log`, email hanya ditulis ke `storage/logs/laravel.log`. Isi pengaturan SMTP pengembangan di `.env`
+  untuk mengirim sungguhan.
+
+Yang masih tersimpan di browser (per orang, tidak dikirim ke server): profil (foto, bio) dan pilihan tema.
+
+Yang perlu dicek sebelum UAT:
+
+- Dashboard dan halaman Client & Partner memuat semua data yang boleh dilihat sekaligus, lalu menghitung di browser.
+  Untuk target 20.000 data (SRS §8.1) ini perlu diuji beban pada hari 9–10; kalau lambat, daftar dan angka dashboard
+  dipindah ke perhitungan server (endpoint `GET /api/client-partners` sudah mendukung `page`).
+- Import menerima kolom opsional "Tanggal dibuat" di sheet 9. Template klien belum punya kolom ini.
 
 ### Catatan dari pembangunan G0
 
@@ -195,5 +206,5 @@ Yang masih di browser sampai G2 (perubahannya tidak dikirim ke server):
 |---|---|
 | G0, hari 3 | ✅ Laravel + Postgres jalan, migrasi semua tabel, seeder data contoh (dipindah dari `seed()` di `assets/data.js`), service hak akses + test per role |
 | G1, hari 5 | ✅ Login SSO Google, sesi 60 menit / 12 jam, Client & Partner (tambah, ubah, arsip, pulihkan, Lead jadi Client, pindah PIC, riwayat), kontak, cek data ganda. Frontend modul ini sudah memakai API. Login cadangan kode email (Should) belum |
-| G2, hari 10 | Interaksi, follow-up, pipeline, deal, dashboard, import/export, audit, email ringkasan. Semua Must lulus, tidak ada bug S1/S2 |
+| G2, hari 10 | ✅ Interaksi, follow-up, pipeline, deal, import (cek, simpan, batalkan), gabung data, Akses & Audit, audit CSV, pemberitahuan, tampilan tersimpan, email ringkasan. Dashboard dan export dihitung di browser dari data server yang sudah disaring hak aksesnya |
 | G3–G5 | Perbaikan UAT, uji beban 20.000 data, migrasi data asli tahap 3, uji pemulihan backup, serah terima |
