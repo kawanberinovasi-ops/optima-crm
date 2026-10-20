@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Access;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +12,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Satu instance per request, supaya cache level hak akses tidak terbawa ke request lain.
+        $this->app->scoped(Access::class);
     }
 
     /**

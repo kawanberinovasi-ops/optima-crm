@@ -34,7 +34,7 @@ return new class extends Migration
             $table->index(['client_partner_id', 'occurred_on']);
             $table->index('user_id');
         });
-        DB::statement("alter table interactions add constraint interactions_cancel_needs_reason check (cancelled_at is null or cancel_reason is not null)");
+        DB::statement('alter table interactions add constraint interactions_cancel_needs_reason check (cancelled_at is null or cancel_reason is not null)');
         // Follow-up yang masih terbuka, untuk My Work dan email ringkasan 08.00.
         DB::statement('create index interactions_open_followups on interactions (followup_on) where followup_on is not null and followup_done_at is null and cancelled_at is null');
     }

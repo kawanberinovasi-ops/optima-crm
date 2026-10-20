@@ -1,16 +1,16 @@
 # Persiapan backend OPTIMA CRM
 
 Acuan: SRS CRM & SSO Foundation OPTIMA v0.2 (13 Okt 2026) dan prototipe di folder ini (`assets/*.js`).
-Status: rencana kerja, belum ada kode backend.
+Status: fondasi G0 sudah ada di `backend/` (skema, model, seeder, service hak akses, 39 test). Login, API, dan modul belum.
 
 ## 1. Keputusan
 
 | Hal | Pilihan | Sumber |
 |---|---|---|
-| Framework | Laravel (PHP 8.3+) | keputusan tim |
+| Framework | Laravel 13 (PHP 8.4) | keputusan tim |
 | Database | PostgreSQL 16 | SRS §01 |
-| Hosting | Laravel Cloud (atau Forge), **perlu dikonfirmasi** | keputusan tim |
-| Login | OIDC lewat Google Workspace / Microsoft Entra ID, akun pengembangan Campus Innovate | SRS §4.1, §8.2 |
+| Hosting | Laravel Cloud, paket gratis | keputusan tim, 20 Okt 2026 |
+| Login | OIDC lewat Google Workspace, akun pengembangan Campus Innovate | SRS §4.1, §8.2; keputusan tim, 20 Okt 2026 |
 | Login cadangan | Kode sekali pakai lewat email | FR-AUT-04 |
 | Frontend | Prototipe sekarang dipakai terus. `Store` (localStorage) diganti panggilan API, per modul | keputusan tim |
 
@@ -48,7 +48,7 @@ Diturunkan dari ERD (SRS §6.1) dan field yang sudah dipakai prototipe. Tidak ad
 | `audit_logs` | user_id, action, entity_type, entity_id, before (json), after (json), ip, at | FR-AUD-01, 02. Riwayat perubahan per data dibaca dari sini |
 | `imports`, `import_rows` | file, status, counts / row_no, data, errors, created_id | dry-run, simpan, batalkan (FR-IMP) |
 | `saved_views` | user_id, page, name, filters (json) | FR-REL-05 |
-| `notifications` | user_id, text, link, read_at | lonceng di navbar |
+| `user_notifications` | user_id, text, link, read_at | lonceng di navbar |
 | `login_codes` | email, code_hash, expires_at | login cadangan |
 | `sessions` | bawaan Laravel (driver `database`) | supaya sesi bisa diputus saat user dinonaktifkan |
 
@@ -72,7 +72,7 @@ SRS §3 dan §6.2: semua operasi lewat satu pemeriksa izin dan satu pencatat aud
 
 ## 5. Login dan sesi
 
-- Paket: `laravel/socialite` + `socialiteproviders/microsoft-azure` (Google sudah bawaan).
+- Paket: `laravel/socialite` (provider Google sudah bawaan). Microsoft Entra ID bisa ditambah lewat `socialiteproviders/microsoft-azure` kalau nanti pindah akun.
 - Alur: SSO → ambil email → cocokkan ke `users`. Belum terdaftar atau nonaktif: tolak dengan pesan jelas dan catat
   di audit log (SRS §4.1).
 - Sesi: `SESSION_LIFETIME=60` (60 menit tidak aktif) plus middleware batas 12 jam sejak login.
@@ -114,28 +114,57 @@ Semua di bawah `/api`, JSON, cookie sesi.
    sudah disesuaikan. Akibatnya untuk migrasi: template impor sekarang belum punya kolom tanggal dibuat, jadi deal
    hasil impor tercatat dibuat pada hari impor. Untuk migrasi data asli (tahap 3), sheet 9 Data Deal perlu kolom
    "Tanggal dibuat", dan backend memakainya bila diisi.
-2. **Hosting.** Konfirmasi Laravel Cloud atau Forge, dan region server.
-3. **Provider SSO tahap awal.** Google Workspace atau Microsoft Entra ID milik Campus Innovate.
+2. ~~Hosting.~~ **Diputuskan: Laravel Cloud paket gratis.** Sebelum G0 perlu dicek batas paket gratisnya terhadap SRS §8.1
+   (backup harian, data hilang paling banyak 24 jam, pulih dalam 8 jam kerja) dan §8.3 (30 pengguna, database 5 GB).
+   Kalau backup harian tidak tersedia di paket gratis, perlu `pg_dump` terjadwal ke penyimpanan terpisah.
+3. ~~Provider SSO tahap awal.~~ **Diputuskan: Google Workspace** milik Campus Innovate.
+4. **Kolom "Tanggal dibuat" di template impor** (sheet 9 Data Deal): belum diputuskan, lihat poin 1.
 
-## 9. Yang perlu disiapkan sebelum scaffolding
+## 9. Lingkungan pengembangan
 
-Di Mac pengembang (butuh password admin):
+Sudah terpasang di Mac pengembang (20 Okt 2026), tanpa sudo:
 
-- [ ] [Laravel Herd](https://herd.laravel.com): PHP 8.3+, Composer dan Laravel installer sekaligus.
-- [ ] PostgreSQL 16: [Postgres.app](https://postgresapp.com) atau DBngin. Buat database `optima_crm`.
-- [ ] `git init` di folder ini, supaya perubahan backend bisa direview per langkah.
+- PHP 8.4, Composer, dan Laravel installer lewat Herd Lite di `~/.config/herd-lite/bin` (PATH di `~/.zshrc`).
+- PostgreSQL 16.13 di `~/.local/pgsql-16`, data di `~/.local/pgsql-16-data`, hanya mendengarkan localhost:5432.
+  Database `optima_crm` (pengembangan) dan `optima_crm_test` (test otomatis).
+- Repo git dengan branch `main` (prototipe) dan `feat/backend-foundation` (backend).
 
-Akun pengembangan Campus Innovate:
+PostgreSQL tidak jalan otomatis setelah Mac restart. Nyalakan dengan:
 
-- [ ] OAuth client (Google Cloud Console atau Entra ID), redirect URI `http://localhost:8000/api/auth/google/callback`.
+```
+~/.local/pgsql-16/bin/pg_ctl -D ~/.local/pgsql-16-data -l ~/.local/pgsql-16.log start
+```
+
+Perintah sehari-hari dari folder `backend/`:
+
+```
+php artisan migrate:fresh --seed   # database bersih + data referensi + data contoh
+php artisan test                   # test hak akses, filter periode, dan data contoh
+```
+
+Data contoh diekspor dari `seed()` di prototipe ke `database/seeders/data/sample.json`. Kalau data contoh di
+prototipe diubah, jalankan ulang `node database/seeders/data/export-prototype-seed.mjs`.
+
+Masih perlu disiapkan di akun pengembangan Campus Innovate:
+
+- [ ] OAuth client di Google Cloud Console (tipe Web), redirect URI `http://localhost:8000/api/auth/google/callback`.
 - [ ] Akun SMTP pengembangan untuk email notifikasi.
 - [ ] Rahasia (client secret, password SMTP) disimpan di `.env`, tidak masuk repo.
+
+### Catatan dari pembangunan G0
+
+- **Rate card Executive bernilai "Ya"** di SRS. Prototipe hanya mengenali M dan R*, jadi Kepala Department atau
+  Staf Executive di prototipe tidak bisa melihat rate card. Backend memperlakukan "Ya" sebagai boleh melihat.
+- **Buka kembali deal** di backend mengikuti bunyi SRS dan lebih ketat dari prototipe: deal Won hanya oleh Super Admin
+  atau Kepala Department dari department PIC deal; deal Lost dan On Hold oleh PIC atau Kepala Department/Koordinator
+  di department yang sama.
+- Kolom `status` di Client & Partner (disebut di SRS §6) belum dipakai prototipe. Isinya perlu disepakati.
 
 ## 10. Urutan kerja sesuai jadwal SRS §10
 
 | Gate | Target backend |
 |---|---|
-| G0, hari 3 | Laravel + Postgres jalan, migrasi semua tabel, seeder data contoh (dipindah dari `seed()` di `assets/data.js`), service hak akses + test per role |
+| G0, hari 3 | ✅ Laravel + Postgres jalan, migrasi semua tabel, seeder data contoh (dipindah dari `seed()` di `assets/data.js`), service hak akses + test per role |
 | G1, hari 5 | Login SSO + login cadangan, sesi 60 menit / 12 jam, Client & Partner CRUD, kontak, cek data ganda. Frontend modul ini sudah memakai API |
 | G2, hari 10 | Interaksi, follow-up, pipeline, deal, dashboard, import/export, audit, email ringkasan. Semua Must lulus, tidak ada bug S1/S2 |
 | G3–G5 | Perbaikan UAT, uji beban 20.000 data, migrasi data asli tahap 3, uji pemulihan backup, serah terima |
