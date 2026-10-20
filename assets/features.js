@@ -513,7 +513,7 @@ function expireSession(reason) {
 }
 let _lastTouch = 0;
 ['click', 'keydown', 'pointermove', 'scroll'].forEach(ev => document.addEventListener(ev, () => { const n = Date.now(); if (n - _lastTouch > 15000 && me()) { _lastTouch = n; Store.db.lastActive = n; Store.save(); } }, { passive: true, capture: true }));
-setInterval(() => { if (!me()) return; const n = Date.now(); if (n - (Store.db.lastActive || n) > IDLE_MS) expireSession('Ga ada aktivitas selama 60 menit.'); else if (n - (Store.db.sessionStart || n) > MAX_MS) expireSession('Udah 12 jam sejak login.'); }, 30000);
+setInterval(() => { if (!me() || window.OPTIMA_API) return; const n = Date.now(); if (n - (Store.db.lastActive || n) > IDLE_MS) expireSession('Ga ada aktivitas selama 60 menit.'); else if (n - (Store.db.sessionStart || n) > MAX_MS) expireSession('Udah 12 jam sejak login.'); }, 30000);
 
 /* ---------- galat global ---------- */
 const _render = render;
@@ -551,8 +551,10 @@ applyTheme(currentTheme());
 Store.load();
 ['options', 'overrides', 'views', 'imports', 'notifs', 'changes'].forEach(k => { if (!Store.db[k]) Store.db[k] = k === 'options' ? JSON.parse(JSON.stringify(DEFAULT_OPTS)) : []; });
 Store.db.records.forEach(ensureRec);
+if (window.OPTIMA_API) { /* sesi dan isi data diatur assets/api.js dari server */ } else {
 if (Store.db.session && !(userById(Store.db.session) || {}).active) Store.db.session = null;
 if (Store.db.session) { const n = Date.now(); if (!Store.db.sessionStart) Store.db.sessionStart = n; if (!Store.db.lastActive) Store.db.lastActive = n; if (n - Store.db.lastActive > IDLE_MS) { App.expired = { reason: 'Ga ada aktivitas selama 60 menit.', name: (me() || {}).name }; Store.db.session = null; } else if (n - Store.db.sessionStart > MAX_MS) { App.expired = { reason: 'Udah 12 jam sejak login.', name: (me() || {}).name }; Store.db.session = null; } }
 parseHash();
 if (me() && (App.route === 'akses') && !canViewAdmin()) App.route = 'mywork';
 render();
+}

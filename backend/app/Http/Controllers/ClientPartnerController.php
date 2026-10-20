@@ -267,7 +267,9 @@ class ClientPartnerController extends Controller
             $base = ['at' => $log->created_at->toIso8601String(), 'by' => (string) $log->user_id, 'kind' => 'record', 'refId' => (string) $clientPartner->id, 'note' => (string) $log->summary];
             $fields = array_intersect_key($log->after ?? [], FrontShape::RECORD_LABELS + self::CONTACT_LABELS);
             if ($log->action === 'Tambah' || $fields === []) {
-                $rows[] = $base + ['id' => $log->id.'', 'field' => $log->action, 'before' => '', 'after' => ''];
+                // Tanpa field yang berubah (misalnya data dibuat): tampilkan ringkasannya sebagai isi baru.
+                $rows[] = ['id' => (string) $log->id, 'field' => $log->action === 'Tambah' ? 'Data dibuat' : $log->action, 'before' => '', 'after' => (string) $log->summary] + $base;
+                $rows[array_key_last($rows)]['note'] = '';
 
                 continue;
             }

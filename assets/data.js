@@ -1,6 +1,7 @@
 /* OPTIMA CRM · data contoh, penyimpanan lokal, dan hak akses */
 'use strict';
-const DB_KEY = 'optima_crm_local_v3';
+// Dengan backend (window.OPTIMA_API), cache browser dipisah dari data contoh mode lokal.
+const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v1' : 'optima_crm_local_v3';
 const DEPTS = ['Executive', 'Commercial', 'Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'];
 const ROLES = ['Super Admin', 'Kepala Department', 'Koordinator', 'Staf', 'Viewer'];
 const CATS = ['Lead', 'Client', 'Community', 'KOL/KOC', 'Media'];
@@ -158,7 +159,7 @@ function perm(ent, u) {
 }
 const can = (ent, lvl) => LV[perm(ent)] >= LV[lvl];
 const catEnt = (cat) => CAT_KEY[cat] || 'lead';
-const canSeeRec = (r) => can(catEnt(r.cat), 'R');
+const canSeeRec = (r) => !r.hidden && can(catEnt(r.cat), 'R');
 const canEditRec = (r) => { const p = perm(catEnt(r.cat)); return p === 'M' || (p === 'C' && r.picId === me().id); };
 const canDelRec = (r) => perm(catEnt(r.cat)) === 'M';
 const canCreateAny = () => CATS.some(c => can(catEnt(c), 'C'));

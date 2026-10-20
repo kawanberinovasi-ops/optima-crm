@@ -17,7 +17,7 @@ class Duplicates
     public function __construct(private Access $access) {}
 
     /**
-     * @return array{matches: list<array{id: string, why: list<string>}>, hidden: int}
+     * @return array{matches: list<array{id: string, why: list<string>}>, hidden: int, hiddenWhy: list<list<string>>}
      */
     public function check(User $user, ?string $name, ?string $email = null, ?string $phone = null, ?int $excludeId = null): array
     {
@@ -28,7 +28,7 @@ class Duplicates
         $candidates = $this->candidates($name, $e, $p, $excludeId);
 
         $matches = [];
-        $hidden = 0;
+        $hiddenWhy = [];
         foreach ($candidates as $r) {
             $why = [];
             $rn = self::normName($r->name);
@@ -48,11 +48,11 @@ class Duplicates
             if ($this->access->canViewRecord($user, $r)) {
                 $matches[] = ['id' => (string) $r->id, 'why' => $why];
             } else {
-                $hidden++;
+                $hiddenWhy[] = $why;
             }
         }
 
-        return ['matches' => $matches, 'hidden' => $hidden];
+        return ['matches' => $matches, 'hidden' => count($hiddenWhy), 'hiddenWhy' => $hiddenWhy];
     }
 
     /** Kandidat dari database: trigram nama, email, atau telepon. Aturan pastinya diperiksa di PHP. */

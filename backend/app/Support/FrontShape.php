@@ -74,6 +74,7 @@ class FrontShape
             'archived' => $r->archived_at !== null,
             'archivedAt' => $r->archived_at?->toDateString() ?? '',
             'archiveReason' => (string) $r->archive_reason,
+            'archivedBy' => $r->archived_by ? (string) $r->archived_by : '',
             'mergedInto' => $r->merged_into_id ? (string) $r->merged_into_id : '',
             'contacts' => $contacts,
             'contact' => $primary['name'] ?? '',

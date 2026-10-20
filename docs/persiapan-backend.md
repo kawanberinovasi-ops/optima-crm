@@ -1,7 +1,9 @@
 # Persiapan backend OPTIMA CRM
 
 Acuan: SRS CRM & SSO Foundation OPTIMA v0.2 (13 Okt 2026) dan prototipe di folder ini (`assets/*.js`).
-Status: fondasi G0 sudah ada di `backend/` (skema, model, seeder, service hak akses, 39 test). Login, API, dan modul belum.
+Status: G0 dan G1 sudah ada di `backend/` (skema, hak akses, login SSO Google, aturan sesi, API Client & Partner, 65 test).
+Frontend sudah memakai API untuk login, pengguna, hak akses, dan Client & Partner. Deal, interaksi, pipeline, dashboard,
+import, dan pengaturan admin masih di browser sampai G2.
 
 ## 1. Keputusan
 
@@ -151,6 +153,33 @@ Masih perlu disiapkan di akun pengembangan Campus Innovate:
 - [ ] Akun SMTP pengembangan untuk email notifikasi.
 - [ ] Rahasia (client secret, password SMTP) disimpan di `.env`, tidak masuk repo.
 
+### Mencoba aplikasi dengan backend (G1)
+
+Dari folder `backend/`, setelah PostgreSQL menyala:
+
+```
+php artisan serve --port=8000
+```
+
+Buka http://localhost:8000. Halaman ini adalah frontend yang sama, tapi data login, pengguna, hak akses, dan
+Client & Partner datang dari server. Prototipe lama tanpa backend tetap bisa dibuka lewat `serve.py` (port 5173),
+dengan data contoh terpisah.
+
+- Tanpa `GOOGLE_CLIENT_ID` di `.env`, tombol SSO membuka pemilih akun uji (hanya di `APP_ENV=local`).
+- Untuk login Google sungguhan, isi `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, dan bila perlu `GOOGLE_HOSTED_DOMAIN`
+  (membatasi ke satu domain Workspace) di `.env`. Redirect URI di Google Cloud Console:
+  `http://localhost:8000/api/auth/google/callback`.
+- Folder `assets/` disajikan lewat symlink `backend/public/assets -> ../../assets`. Untuk deploy ke Laravel Cloud,
+  folder frontend perlu disalin ke `public/` saat build. Ini dibereskan sebelum G0 di hosting.
+
+Yang masih di browser sampai G2 (perubahannya tidak dikirim ke server):
+
+- Deal, pipeline, interaksi, follow-up, dashboard, notifikasi, tampilan tersimpan, profil, dan tema.
+- Gabung data ganda, import, dan pengaturan admin (pengguna, department, hak akses, daftar pilihan) menampilkan
+  pesan "belum tersambung" supaya tidak ada perubahan yang hanya tersimpan di satu browser.
+- Halaman Client & Partner memuat semua data yang boleh dilihat sekaligus. Untuk target 20.000 data (SRS §8.1)
+  daftar perlu pindah ke halaman dari server (endpoint `GET /api/client-partners` sudah mendukung `page`).
+
 ### Catatan dari pembangunan G0
 
 - **Rate card Executive bernilai "Ya"** di SRS. Prototipe hanya mengenali M dan R*, jadi Kepala Department atau
@@ -165,6 +194,6 @@ Masih perlu disiapkan di akun pengembangan Campus Innovate:
 | Gate | Target backend |
 |---|---|
 | G0, hari 3 | ✅ Laravel + Postgres jalan, migrasi semua tabel, seeder data contoh (dipindah dari `seed()` di `assets/data.js`), service hak akses + test per role |
-| G1, hari 5 | Login SSO + login cadangan, sesi 60 menit / 12 jam, Client & Partner CRUD, kontak, cek data ganda. Frontend modul ini sudah memakai API |
+| G1, hari 5 | ✅ Login SSO Google, sesi 60 menit / 12 jam, Client & Partner (tambah, ubah, arsip, pulihkan, Lead jadi Client, pindah PIC, riwayat), kontak, cek data ganda. Frontend modul ini sudah memakai API. Login cadangan kode email (Should) belum |
 | G2, hari 10 | Interaksi, follow-up, pipeline, deal, dashboard, import/export, audit, email ringkasan. Semua Must lulus, tidak ada bug S1/S2 |
 | G3–G5 | Perbaikan UAT, uji beban 20.000 data, migrasi data asli tahap 3, uji pemulihan backup, serah terima |
