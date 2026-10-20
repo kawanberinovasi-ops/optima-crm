@@ -83,7 +83,7 @@
     db.records = b.records.map(ensureRec);
     // Sejak G2 pipeline, deal, dan interaksi juga datang dari server.
     db.lines = b.lines; db.deals = b.deals; db.interactions = b.interactions;
-    db.notifs = b.notifs; db.views = b.views; db.audit = b.audit; db.changes = b.changes;
+    db.notifs = b.notifs; db.views = b.views; db.audit = b.audit; db.changes = b.changes; db.imports = b.imports;
     // Data yang direferensikan deal atau interaksi lokal tapi tidak boleh dilihat: tampil sebagai data tersembunyi.
     const ids = new Set(db.records.map(r => r.id));
     const missing = new Set([].concat((db.deals || []).map(d => d.recordId), (db.interactions || []).map(i => i.recordId)).filter(id => id && !ids.has(id)));
@@ -335,10 +335,47 @@
     Promise.all([Api.get('audit-logs'), Api.get('changes')]).then(([a, c]) => { Store.db.audit = a.data; Store.db.changes = c.data; Store.save(); render(); }).catch(() => {});
   });
 
-  /* ---------- fitur yang belum tersambung ke server ---------- */
-  const later = (what) => () => toast(what + ' belum tersambung', 'Bagian ini masih disiapkan. Data di server ga berubah.', 'info');
-  Actions.mergerec = later('Gabung data ganda');
-  window.readImport = later('Import data');
+  /* ---------- import dan gabung data lewat API (G2) ---------- */
+  // File dibaca di browser (sama seperti prototipe), lalu barisnya diperiksa ulang dan disimpan oleh server.
+  window.readImport = (file) => {
+    if (typeof XLSX === 'undefined') { toast('Library Excel ga kebaca', 'Cek file assets/xlsx.full.min.js.', 'bad'); return; }
+    const rd = new FileReader();
+    rd.onload = async (e) => {
+      let sheets;
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false });
+        sheets = { records: sheetRows(wb, '7', 'kode sumber') || [], interactions: sheetRows(wb, '8', 'kode sumber') || [], deals: sheetRows(wb, '9', 'kode sumber') || [] };
+      } catch (x) { toast('File ga bisa dibaca', 'Pastikan formatnya .xlsx atau .csv.', 'bad'); return; }
+      toast('Lagi dicek…', file.name, 'info');
+      try { const res = await Api.post('imports/check', { filename: file.name, sheets }); App.modal = { kind: 'import', file: file.name, parsed: res.data, importId: res.data.id }; render(); }
+      catch (x) { fail(x); }
+    };
+    rd.readAsArrayBuffer(file);
+  };
+  doImport = async function () {
+    const m = App.modal; if (!m || m.busy) return; m.busy = true;
+    try {
+      await Api.post('imports/' + m.importId + '/commit');
+      const p = m.parsed; const n = p.records.length + p.ints.length + p.deals.length;
+      await refresh(n + ' baris masuk!', p.errors.length ? p.errors.length + ' baris dilewati. Perbaiki lalu import ulang, data yang sama ga bakal dobel.' : 'Semua baris berhasil.');
+    } catch (e) { m.busy = false; fail(e); }
+  };
+  Actions.doimport = () => doImport();
+  Actions.undoimport = (el) => {
+    const b = Store.db.imports.find(x => x.id === el.dataset.v);
+    App.modal = { kind: 'confirm', sub: 'Batalkan import', title: 'Tarik balik ' + esc(b.file) + '?', danger: true, ok: 'Batalkan import',
+      text: b.created.r.length + ' data baru, ' + b.created.i.length + ' interaksi, dan ' + b.created.d.length + ' deal dari import ini ditarik. ' + b.updated.length + ' data yang diperbarui balik ke isi sebelumnya.',
+      fn: () => { Api.post('imports/' + b.id + '/undo').then(() => refresh('Import dibatalkan', b.file + ' udah ditarik balik.')).catch(e => fail(e)); } };
+    render();
+  };
+  Forms.merge = async (o) => {
+    const m = App.modal; if (!o.srcId) { m.err = { srcId: 'Pilih data duplikatnya.' }; m.still = true; render(); return; }
+    try {
+      const res = await Api.post('client-partners/' + m.keepId + '/merge', { srcId: o.srcId });
+      await loadBootstrap(); App.modal = null; App.drawer = { id: res.data.id }; render();
+      toast('Digabung!', res.moved.interactions + ' interaksi, ' + res.moved.deals + ' deal, dan ' + res.moved.contacts + ' kontak pindah ke ' + res.data.name + '.');
+    } catch (e) { fail(e, m); }
+  };
   Actions.resetdata = () => toast('Reset data contoh', 'Cuma ada di mode lokal tanpa server.', 'info');
 
   /* ---------- boot ---------- */

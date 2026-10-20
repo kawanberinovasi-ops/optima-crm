@@ -83,6 +83,7 @@ class BootstrapController extends Controller
             'records' => $records,
             'notifs' => MeController::notifications($me->id),
             'views' => MeController::views($me->id),
+            'imports' => ImportController::historyFor($me, $access),
             // Audit log dan riwayat data hanya untuk yang boleh membuka Akses & Audit.
             'audit' => $access->canViewAdmin($me) ? AdminController::auditShape(AuditLog::orderByDesc('id')->limit(500)->get()) : [],
             'changes' => $access->canViewAdmin($me) ? $history->latest($me) : [],

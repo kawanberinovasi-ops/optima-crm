@@ -232,6 +232,53 @@ class ClientPartnerController extends Controller
         return $this->respond($me, $clientPartner);
     }
 
+    /**
+     * Gabung data ganda (FR-REL-09): interaksi, deal, dan kontak dari data duplikat dipindah ke data yang disimpan,
+     * kolom kosong diisi dari data duplikat, lalu data duplikat diarsipkan (tidak dihapus).
+     */
+    public function merge(Request $request, ClientPartner $clientPartner): JsonResponse
+    {
+        $me = $request->user();
+        $data = $request->validate(['srcId' => ['required', 'integer', Rule::exists('client_partners', 'id'), Rule::notIn([$clientPartner->id])]],
+            ['srcId.required' => 'Pilih data duplikatnya.', 'srcId.not_in' => 'Pilih data lain.']);
+        $source = ClientPartner::findOrFail($data['srcId']);
+        foreach ([$clientPartner, $source] as $r) {
+            $this->authorizeView($me, $r);
+            abort_unless($this->access->canArchiveRecord($me, $r), 403, 'Gabung data cuma bisa oleh pengelola kategori '.$r->category->value.'.');
+        }
+        abort_if($clientPartner->archived_at || $source->archived_at, 409, 'Data yang diarsipkan ga bisa digabung.');
+
+        $moved = DB::transaction(function () use ($clientPartner, $source, $me) {
+            $ints = $source->interactions()->update(['client_partner_id' => $clientPartner->id]);
+            $deals = $source->deals()->update(['client_partner_id' => $clientPartner->id]);
+            $emails = $clientPartner->contacts()->pluck('email')->filter()->map(fn ($e) => strtolower($e))->all();
+            $contacts = 0;
+            foreach ($source->contacts as $c) {
+                if (! $c->email || ! in_array(strtolower($c->email), $emails, true)) {
+                    $c->update(['client_partner_id' => $clientPartner->id, 'is_primary' => false]);
+                    $contacts++;
+                }
+            }
+            $original = $clientPartner->getRawOriginal();
+            $fill = [];
+            foreach (['segment', 'city', 'source', 'note', 'rate_card'] as $k) {
+                if (empty($clientPartner->{$k}) && ! empty($source->{$k})) {
+                    $fill[$k] = $source->{$k};
+                }
+            }
+            $clientPartner->update($fill);
+            $this->audit->changed(self::ENTITY, $clientPartner, $original, 'Diisi dari '.$source->name);
+            $source->update(['archived_at' => now(), 'archived_by' => $me->id, 'archive_reason' => 'Digabung ke '.$clientPartner->name, 'merged_into_id' => $clientPartner->id]);
+            $summary = $source->name.' ('.$source->code.') digabung ke '.$clientPartner->name.' ('.$clientPartner->code.'): '.$ints.' interaksi, '.$deals.' deal, '.$contacts.' kontak dipindah';
+            $this->audit->log('Gabung', self::ENTITY, $clientPartner->id, $summary, null, ['merged' => $source->id]);
+            $this->audit->log('Gabung', self::ENTITY, $source->id, $summary, ['archived_at' => null], ['archived_at' => now()->toIso8601String(), 'merged_into_id' => $clientPartner->id]);
+
+            return ['interactions' => $ints, 'deals' => $deals, 'contacts' => $contacts];
+        });
+
+        return response()->json(['data' => FrontShape::record($clientPartner->fresh(['contacts', 'department']), $me, $this->access), 'moved' => $moved, 'mergedId' => (string) $source->id]);
+    }
+
     /** Cek data ganda sebelum menyimpan (FR-REL-03). */
     public function duplicates(Request $request, Duplicates $duplicates): JsonResponse
     {

@@ -6,6 +6,7 @@ use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\ClientPartnerController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DealController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\InteractionController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\PipelineController;
@@ -37,6 +38,7 @@ Route::middleware('crm')->group(function () {
     Route::post('client-partners/{clientPartner}/restore', [ClientPartnerController::class, 'restore']);
     Route::post('client-partners/{clientPartner}/convert', [ClientPartnerController::class, 'convert']);
     Route::post('client-partners/{clientPartner}/move-pic', [ClientPartnerController::class, 'movePic']);
+    Route::post('client-partners/{clientPartner}/merge', [ClientPartnerController::class, 'merge']);
 
     Route::post('client-partners/{clientPartner}/contacts', [ContactController::class, 'store']);
     Route::patch('contacts/{contact}', [ContactController::class, 'update']);
@@ -62,6 +64,11 @@ Route::middleware('crm')->group(function () {
     Route::post('interactions', [InteractionController::class, 'store']);
     Route::post('interactions/{interaction}/done', [InteractionController::class, 'done']);
     Route::post('interactions/{interaction}/cancel', [InteractionController::class, 'cancel']);
+
+    // Import (SRS 4.4)
+    Route::post('imports/check', [ImportController::class, 'check']);
+    Route::post('imports/{import}/commit', [ImportController::class, 'commit']);
+    Route::post('imports/{import}/undo', [ImportController::class, 'undo']);
 
     // Pemberitahuan dan tampilan tersimpan milik pengguna
     Route::post('notifications/read', [MeController::class, 'readNotifications']);
