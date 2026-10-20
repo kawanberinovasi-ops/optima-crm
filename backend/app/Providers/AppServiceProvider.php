@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\Access;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +22,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Di produksi semua URL (redirect SSO, tautan email) memakai HTTPS.
+        if ($this->app->isProduction()) {
+            URL::forceScheme('https');
+        }
     }
 }

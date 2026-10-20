@@ -4,7 +4,9 @@ Acuan: SRS CRM & SSO Foundation OPTIMA v0.2 (13 Okt 2026) dan prototipe di folde
 Status: G0, G1, dan G2 sudah ada di `backend/` (106 test). Semua data dan perubahan di frontend lewat API: login SSO
 Google, sesi, Client & Partner, kontak, data ganda, gabung data, pipeline dan stage, deal, interaksi dan follow-up,
 import dan batalkan import, Akses & Audit, pemberitahuan, tampilan tersimpan, dan email ringkasan 08.00.
-Yang belum: login cadangan kode email (FR-AUT-04, Should), tes login Google sungguhan, dan persiapan deploy.
+Persiapan deploy ke Laravel Cloud ada di [deploy-laravel-cloud.md](deploy-laravel-cloud.md): paket frontend, konfigurasi
+produksi, scheduler, dan backup harian dengan uji pemulihan.
+Yang belum: login cadangan kode email (FR-AUT-04, Should) dan tes login Google sungguhan.
 
 ## 1. Keputusan
 
@@ -170,8 +172,8 @@ dengan data contoh terpisah.
 - Untuk login Google sungguhan, isi `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, dan bila perlu `GOOGLE_HOSTED_DOMAIN`
   (membatasi ke satu domain Workspace) di `.env`. Redirect URI di Google Cloud Console:
   `http://localhost:8000/api/auth/google/callback`.
-- Folder `assets/` disajikan lewat symlink `backend/public/assets -> ../../assets`. Untuk deploy ke Laravel Cloud,
-  folder frontend perlu disalin ke `public/` saat build. Ini dibereskan sebelum G0 di hosting.
+- Folder `assets/` disajikan lewat symlink `backend/public/assets -> ../../assets`. Saat deploy, folder ini
+  disalin ke dalam `backend/` oleh `php artisan optima:build-frontend`. Lihat [deploy-laravel-cloud.md](deploy-laravel-cloud.md).
 
 Email ringkasan 08.00 WIB (`php artisan optima:daily-digest`, coba dulu dengan `--dry-run`):
 
