@@ -33,7 +33,7 @@ Tampilan UI/UX yang sudah selesai tetap dipertahankan. Pembatasan ini
 bukan bukti penyelesaian S-10, UAT, training, atau serah terima.
 
 JALANKAN:
-Mac/Linux: ./start.sh
+Mac/Linux: bash start.sh
 Windows: start.bat
 Atau: python3 serve.py 5175
 Alamat: http://127.0.0.1:5175

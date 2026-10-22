@@ -12,7 +12,7 @@ python3 serve.py 5175
 
 Buka **http://127.0.0.1:5175/** di Safari atau browser lain. Biarkan server berjalan selama aplikasi digunakan.
 
-Alternatif: `./start.sh` pada macOS/Linux atau `start.bat` pada Windows. Dengan Node.js, tersedia `npm start`.
+Alternatif: `bash start.sh` pada macOS/Linux atau `start.bat` pada Windows. Dengan Node.js, tersedia `npm start`.
 
 ## Cakupan presentasi
 
