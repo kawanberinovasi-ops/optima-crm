@@ -1,0 +1,43 @@
+OPTIMA CRM — CLIENT PREVIEW S-01 SAMPAI S-06
+===========================================
+Mode presentasi di folder dan penyimpanan terpisah dari versi lengkap.
+
+AKTIF:
+S-01 Login pengembangan: halaman login ditampilkan kembali, menggunakan
+pilihan akun contoh. Ini simulasi SSO lokal, belum autentikasi SSO server.
+S-02 Pengguna/karyawan, department, role, aktivasi dan hak akses,
+termasuk pengecualian akses per orang dan Edit Profil sendiri.
+S-03 Data lead, client, community, KOL/KOC, dan media.
+S-04 Pencarian, filter, segmen, PIC, validasi, duplikasi, gabung data,
+arsip dan pemulihan.
+S-05 Riwayat interaksi, hasil komunikasi, langkah berikutnya, dan follow-up.
+Buka detail relasi untuk riwayat, tambah interaksi, dan tandai follow-up selesai.
+S-06 Pipeline penjualan: stage, PIC, layanan, nilai deal, target closing,
+alasan gagal, serta perpindahan stage dan hubungan deal dengan interaksi.
+Bagian deal/Pipeline pada detail relasi dan formulir interaksi ditampilkan.
+
+SETELAH MASUK:
+Langsung Client & Partner. Logo juga mengarah ke Client & Partner.
+Semua menu masih tampil normal, tanpa gembok atau warna pudar.
+Warna tema bisa diganti lewat menu profil, dan tersimpan di browser ini.
+
+TETAP TERLIHAT, TETAPI KLIK TIDAK MENJALANKAN AKSI:
+- My Work (halaman gabungan yang juga berisi statistik di luar S-06).
+- Dashboard (S-07).
+- Import/export Excel termasuk unduh template dan drag/drop file (S-08).
+  Panel ini tidak ditampilkan di area kerja.
+- Audit log dan catatan aktivitas (S-09). Riwayat perubahan detail tidak ditampilkan.
+- Reset data dan simulasi sesi.
+
+Tampilan UI/UX yang sudah selesai tetap dipertahankan. Pembatasan ini
+bukan bukti penyelesaian S-10, UAT, training, atau serah terima.
+
+JALANKAN:
+Mac/Linux: ./start.sh
+Windows: start.bat
+Atau: python3 serve.py 5175
+Alamat: http://127.0.0.1:5175
+
+Data contoh tersimpan di browser dengan kunci optima_crm_client_preview_v1.
+Data browser versi lengkap tidak disalin atau diubah.
+Folder lengkap /Users/mac/Downloads/optima-crm tetap mandiri di port 5173.

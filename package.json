@@ -1,0 +1,9 @@
+{
+  "name": "optima-crm-client-preview",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OPTIMA CRM client presentation S-01\u2013S-06: development login, roles, relationships, data management, follow-up and sales pipeline",
+  "scripts": {
+    "start": "npx --yes serve -l 5175 ."
+  }
+}
