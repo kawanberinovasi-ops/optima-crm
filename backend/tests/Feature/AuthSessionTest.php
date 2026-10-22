@@ -26,7 +26,7 @@ class AuthSessionTest extends TestCase
 
     private function user(array $attrs = []): User
     {
-        return User::factory()->inDepartment('Commercial')->role(Role::Staf)->create($attrs);
+        return User::factory()->inDepartment('Customer Service')->role(Role::Staf)->create($attrs);
     }
 
     public function test_registered_user_logs_in_and_gets_bootstrap(): void
@@ -38,8 +38,8 @@ class AuthSessionTest extends TestCase
         $this->assertAuthenticatedAs($user);
         $this->getJson('/api/bootstrap')->assertOk()
             ->assertJsonPath('me.email', 'rina@contoh.test')
-            ->assertJsonPath('me.dept', 'Commercial')
-            ->assertJsonPath('access.Commercial.deal', 'M');
+            ->assertJsonPath('me.dept', 'Customer Service')
+            ->assertJsonPath('access.Customer Service.deal', 'M');
         $this->assertDatabaseHas('audit_logs', ['action' => 'Login', 'user_id' => $user->id]);
         $this->assertNotNull($user->fresh()->last_login_at);
     }

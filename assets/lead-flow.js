@@ -1,5 +1,5 @@
-/* OPTIMA CRM · alur Lead/Client (22 Okt 2026): serah terima antar divisi, Lead jadi Client lewat Won,
-   layanan dan pemetaannya ke divisi, dan department yang melihat lintas divisi.
+/* OPTIMA CRM · alur Lead/Client (22 Okt 2026, mengikuti pratinjau klien): Pindah PIC / divisi, Lead jadi Client lewat Won,
+   layanan dan pemetaannya ke divisi, satu pipeline per divisi, dan department yang melihat lintas divisi.
    Di mode backend (assets/api.js), simpan-simpannya dikirim ke server; fungsi di sini dipakai di mode lokal. */
 'use strict';
 
@@ -22,21 +22,37 @@ function handoverList(r) {
     '</div></section>';
 }
 
+/**
+ * Deal ikut pipeline divisi baru relasinya. Stage dicocokkan lewat nama, kalau tidak ada lewat urutan;
+ * deal Won tetap di Closing. Perpindahan dicatat di riwayat deal.
+ */
+function moveDealToLine(d, line, note) {
+  if (!line || d.lineId === line.id) return;
+  const old = lineById(d.lineId); const from = stageOf(d) || {};
+  const open = line.stages.slice(0, -1); const closing = line.stages[line.stages.length - 1];
+  const oldIdx = old ? old.stages.findIndex(s => s.id === d.stageId) : 0;
+  const isClosing = d.status === 'Won' || (old && oldIdx === old.stages.length - 1);
+  const to = isClosing ? closing : (open.find(s => s.name.toLowerCase() === String(from.name || '').toLowerCase()) || open[Math.min(Math.max(oldIdx, 0), open.length - 1)]);
+  d.lineId = line.id; d.stageId = to.id;
+  dealLog(d, from.name, to.name, d.status, note + ' (pipeline ' + ((old || {}).name || '-') + ' ke ' + line.name + ')');
+}
+
 const svcChip = (s) => s ? '<span class="chip c-y">' + esc(s) + '</span>' : '';
 
-/* ---------- serah terima ---------- */
-const handoverPics = (dept) => Store.db.users.filter(u => u.active && u.role !== 'Viewer' && u.dept === dept);
+/* ---------- Pindah PIC / divisi ---------- */
+const handoverPics = divisionUsers;
 Modals.handover = (m) => {
-  const r = recById(m.id); const v = Object.assign({ dept: '', picId: '', reason: '' }, m.val || {});
-  const svc = serviceList().find(x => x.name === r.service);
+  const r = recById(m.id); const svc = serviceList().find(x => x.name === r.service);
+  // Divisi tujuan bawaan: divisi yang menangani layanannya, kalau belum ada divisi sekarang.
+  const v = Object.assign({ dept: (svc && svc.dept) || r.dept, picId: '', reason: '' }, m.val || {});
   const pics = v.dept ? handoverPics(v.dept) : [];
-  return modalShell('Serah terima', esc(r.name),
+  return modalShell('Pindah PIC / divisi', esc(r.name),
     '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center" class="small">' + catChip(r.cat) + svcChip(r.service) + '<span>Sekarang: <b>' + esc(userName(r.picId)) + '</b> · ' + esc(r.dept) + '</span></div>' +
-    '<p class="small muted" style="margin:0">Bisa ke divisi mana pun, termasuk ke atau dari Customer Service. Setelah diserahkan, data ini ikut divisi penerima. Pembuat data tetap tercatat, interaksi dan deal tetap di relasi ini, dan deal yang masih berjalan ikut dipegang PIC baru.</p>' +
+    '<p class="small muted" style="margin:0">Bisa ke divisi mana pun, termasuk ke atau dari Customer Service. Data, kontak, interaksi, dan deal mengikuti divisi penerima; deal pindah ke pipeline divisi itu dan yang masih berjalan dipegang PIC baru. Divisi asal tidak lagi bisa membuka data ini, kecuali Executive. Pengisi data tetap tercatat.</p>' +
     '<div class="form-grid">' +
     '<label class="fld"><span>Divisi tujuan *</span><select class="inp" name="dept" data-ch="hodept"' + inv(m, 'deptId') + '>' + opt('', v.dept, 'Pilih divisi') + Store.db.departments.map(d => opt(d.name, v.dept, d.name + (svc && svc.dept === d.name ? ' · menangani ' + svc.name : ''))).join('') + '</select>' + fieldErr(m, 'deptId') + '</label>' +
     '<label class="fld"><span>PIC penerima *</span><select class="inp" name="picId"' + inv(m, 'picId') + (v.dept ? '' : ' disabled') + '>' + opt('', v.picId, v.dept ? (pics.length ? 'Pilih orang' : 'Belum ada pengguna aktif') : 'Pilih divisi dulu') + pics.map(u => opt(u.id, v.picId, u.name + ' · ' + u.role)).join('') + '</select>' + fieldErr(m, 'picId') + '</label>' +
-    '<label class="fld" style="grid-column:1/-1"><span>Alasan *</span><input class="inp" name="reason" value="' + esc(v.reason) + '"' + inv(m, 'reason') + ' placeholder="Contoh: butuh paket KOL, dipegang Digital Campaign">' + fieldErr(m, 'reason') + '</label></div>',
+    '<label class="fld" style="grid-column:1/-1"><span>Alasan serah terima *</span><input class="inp" name="reason" value="' + esc(v.reason) + '"' + inv(m, 'reason') + ' placeholder="Contoh: butuh paket KOL, dipegang Digital Campaign">' + fieldErr(m, 'reason') + '</label></div>',
     '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="submit" class="btn">' + ic('swap', 'ic-s') + 'Serahkan</button>', false, 'handover');
 };
 Actions.handover = (el) => { App.modal = { kind: 'handover', id: el.dataset.v }; render(); };
@@ -45,29 +61,34 @@ const handoverErr = (m, o) => { const err = {}; if (!o.dept) err.deptId = 'Pilih
 Forms.handover = (o) => {
   const m = App.modal; if (handoverErr(m, o)) return;
   const r = recById(m.id); const to = userById(o.picId); const from = { pic: r.picId, dept: r.dept };
+  if (!r || !canHandover(r)) { toast('Tidak ada akses', 'Data ini berada di luar divisi atau kewenanganmu.', 'bad'); return; }
+  if (!to || !divisionUsers(o.dept).includes(to)) { m.err = { picId: 'Pilih pengguna aktif dari divisi tujuan.' }; m.val = o; m.still = true; render(); return; }
+  const note = 'Pindah ke ' + to.name + ' (' + to.dept + ')';
+  const line = lineForDivision(to.dept);
+  Store.db.deals.filter(d => d.recordId === r.id).forEach(d => moveDealToLine(d, line, note));
   const running = Store.db.deals.filter(d => d.recordId === r.id && (d.status === 'Open' || d.status === 'On Hold') && d.ownerId !== to.id);
-  running.forEach(d => { d.ownerId = to.id; dealLog(d, (stageOf(d) || {}).name, (stageOf(d) || {}).name, d.status, 'Serah terima ke ' + to.name + ' (' + to.dept + ')'); });
+  running.forEach(d => { d.ownerId = to.id; dealLog(d, (stageOf(d) || {}).name, (stageOf(d) || {}).name, d.status, note); });
   trackChange('record', r.id, 'PIC', userName(from.pic), to.name, o.reason); trackChange('record', r.id, 'Divisi pemilik', from.dept, to.dept, o.reason);
   r.picId = to.id; r.dept = to.dept;
   r.handovers = (r.handovers || []).concat([{ at: new Date().toISOString(), from: from.pic, fromDept: from.dept, to: to.id, toDept: to.dept, by: me().id, reason: o.reason, dealsMoved: running.length }]);
-  audit('Ubah', 'Client & Partner', 'Serah terima ' + r.name + ': ' + from.dept + ' ke ' + to.dept + ' (' + o.reason + ')');
+  audit('Ubah', 'Client & Partner', 'Penanganan ' + r.name + ' diserahkan: ' + from.dept + ' ke ' + to.dept + ' (' + o.reason + ')');
   notify(to.id, me().name + ' menyerahkan ' + r.name + ' ke kamu', 'rec:' + r.id);
   App.modal = null; if (!canSeeRec(r)) App.drawer = null; commit();
-  toast('Diserahkan', r.name + ' sekarang dipegang ' + to.name + ' (' + to.dept + ').');
+  toast('Penanganan diserahkan', r.name + ' → ' + to.dept + ' · ' + to.name, 'info');
 };
 
-/* ---------- Akses & Audit: layanan dan department lintas divisi ---------- */
-const _optionsTab = AdminTabs.options;
-AdminTabs.options = (adm) => {
+/* ---------- Akses & Audit: tab Layanan & Divisi, dan department lintas divisi ---------- */
+AdminTabs.services = (adm) => {
   const svcs = (Store.db.services || serviceList());
-  const svc = '<div class="card pad" style="display:flex;flex-direction:column;gap:12px;padding:20px"><div><strong>Layanan dan divisi yang menangani</strong><p class="small muted" style="margin:4px 0 0">Layanan bukan status relasi. Mengubah pemetaan ini ga memindahkan PIC atau divisi data yang sudah ada; perpindahan tetap lewat Serah terima. KOL dan Community sementara ke Digital Campaign.</p></div>' +
-    '<div style="display:flex;flex-direction:column;gap:8px">' + svcs.map(x => '<div class="lrow" style="padding:10px 12px;gap:10px"><span style="flex:1 1 140px;min-width:0"><strong>' + esc(x.name) + '</strong>' + (x.active === false ? ' <span class="chip c-n">nonaktif</span>' : '') + '</span>' +
-      (adm ? '<label style="flex:1 1 180px"><span class="sr">Divisi untuk ' + esc(x.name) + '</span><select class="inp" data-ch="svcdept" data-v="' + x.id + '" style="min-height:44px">' + opt('', x.dept, 'Belum ditentukan') + Store.db.departments.map(d => opt(d.name, x.dept)).join('') + '</select></label>' +
-        '<button type="button" class="btn btn-s btn-sm" data-a="svcactive" data-v="' + x.id + '">' + (x.active === false ? 'Aktifkan' : 'Nonaktifkan') + '</button>'
-        : '<span class="small">' + esc(x.dept || 'Belum ditentukan') + '</span>') + '</div>').join('') + '</div>' +
-    (adm ? '<form data-form="svcadd" style="display:flex;flex-wrap:wrap;gap:8px"><label style="flex:1 1 180px"><span class="sr">Nama layanan baru</span><input class="inp" name="name" placeholder="Layanan baru" style="min-height:44px"></label><button type="submit" class="btn btn-sm">Tambah</button></form>' : '') + '</div>';
-  return _optionsTab(adm) + svc;
+  return '<div class="sec-h"><div><span class="lbl">Layanan dan penanggung jawab</span><h2 class="disp h2">Layanan terpisah dari status.</h2></div></div>' +
+    '<p class="small muted" style="margin:0">Status relasi hanya Lead atau Client. Pemetaan layanan adalah saran divisi penerima, bukan jalur wajib: setiap divisi tetap bisa menerima Lead langsung dan memindahkan PIC / divisi. Mengubah pemetaan tidak memindahkan data yang sudah ada.</p>' +
+    '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Layanan</th><th>Divisi layanan</th>' + (adm ? '<th><span class="sr">Aksi</span></th>' : '') + '</tr></thead><tbody>' +
+    svcs.map(x => '<tr><td><strong>' + esc(x.name) + '</strong>' + (x.active === false ? ' <span class="chip c-n">nonaktif</span>' : '') + '</td><td>' +
+      (adm ? '<label><span class="sr">Divisi layanan ' + esc(x.name) + '</span><select class="inp" data-ch="svcdept" data-v="' + x.id + '" style="min-height:44px">' + opt('', x.dept, 'Belum ditentukan') + Store.db.departments.map(d => opt(d.name, x.dept)).join('') + '</select></label>' : esc(x.dept || 'Belum ditentukan')) + '</td>' +
+      (adm ? '<td style="text-align:right"><button type="button" class="btn btn-s btn-sm" data-a="svcactive" data-v="' + x.id + '">' + (x.active === false ? 'Aktifkan' : 'Nonaktifkan') + '</button></td>' : '') + '</tr>').join('') + '</tbody></table></div>' +
+    (adm ? '<form data-form="svcadd" style="display:flex;flex-wrap:wrap;gap:8px"><label style="flex:1 1 180px"><span class="sr">Nama layanan baru</span><input class="inp" name="name" placeholder="Layanan baru" style="min-height:44px"></label><button type="submit" class="btn btn-sm">' + ic('plus', 'ic-s') + 'Layanan baru</button></form>' : '');
 };
+Changes['record-service'] = (el) => { App.modal.val = Object.assign({}, App.modal.val, fd(el.closest('form'))); App.modal.still = true; render(); };
 Changes.svcdept = (el) => { const x = (Store.db.services || []).find(s => s.id === el.dataset.v); if (!x) return; audit('Ubah', 'Layanan', x.name + ': ditangani ' + (el.value || 'belum ditentukan')); x.dept = el.value; commit(); };
 Actions.svcactive = (el) => { const x = (Store.db.services || []).find(s => s.id === el.dataset.v); if (!x) return; x.active = x.active === false; audit('Ubah', 'Layanan', x.name + (x.active ? ' diaktifkan' : ' dinonaktifkan')); commit(); };
 Forms.svcadd = (o) => { if (!o.name) return; Store.db.services = Store.db.services || []; if (Store.db.services.some(x => x.name.toLowerCase() === o.name.toLowerCase())) { toast('Udah ada', o.name + ' udah ada di daftar.', 'bad'); return; } Store.db.services.push({ id: uid('s'), name: o.name, dept: '', active: true }); audit('Tambah', 'Layanan', o.name); commit(); };

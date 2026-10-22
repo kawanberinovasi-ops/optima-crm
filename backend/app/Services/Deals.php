@@ -4,12 +4,15 @@ namespace App\Services;
 
 use App\Enums\Category;
 use App\Enums\DealStatus;
+use App\Enums\Role;
 use App\Models\ClientPartner;
 use App\Models\Deal;
+use App\Models\Department;
 use App\Models\Pipeline;
 use App\Models\Stage;
 use App\Models\User;
 use App\Support\Codes;
+use App\Support\DivisionDefaults;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -42,6 +45,56 @@ class Deals
 
             return $deal;
         });
+    }
+
+    /** Pipeline divisi (satu per divisi). Dibuat dengan stage standar kalau divisi itu belum punya. */
+    public function pipelineFor(int $departmentId): Pipeline
+    {
+        $pipeline = Pipeline::where('department_id', $departmentId)->whereNull('archived_at')->orderBy('position')->first();
+        if ($pipeline) {
+            return $pipeline;
+        }
+        $dept = Department::findOrFail($departmentId);
+
+        return DB::transaction(function () use ($dept) {
+            $name = Pipeline::where('name', $dept->name)->exists() ? $dept->name.' (divisi)' : $dept->name;
+            $pipeline = Pipeline::create(['name' => $name, 'department_id' => $dept->id, 'position' => (int) Pipeline::max('position') + 1]);
+            foreach (DivisionDefaults::STAGES as $i => $stage) {
+                $pipeline->stages()->create(['name' => $stage, 'position' => $i, 'is_closing' => $stage === 'Closing']);
+            }
+            $this->audit->log('Tambah', 'Pipeline', $pipeline->id, $pipeline->name.' untuk divisi '.$dept->name);
+
+            return $pipeline;
+        });
+    }
+
+    /** PIC deal harus pengguna aktif, bukan Viewer, dari divisi pemilik relasi. */
+    public function assertOwner(?User $owner, ClientPartner $record, string $field = 'ownerId'): void
+    {
+        if (! $owner || ! $owner->active || $owner->role === Role::Viewer || $owner->department_id !== $record->department_id) {
+            throw ValidationException::withMessages([$field => 'PIC deal harus pengguna aktif dari divisi '.($record->department?->name ?? 'pemilik data').'.']);
+        }
+    }
+
+    /**
+     * Deal ikut divisi baru relasinya: pindah ke pipeline divisi itu. Stage dicocokkan lewat nama, kalau tidak ada
+     * lewat urutan; deal Won tetap di Closing. Perpindahan dicatat di riwayat deal.
+     */
+    public function moveToDivision(User $by, Deal $deal, Pipeline $target, string $note): void
+    {
+        if ($deal->pipeline_id === $target->id) {
+            return;
+        }
+        $from = $deal->stage;
+        $stages = $target->stages()->get();
+        $open = $stages->where('is_closing', false)->values();
+        $stage = $deal->status === DealStatus::Won || $from?->is_closing
+            ? $stages->firstWhere('is_closing', true)
+            : ($open->first(fn (Stage $s) => strcasecmp($s->name, (string) $from?->name) === 0)
+                ?? $open->get(min($deal->pipeline->stages()->where('is_closing', false)->where('position', '<', (int) $from?->position)->count(), $open->count() - 1)));
+        $oldLine = $deal->pipeline->name;
+        $deal->update(['pipeline_id' => $target->id, 'stage_id' => $stage->id]);
+        $this->history($deal, $by, $from, $stage, $deal->status, $note.' (pipeline '.$oldLine.' ke '.$target->name.')');
     }
 
     /** Pindah ke stage lain yang bukan Closing. Deal On Hold yang dipindah otomatis aktif lagi. */

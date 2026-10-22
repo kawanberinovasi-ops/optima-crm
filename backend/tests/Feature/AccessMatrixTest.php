@@ -14,10 +14,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * Matriks hak akses awal: tabel SRS bagian 3 (halaman 4) dengan perubahan alur bisnis 22 Okt 2026.
+ * Matriks hak akses awal: tabel SRS bagian 3 (halaman 4) dengan keputusan 22 Okt 2026 (mengikuti pratinjau klien).
  * - Kolom Community, KOL/KOC, dan Media dihapus: sekarang layanan, bukan status relasi.
- * - Lead C untuk department yang punya hak input interaksi (Customer Service, Creative & Media), supaya siapa pun
- *   yang punya hak input bisa menerima Lead langsung.
+ * - Commercial dilebur ke Customer Service. Executive dan CS mengelola (M), divisi lain mengelola datanya sendiri (C).
  * Tabel ditulis di sini, bukan dibaca dari seeder, supaya selisih dengan keputusan bisnis langsung ketahuan.
  */
 class AccessMatrixTest extends TestCase
@@ -32,14 +31,13 @@ class AccessMatrixTest extends TestCase
 
     /** Department => [Lead, Client, Interaksi, Deal, Nilai deal, Rate card] */
     private const SRS = [
-        'Executive' => ['M', 'M', 'M', 'M', 'Ya', 'Ya'],
-        'Commercial' => ['M', 'M', 'C', 'M', 'Ya*', 'R*'],
-        'Customer Service' => ['C', 'R', 'M', 'R', 'Tidak', 'Tidak'],
-        'Digital Campaign' => ['C', 'R', 'C', 'N', 'Tidak', 'M'],
-        'Creative & Media' => ['C', 'R', 'C', 'N', 'Tidak', 'Tidak'],
-        'CampusNet' => ['C', 'R', 'C', 'N', 'Tidak', 'Tidak'],
-        'DietPartner' => ['C', 'R', 'C', 'N', 'Tidak', 'Tidak'],
-        'Business Operation' => ['R', 'R', 'R', 'R', 'Lihat*', 'Tidak'],
+        'Executive' => ['M', 'M', 'M', 'M', 'Ya', 'M'],
+        'Customer Service' => ['M', 'M', 'M', 'M', 'Ya*', 'Tidak'],
+        'Digital Campaign' => ['C', 'C', 'C', 'C', 'Ya*', 'M'],
+        'Creative & Media' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
+        'CampusNet' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
+        'DietPartner' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
+        'Business Operation' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
     ];
 
     private const ENTITIES = ['lead', 'client', 'interaksi', 'deal'];
@@ -98,11 +96,14 @@ class AccessMatrixTest extends TestCase
         $this->assertFalse($this->access()->canCreateAnyRecord($viewer));
     }
 
-    public function test_viewer_keeps_no_access_where_department_has_none(): void
+    public function test_viewer_is_capped_at_read_even_with_personal_override(): void
     {
         $viewer = $this->user('Digital Campaign', Role::Viewer);
+        $this->assertSame(AccessLevel::R, $this->access()->level($viewer, 'deal'));
 
-        $this->assertSame(AccessLevel::N, $this->access()->level($viewer, 'deal'));
+        AccessOverride::create(['user_id' => $viewer->id, 'entity' => 'deal', 'level' => 'M']);
+        $this->access()->forget($viewer);
+        $this->assertSame(AccessLevel::R, $this->access()->level($viewer, 'deal'));
     }
 
     public function test_super_admin_always_has_full_access(): void
@@ -122,8 +123,8 @@ class AccessMatrixTest extends TestCase
         foreach ([Role::KepalaDepartment, Role::Koordinator, Role::Staf, Role::Viewer] as $role) {
             $this->assertFalse($this->access()->canAdminister($this->user('Executive', $role)), $role->value);
         }
-        $this->assertTrue($this->access()->canViewAdmin($this->user('Commercial', Role::KepalaDepartment)));
-        $this->assertFalse($this->access()->canViewAdmin($this->user('Commercial', Role::Koordinator)));
+        $this->assertTrue($this->access()->canViewAdmin($this->user('Customer Service', Role::KepalaDepartment)));
+        $this->assertFalse($this->access()->canViewAdmin($this->user('Customer Service', Role::Koordinator)));
     }
 
     public function test_inactive_user_has_no_access_at_all(): void
@@ -137,15 +138,15 @@ class AccessMatrixTest extends TestCase
 
     public function test_personal_override_beats_department_matrix(): void
     {
-        $staff = $this->user('Customer Service');
-        $this->assertSame(AccessLevel::R, $this->access()->level($staff, 'deal'));
+        $staff = $this->user('CampusNet');
+        $this->assertSame(AccessLevel::C, $this->access()->level($staff, 'deal'));
         $this->assertFalse($this->access()->canSeeDealValue($staff));
 
-        AccessOverride::create(['user_id' => $staff->id, 'entity' => 'deal', 'level' => 'C', 'reason' => 'Bantu tim BD']);
+        AccessOverride::create(['user_id' => $staff->id, 'entity' => 'deal', 'level' => 'M', 'reason' => 'Bantu tim CS']);
         AccessOverride::create(['user_id' => $staff->id, 'entity' => 'nilai', 'level' => 'Ya']);
         $this->access()->forget($staff);
 
-        $this->assertSame(AccessLevel::C, $this->access()->level($staff, 'deal'));
+        $this->assertSame(AccessLevel::M, $this->access()->level($staff, 'deal'));
         $this->assertTrue($this->access()->canSeeDealValue($staff));
     }
 

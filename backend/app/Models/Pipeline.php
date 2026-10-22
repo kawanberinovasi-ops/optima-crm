@@ -4,16 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-/** Satu pipeline per lini bisnis, dengan urutan stage sendiri (SRS 4.3). */
-#[Fillable(['name', 'position', 'archived_at'])]
+/** Satu pipeline per divisi, dengan urutan stage sendiri (SRS 4.3). department_id kosong untuk pipeline lama yang diarsipkan. */
+#[Fillable(['name', 'department_id', 'position', 'archived_at'])]
 class Pipeline extends Model
 {
     protected function casts(): array
     {
         return ['archived_at' => 'datetime'];
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function stages(): HasMany

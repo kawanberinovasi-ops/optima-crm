@@ -39,13 +39,13 @@ class MeController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'filter' => ['required', 'array'],
-            'filter.cat' => ['nullable', 'string'], 'filter.dept' => ['nullable', 'string'], 'filter.q' => ['nullable', 'string', 'max:100'],
+            'filter.cat' => ['nullable', 'string'], 'filter.dept' => ['nullable', 'string'], 'filter.service' => ['nullable', 'string', 'max:100'], 'filter.q' => ['nullable', 'string', 'max:100'],
             'filter.sort' => ['nullable', 'string'], 'filter.arch' => ['nullable', 'boolean'],
         ], ['name.required' => 'Kasih nama tampilannya.']);
 
         DB::table('saved_views')->insert([
             'user_id' => $request->user()->id, 'page' => 'cp', 'name' => trim($data['name']),
-            'filters' => json_encode(array_intersect_key($data['filter'], array_flip(['cat', 'dept', 'q', 'sort', 'arch']))),
+            'filters' => json_encode(array_intersect_key($data['filter'], array_flip(['cat', 'dept', 'service', 'q', 'sort', 'arch']))),
             'created_at' => now(), 'updated_at' => now(),
         ]);
 

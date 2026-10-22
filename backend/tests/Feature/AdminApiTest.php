@@ -7,6 +7,7 @@ use App\Enums\Role;
 use App\Models\AccessGrant;
 use App\Models\Department;
 use App\Models\OptionList;
+use App\Models\Pipeline;
 use App\Models\User;
 use App\Services\Access;
 use Database\Seeders\ReferenceDataSeeder;
@@ -25,7 +26,7 @@ class AdminApiTest extends TestCase
         $this->seed(ReferenceDataSeeder::class);
     }
 
-    private function user(string $dept = 'Commercial', Role $role = Role::Staf): User
+    private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User
     {
         return User::factory()->inDepartment($dept)->role($role)->create();
     }
@@ -42,10 +43,10 @@ class AdminApiTest extends TestCase
 
     public function test_only_super_admin_changes_admin_settings(): void
     {
-        $head = $this->user('Commercial', Role::KepalaDepartment);
+        $head = $this->user('Customer Service', Role::KepalaDepartment);
 
-        $this->as($head)->postJson('/api/users', ['name' => 'X', 'email' => 'x@contoh.test', 'dept' => 'Commercial', 'role' => 'Staf'])->assertForbidden();
-        $this->as($head)->putJson('/api/access-grants', ['dept' => 'Commercial', 'entity' => 'deal', 'level' => 'R'])->assertForbidden();
+        $this->as($head)->postJson('/api/users', ['name' => 'X', 'email' => 'x@contoh.test', 'dept' => 'Customer Service', 'role' => 'Staf'])->assertForbidden();
+        $this->as($head)->putJson('/api/access-grants', ['dept' => 'Customer Service', 'entity' => 'deal', 'level' => 'R'])->assertForbidden();
         $this->as($head)->getJson('/api/audit-logs')->assertOk(); // Kepala Department boleh melihat
         $this->as($this->user())->getJson('/api/audit-logs')->assertForbidden();
     }
@@ -85,14 +86,14 @@ class AdminApiTest extends TestCase
     public function test_access_grant_change_takes_effect_and_is_audited(): void
     {
         $staff = $this->user('Digital Campaign');
-        $this->assertFalse(app(Access::class)->can($staff, 'deal', AccessLevel::R));
+        $this->assertTrue(app(Access::class)->can($staff, 'deal', AccessLevel::C));
 
         $this->as($this->admin())->putJson('/api/access-grants', ['dept' => 'Digital Campaign', 'entity' => 'deal', 'level' => 'R'])->assertOk();
         $this->as($this->admin())->putJson('/api/access-grants', ['dept' => 'Digital Campaign', 'entity' => 'nilai', 'level' => 'M'])->assertStatus(422);
 
         app(Access::class)->forget();
-        $this->assertTrue(app(Access::class)->can($staff, 'deal', AccessLevel::R));
-        $this->assertDatabaseHas('audit_logs', ['entity_type' => 'Hak akses', 'summary' => 'Digital Campaign · deal: N jadi R']);
+        $this->assertFalse(app(Access::class)->can($staff, 'deal', AccessLevel::C));
+        $this->assertDatabaseHas('audit_logs', ['entity_type' => 'Hak akses', 'summary' => 'Digital Campaign · deal: C jadi R']);
     }
 
     public function test_override_replace_and_revoke(): void
@@ -116,13 +117,15 @@ class AdminApiTest extends TestCase
         $admin = $this->admin();
 
         $res = $this->as($admin)->postJson('/api/departments', ['name' => 'Training'])->assertCreated();
-        $this->assertSame('R', $res->json('access.lead'));
-        $this->assertSame('Tidak', $res->json('access.nilai'));
+        $this->assertSame('C', $res->json('access.lead'));
+        $this->assertSame('Ya*', $res->json('access.nilai'));
         $id = $res->json('data.id');
+        $this->assertSame('Training', Pipeline::where('department_id', $id)->value('name'), 'department baru langsung punya pipeline');
 
         $this->as($admin)->patchJson('/api/departments/'.$id, ['name' => 'Training & Development'])->assertOk();
-        $this->user('Commercial'); // department yang masih punya pengguna
-        $this->as($admin)->deleteJson('/api/departments/'.Department::where('name', 'Commercial')->value('id'))->assertStatus(422);
+        $this->assertSame('Training & Development', Pipeline::where('department_id', $id)->value('name'), 'pipeline ikut berganti nama');
+        $this->user('Customer Service'); // department yang masih punya pengguna
+        $this->as($admin)->deleteJson('/api/departments/'.Department::where('name', 'Customer Service')->value('id'))->assertStatus(422);
         $this->as($admin)->deleteJson('/api/departments/'.$id)->assertOk();
         $this->assertSame(0, AccessGrant::where('department_id', $id)->count());
     }

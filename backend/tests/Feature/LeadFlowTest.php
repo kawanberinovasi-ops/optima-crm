@@ -66,12 +66,12 @@ class LeadFlowTest extends TestCase
 
     public function test_1_users_from_many_divisions_receive_leads_directly(): void
     {
-        foreach (['Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Commercial', 'Executive'] as $dept) {
+        foreach (['Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation', 'Executive'] as $dept) {
             $lead = $this->newLead($this->user($dept), ['service' => 'KOL']);
             $this->assertSame('Lead', $lead['cat'], $dept);
         }
-        // Yang tidak punya hak input (Business Operation, Viewer) tetap tidak bisa.
-        $this->as($this->user('Business Operation'))->postJson('/api/client-partners', ['name' => 'X'])->assertForbidden();
+        // Viewer tetap tidak bisa.
+        $this->as($this->user('Business Operation', Role::Viewer))->postJson('/api/client-partners', ['name' => 'X'])->assertForbidden();
     }
 
     public function test_2_pic_division_and_creator_follow_the_person_who_fills_in(): void
@@ -88,7 +88,7 @@ class LeadFlowTest extends TestCase
 
     public function test_3_lead_becomes_client_after_won(): void
     {
-        $me = $this->user('Commercial');
+        $me = $this->user('Customer Service');
         $lead = $this->newLead($me);
         $deal = $this->newDeal($me, $lead['id']);
 
@@ -102,7 +102,7 @@ class LeadFlowTest extends TestCase
 
     public function test_4_lost_and_on_hold_do_not_convert_and_client_stays_client(): void
     {
-        $me = $this->user('Commercial');
+        $me = $this->user('Customer Service');
         $lead = $this->newLead($me);
         $lost = $this->newDeal($me, $lead['id']);
         $hold = $this->newDeal($me, $lead['id']);
@@ -127,11 +127,11 @@ class LeadFlowTest extends TestCase
         $dc = $this->user('Digital Campaign', Role::KepalaDepartment);
         $cs = $this->user('Customer Service', Role::KepalaDepartment);
         $cm = $this->user('Creative & Media', Role::KepalaDepartment);
-        $com = $this->user('Commercial', Role::KepalaDepartment);
+        $cn = $this->user('CampusNet', Role::KepalaDepartment);
         $lead = $this->newLead($dc, ['service' => 'Media']);
 
-        // DC -> CS -> Creative & Media -> Commercial -> DC
-        foreach ([[$dc, $cs], [$cs, $cm], [$cm, $com], [$com, $dc]] as [$from, $to]) {
+        // DC -> CS -> Creative & Media -> CampusNet -> DC
+        foreach ([[$dc, $cs], [$cs, $cm], [$cm, $cn], [$cn, $dc]] as [$from, $to]) {
             $res = $this->handover($from, $lead['id'], $to)->assertOk();
             $this->assertSame($to->department->name, $res->json('data.dept'));
             $this->assertSame((string) $to->id, $res->json('data.picId'));
@@ -159,20 +159,21 @@ class LeadFlowTest extends TestCase
         $this->handover($dc, $lead['id'], $viewer)->assertUnprocessable();
         $inactive = User::factory()->inDepartment('Customer Service')->inactive()->create();
         $this->handover($dc, $lead['id'], $inactive)->assertUnprocessable();
-        // Staf biasa dengan level C tidak bisa menyerahkan (role yang ada tetap berlaku).
+        // Siapa pun yang boleh mengubah data boleh memindahkan: staf C atas data yang PIC-nya dia sendiri,
+        // tapi tidak atas data rekan sedivisi.
         $staff = $this->user('Digital Campaign');
         $own = $this->newLead($staff);
-        $this->handover($staff, $own['id'], $cs)->assertForbidden();
+        $this->handover($this->user('Digital Campaign'), $own['id'], $cs)->assertForbidden();
+        $this->handover($staff, $own['id'], $cs)->assertOk();
     }
 
     public function test_6_access_follows_the_new_division_after_handover(): void
     {
         $dc = $this->user('Digital Campaign', Role::KepalaDepartment);
         $dcStaff = $this->user('Digital Campaign');
-        $com = $this->user('Commercial');
+        $com = $this->user('Customer Service');
         $lead = $this->newLead($dc);
         $this->as($dc)->postJson('/api/interactions', ['recordId' => $lead['id'], 'type' => 'Telepon', 'date' => today()->toDateString(), 'result' => 'Kenalan', 'fuDate' => today()->toDateString()])->assertCreated();
-        // DC tidak punya akses deal (N), jadi deal dibuat Commercial setelah serah terima.
 
         $this->as($com)->getJson('/api/client-partners/'.$lead['id'])->assertForbidden();
         $this->handover($dc, $lead['id'], $com)->assertOk();
@@ -189,7 +190,7 @@ class LeadFlowTest extends TestCase
 
     public function test_6b_running_deals_move_to_new_pic_closed_deals_keep_history(): void
     {
-        $com = $this->user('Commercial', Role::KepalaDepartment);
+        $com = $this->user('Customer Service', Role::KepalaDepartment);
         $exec = $this->user('Executive', Role::KepalaDepartment);
         $lead = $this->newLead($com);
         $open = $this->newDeal($com, $lead['id']);
@@ -201,12 +202,18 @@ class LeadFlowTest extends TestCase
         $this->assertSame($exec->id, Deal::find($open['id'])->owner_id);
         $this->assertSame($com->id, Deal::find($won['id'])->owner_id, 'deal Won tetap tercatat atas PIC lama');
         $this->assertSame(1, Handover::first()->deals_moved);
-        $this->assertStringContainsString('Serah terima', Deal::find($open['id'])->histories()->latest('id')->value('note'));
+        $this->assertStringContainsString('Pindah ke', Deal::find($open['id'])->histories()->latest('id')->value('note'));
+
+        // Semua deal (termasuk yang Won) ikut pipeline divisi baru; Won tetap di Closing.
+        $line = Pipeline::with('stages')->whereRelation('department', 'name', 'Executive')->first();
+        $this->assertSame([$line->id, $line->id], [Deal::find($open['id'])->pipeline_id, Deal::find($won['id'])->pipeline_id]);
+        $this->assertSame('Lead', Deal::find($open['id'])->stage->name, 'stage dicocokkan lewat nama');
+        $this->assertTrue(Deal::find($won['id'])->stage->is_closing);
     }
 
     public function test_7_executive_sees_across_divisions_others_do_not(): void
     {
-        foreach (['Digital Campaign', 'Customer Service', 'Creative & Media', 'Commercial'] as $dept) {
+        foreach (['Digital Campaign', 'Customer Service', 'Creative & Media', 'CampusNet'] as $dept) {
             $this->newLead($this->user($dept), ['name' => 'Lead '.$dept]);
         }
 
@@ -231,7 +238,7 @@ class LeadFlowTest extends TestCase
         $migration = require database_path('migrations/2026_10_22_000001_lead_client_flow.php');
         $migration->down();
 
-        $pic = $this->user('Commercial');
+        $pic = $this->user('Customer Service');
         $line = Pipeline::with('stages')->first();
         $insert = fn (string $code, string $cat) => DB::table('client_partners')->insertGetId([
             'code' => $code, 'name' => 'Lama '.$code, 'category' => $cat, 'pic_id' => $pic->id, 'department_id' => $pic->department_id,
@@ -310,7 +317,7 @@ class LeadFlowTest extends TestCase
         $admin = $this->user('Executive', Role::SuperAdmin);
         $community = Service::where('name', 'Community')->first();
 
-        $this->as($this->user('Commercial', Role::KepalaDepartment))->patchJson('/api/services/'.$community->id, ['deptId' => null])->assertForbidden();
+        $this->as($this->user('Customer Service', Role::KepalaDepartment))->patchJson('/api/services/'.$community->id, ['deptId' => null])->assertForbidden();
         $this->as($admin)->patchJson('/api/services/'.$community->id, ['deptId' => Department::where('name', 'CampusNet')->value('id')])
             ->assertOk()->assertJsonFragment(['name' => 'Community', 'dept' => 'CampusNet']);
 
@@ -330,7 +337,7 @@ class LeadFlowTest extends TestCase
 
         $own = $this->as($dc)->postJson('/api/imports/check', ['filename' => 'a.xlsx', 'sheets' => $rows('Digital Campaign')])->json('data');
         $this->assertCount(1, $own['records']);
-        $other = $this->as($dc)->postJson('/api/imports/check', ['filename' => 'b.xlsx', 'sheets' => $rows('Commercial')])->json('data');
+        $other = $this->as($dc)->postJson('/api/imports/check', ['filename' => 'b.xlsx', 'sheets' => $rows('Customer Service')])->json('data');
         $this->assertStringContainsString('Divisi pemilik harus divisi kamu', $other['errors'][0]);
 
         $this->as($dc)->postJson('/api/imports/'.$own['id'].'/commit')->assertOk();
@@ -340,10 +347,10 @@ class LeadFlowTest extends TestCase
 
     public function test_won_deal_from_import_makes_client(): void
     {
-        $com = $this->user('Commercial', Role::KepalaDepartment);
+        $com = $this->user('Customer Service', Role::KepalaDepartment);
         $com->update(['email' => 'com@contoh.test']);
         $sheets = [
-            'records' => [['_row' => 6, 'kode sumber' => 'W-1', 'nama' => 'PT Won', 'kategori' => 'Lead', 'email pic' => 'com@contoh.test', 'department pemilik' => 'Commercial']],
+            'records' => [['_row' => 6, 'kode sumber' => 'W-1', 'nama' => 'PT Won', 'kategori' => 'Lead', 'email pic' => 'com@contoh.test', 'department pemilik' => 'Customer Service']],
             'deals' => [['_row' => 6, 'kode sumber' => 'WD-1', 'kode client & partner' => 'W-1', 'lini bisnis' => $this->pipeline->name, 'status' => 'Won',
                 'email pic' => 'com@contoh.test', 'nilai deal (rp)' => '1000000', 'tanggal closing' => today()->toDateString()]],
         ];

@@ -26,10 +26,11 @@ class DealApiTest extends TestCase
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
-        $this->pipeline = Pipeline::with('stages')->first();
+        // Deal selalu masuk pipeline divisi pemilik relasi; pengguna bawaan tes ada di Customer Service.
+        $this->pipeline = Pipeline::with('stages')->whereRelation('department', 'name', 'Customer Service')->firstOrFail();
     }
 
-    private function user(string $dept = 'Commercial', Role $role = Role::Staf): User
+    private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User
     {
         return User::factory()->inDepartment($dept)->role($role)->create();
     }
@@ -66,26 +67,50 @@ class DealApiTest extends TestCase
         $this->assertTrue(AuditLog::where(['entity_type' => 'Deal', 'entity_id' => $deal['id'], 'action' => 'Tambah'])->exists());
     }
 
-    public function test_departments_without_deal_access_cannot_see_or_create_deals(): void
+    public function test_deals_and_pipelines_of_other_divisions_are_hidden(): void
     {
         $this->newDeal($this->user());
         $dc = $this->user('Digital Campaign');
 
-        $this->as($dc)->getJson('/api/deals')->assertForbidden();
-        $this->as($dc)->getJson('/api/bootstrap')->assertOk()->assertJsonPath('deals', []);
-        $this->as($this->user('Business Operation'))->postJson('/api/deals', ['title' => 'X', 'recordId' => 1, 'lineId' => 1])->assertForbidden();
+        $this->as($dc)->getJson('/api/deals')->assertOk()->assertJsonPath('data', []);
+        $boot = $this->as($dc)->getJson('/api/bootstrap')->assertOk();
+        $this->assertSame([], $boot->json('deals'));
+        $this->assertSame(['Digital Campaign'], array_column($boot->json('lines'), 'dept'), 'hanya pipeline divisinya');
+        $this->assertCount(7, $this->as($this->user('Executive'))->getJson('/api/bootstrap')->json('lines'), 'Executive melihat semua pipeline');
+
+        $noDeal = $this->user('Business Operation');
+        AccessOverride::create(['user_id' => $noDeal->id, 'entity' => 'deal', 'level' => 'N']);
+        $this->as($noDeal)->getJson('/api/deals')->assertForbidden();
+        $this->as($noDeal)->postJson('/api/deals', ['title' => 'X', 'recordId' => 1])->assertForbidden();
+    }
+
+    public function test_new_deal_uses_record_division_pipeline_and_owner_from_that_division(): void
+    {
+        $pic = $this->user('CampusNet');
+        $record = ClientPartner::create(['code' => 'CP-CN', 'name' => 'Sekolah Nusa', 'category' => Category::Lead, 'pic_id' => $pic->id, 'department_id' => $pic->department_id]);
+        $exec = $this->user('Executive');
+
+        $deal = $this->as($exec)->postJson('/api/deals', ['title' => 'Portal siswa', 'recordId' => $record->id, 'lineId' => $this->pipeline->id])->assertCreated()->json('data');
+        $line = Pipeline::find($deal['lineId']);
+        $this->assertSame('CampusNet', $line->department->name, 'lineId dari klien diabaikan');
+        $this->assertSame((string) $pic->id, $deal['ownerId'], 'PIC deal bawaan = PIC relasi');
+
+        $this->as($exec)->postJson('/api/deals', ['title' => 'X', 'recordId' => $record->id, 'ownerId' => $this->user('Customer Service')->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('ownerId');
+        $this->as($exec)->postJson('/api/deals', ['title' => 'X', 'recordId' => $record->id, 'ownerId' => $this->user('CampusNet', Role::Viewer)->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('ownerId');
     }
 
     public function test_deal_values_are_not_sent_to_users_without_permission(): void
     {
-        $deal = $this->newDeal($this->user('Commercial', Role::KepalaDepartment));
+        $deal = $this->newDeal($this->user('Customer Service', Role::KepalaDepartment));
 
-        // Staf Commercial (Ya*) melihat deal divisinya, tapi nilainya hanya untuk Kepala Department dan Koordinator.
-        $row = collect($this->as($this->user('Commercial'))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
+        // Staf Customer Service (Ya*) melihat deal divisinya, tapi nilainya hanya untuk Kepala Department dan Koordinator.
+        $row = collect($this->as($this->user('Customer Service'))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
         $this->assertSame('', $row['offer']);
         $this->assertTrue($row['valueHidden']);
 
-        $row = collect($this->as($this->user('Commercial', Role::Koordinator))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
+        $row = collect($this->as($this->user('Customer Service', Role::Koordinator))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
         $this->assertSame(50000000, $row['offer'], 'Ya* untuk Koordinator');
 
         $this->assertNull(collect($this->as($this->user('Business Operation', Role::Koordinator))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']), 'divisi lain tidak menerima deal');
@@ -114,11 +139,15 @@ class DealApiTest extends TestCase
     public function test_staff_with_level_c_cannot_edit_other_peoples_deals(): void
     {
         $deal = $this->newDeal($this->user());
-        $other = $this->user('Executive', Role::Staf);
-        // Executive punya deal M, jadi pakai pengecualian C untuk menguji aturan "punya sendiri".
+        $other = $this->user();
+        // Customer Service punya deal M, jadi pakai pengecualian C untuk menguji aturan "punya sendiri".
         AccessOverride::create(['user_id' => $other->id, 'entity' => 'deal', 'level' => 'C']);
-
         $this->as($other)->postJson('/api/deals/'.$deal['id'].'/move', ['stageId' => $this->stage('Meeting')])->assertForbidden();
+
+        // Kepala Department/Koordinator dengan level C boleh mengubah deal divisinya.
+        $coord = $this->user('Customer Service', Role::Koordinator);
+        AccessOverride::create(['user_id' => $coord->id, 'entity' => 'deal', 'level' => 'C']);
+        $this->as($coord)->postJson('/api/deals/'.$deal['id'].'/move', ['stageId' => $this->stage('Meeting')])->assertOk();
     }
 
     public function test_won_requires_value_and_date_then_moves_to_closing(): void
@@ -172,7 +201,7 @@ class DealApiTest extends TestCase
 
         $this->as($owner)->postJson('/api/deals/'.$deal['id'].'/reopen', ['toStage' => $this->stage('Negotiation'), 'reason' => 'Salah klik'])->assertForbidden();
 
-        $head = $this->user('Commercial', Role::KepalaDepartment);
+        $head = $this->user('Customer Service', Role::KepalaDepartment);
         $this->as($head)->postJson('/api/deals/'.$deal['id'].'/reopen', ['toStage' => $this->stage('Negotiation')])
             ->assertUnprocessable()->assertJsonValidationErrors('reason');
         $open = $this->as($head)->postJson('/api/deals/'.$deal['id'].'/reopen', ['toStage' => $this->stage('Negotiation'), 'reason' => 'Klien minta revisi'])
@@ -186,7 +215,7 @@ class DealApiTest extends TestCase
 
     public function test_pipeline_configuration_by_department_head(): void
     {
-        $head = $this->user('Commercial', Role::KepalaDepartment);
+        $head = $this->user('Customer Service', Role::KepalaDepartment);
 
         $this->as($this->user())->postJson('/api/pipelines', ['name' => 'Event'])->assertForbidden();
 
@@ -208,7 +237,7 @@ class DealApiTest extends TestCase
 
     public function test_stage_with_deals_cannot_be_deleted(): void
     {
-        $head = $this->user('Commercial', Role::KepalaDepartment);
+        $head = $this->user('Customer Service', Role::KepalaDepartment);
         $this->newDeal($head);
 
         $this->as($head)->deleteJson('/api/stages/'.$this->stage('Lead'))->assertUnprocessable()->assertJsonPath('message', fn ($m) => str_contains($m, 'Masih ada 1 deal'));

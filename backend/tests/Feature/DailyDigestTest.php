@@ -29,7 +29,7 @@ class DailyDigestTest extends TestCase
     private function followup(string $email, int $daysFromToday): User
     {
         static $n = 0;
-        $user = User::where('email', $email)->first() ?? User::factory()->inDepartment('Commercial')->create(['email' => $email]);
+        $user = User::where('email', $email)->first() ?? User::factory()->inDepartment('Customer Service')->create(['email' => $email]);
         $record = ClientPartner::create(['code' => 'CP-G'.++$n, 'name' => 'Relasi '.$n, 'category' => Category::Client, 'pic_id' => $user->id, 'department_id' => $user->department_id]);
         Interaction::create(['code' => 'INT-G'.$n, 'client_partner_id' => $record->id, 'user_id' => $user->id, 'occurred_on' => today()->subDays(5),
             'type' => 'Telepon', 'result' => 'x', 'next_action' => 'Kirim proposal', 'followup_on' => today()->addDays($daysFromToday)]);
@@ -43,7 +43,7 @@ class DailyDigestTest extends TestCase
         $rina = $this->followup('rina@contoh.test', 0);
         $this->followup('rina@contoh.test', -3);
         $this->followup('rina@contoh.test', 4); // belum jatuh tempo
-        $free = User::factory()->inDepartment('Commercial')->create(['email' => 'santai@contoh.test']);
+        $free = User::factory()->inDepartment('Customer Service')->create(['email' => 'santai@contoh.test']);
 
         $this->artisan('optima:daily-digest')->assertSuccessful();
 

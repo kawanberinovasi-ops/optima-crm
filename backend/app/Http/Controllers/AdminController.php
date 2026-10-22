@@ -9,11 +9,14 @@ use App\Models\AuditLog;
 use App\Models\ClientPartner;
 use App\Models\Department;
 use App\Models\OptionList;
+use App\Models\Pipeline;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
 use App\Services\ChangeHistory;
+use App\Services\Deals;
+use App\Support\DivisionDefaults;
 use App\Support\FrontShape;
 use App\Support\Notify;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +37,7 @@ class AdminController extends Controller
 
     private const OPTION_LABEL = ['segments' => 'Segmen', 'sources' => 'Sumber data', 'interaction_types' => 'Jenis interaksi', 'lost_reasons' => 'Alasan deal Lost'];
 
-    public function __construct(private Access $access, private Audit $audit) {}
+    public function __construct(private Access $access, private Audit $audit, private Deals $deals) {}
 
     /* ---------- pengguna ---------- */
 
@@ -106,12 +109,11 @@ class AdminController extends Controller
 
         $dept = DB::transaction(function () use ($data) {
             $dept = Department::create(['name' => trim($data['name'])]);
-            // Sama seperti prototipe: department baru bisa melihat semua data, belum boleh melihat nilai deal dan rate card.
-            foreach (self::DATA_ENTITIES as $e) {
-                AccessGrant::create(['department_id' => $dept->id, 'entity' => $e, 'level' => 'R']);
+            // Department baru mengelola datanya sendiri (C), lengkap dengan pipeline divisinya.
+            foreach (DivisionDefaults::access($dept->name) as $entity => $level) {
+                AccessGrant::create(['department_id' => $dept->id, 'entity' => $entity, 'level' => $level]);
             }
-            AccessGrant::create(['department_id' => $dept->id, 'entity' => 'nilai', 'level' => 'Tidak']);
-            AccessGrant::create(['department_id' => $dept->id, 'entity' => 'rate', 'level' => 'Tidak']);
+            $this->deals->pipelineFor($dept->id);
 
             return $dept;
         });
@@ -130,6 +132,10 @@ class AdminController extends Controller
 
         $before = ['name' => $department->name, 'sees_all' => $department->sees_all];
         $department->update(array_filter(['name' => isset($data['name']) ? trim($data['name']) : null, 'sees_all' => $data['seesAll'] ?? null], fn ($v) => $v !== null));
+        if ($before['name'] !== $department->name && ! Pipeline::where('name', $department->name)->exists()) {
+            // Pipeline divisi ikut berganti nama.
+            $department->pipelines()->where('name', $before['name'])->update(['name' => $department->name]);
+        }
         $after = ['name' => $department->name, 'sees_all' => $department->sees_all];
         $summary = $before['name'] !== $after['name'] ? $before['name'].' jadi '.$after['name'] : $department->name;
         if ($before['sees_all'] !== $after['sees_all']) {
@@ -148,6 +154,10 @@ class AdminController extends Controller
             'Department ini masih punya pengguna atau data. Pindahkan dulu.');
 
         $name = $department->name;
+        // Pipeline kosong ikut dihapus; yang masih punya deal diarsipkan supaya riwayatnya tetap ada.
+        foreach ($department->pipelines as $pipeline) {
+            $pipeline->deals()->exists() ? $pipeline->update(['archived_at' => now(), 'department_id' => null]) : $pipeline->delete();
+        }
         $department->delete();
         $this->audit->log('Hapus', 'Department', null, $name);
 

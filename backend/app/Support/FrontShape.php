@@ -46,6 +46,7 @@ class FrontShape
         return [
             'id' => (string) $p->id,
             'name' => $p->name,
+            'dept' => $p->department?->name ?? '',
             'stages' => $p->stages->sortBy('position')->values()->map(fn (Stage $s) => ['id' => (string) $s->id, 'name' => $s->name])->all(),
         ];
     }

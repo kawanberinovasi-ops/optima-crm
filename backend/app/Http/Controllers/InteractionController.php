@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Enums\AccessLevel;
 use App\Enums\DealStatus;
+use App\Enums\Role;
 use App\Models\ClientPartner;
 use App\Models\Deal;
 use App\Models\Interaction;
-use App\Models\Pipeline;
 use App\Models\Stage;
 use App\Services\Access;
 use App\Services\Audit;
@@ -72,16 +72,18 @@ class InteractionController extends Controller
 
             if ($dealId === 'new') {
                 abort_unless($this->access->can($me, 'deal', AccessLevel::C), 403, 'Kamu ga punya izin menambah deal.');
-                $pipeline = isset($data['lineId']) ? Pipeline::findOrFail($data['lineId']) : Pipeline::orderBy('position')->firstOrFail();
+                $pipeline = $this->deals->pipelineFor($record->department_id);
                 $stage = isset($data['toStage']) ? Stage::find($data['toStage']) : null;
+                $owner = $me->department_id === $record->department_id && $me->role !== Role::Viewer ? $me : $record->pic;
+                $this->deals->assertOwner($owner, $record, 'dealTitle');
                 $deal = $this->deals->create($me, $record, $pipeline, $stage, [
-                    'title' => trim($data['dealTitle']), 'owner_id' => $me->id, 'target_closing' => today()->addDays(30),
+                    'title' => trim($data['dealTitle']), 'owner_id' => $owner->id, 'target_closing' => today()->addDays(30),
                 ], 'Deal dibuat dari catat interaksi');
                 $stageNote = 'Deal baru di '.$deal->stage->name;
             } elseif ($dealId !== '') {
                 $deal = Deal::where('client_partner_id', $record->id)->findOrFail((int) $dealId);
                 abort_unless($this->access->can($me, 'deal', AccessLevel::R), 403, 'Akun ini ga punya akses ke deal.');
-                $to = isset($data['toStage']) ? Stage::find($data['toStage']) : null;
+                $to = isset($data['toStage']) ? Stage::where('pipeline_id', $deal->pipeline_id)->find($data['toStage']) : null;
                 if ($to && $to->id !== $deal->stage_id && $this->access->canEditDeal($me, $deal)) {
                     if ($to->is_closing) {
                         // Closing butuh nilai dan tanggal: frontend membuka form Closing setelah ini.

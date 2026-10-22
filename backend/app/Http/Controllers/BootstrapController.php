@@ -63,7 +63,7 @@ class BootstrapController extends Controller
 
         $canDeal = $access->can($me, 'deal', AccessLevel::R);
         $deals = $canDeal
-            ? Deal::with('histories')->whereIn('client_partner_id', $access->scopeClientPartners(ClientPartner::query(), $me)->select('id'))
+            ? Deal::with('histories', 'clientPartner')->whereIn('client_partner_id', $access->scopeClientPartners(ClientPartner::query(), $me)->select('id'))
                 ->orderBy('id')->get()->map(fn (Deal $d) => FrontShape::deal($d, $me, $access))->values()
             : [];
         $interactions = $access->can($me, 'interaksi', AccessLevel::R)
@@ -73,7 +73,8 @@ class BootstrapController extends Controller
 
         return response()->json([
             'me' => FrontShape::user($me),
-            'lines' => Pipeline::with('stages')->whereNull('archived_at')->orderBy('position')->get()->map(fn (Pipeline $p) => FrontShape::line($p))->values(),
+            // Pipeline divisinya sendiri; Executive melihat semua.
+            'lines' => $access->scopePipelines(Pipeline::with('stages', 'department'), $me)->whereNull('archived_at')->orderBy('position')->get()->map(fn (Pipeline $p) => FrontShape::line($p))->values(),
             'deals' => $deals,
             'interactions' => $interactions,
             'users' => User::with('department')->orderBy('id')->get()->map(fn (User $u) => FrontShape::user($u))->values(),

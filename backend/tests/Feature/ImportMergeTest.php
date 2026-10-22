@@ -23,7 +23,7 @@ class ImportMergeTest extends TestCase
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
-        $this->me = User::factory()->inDepartment('Commercial')->role(Role::KepalaDepartment)->create(['email' => 'rina@contoh.test']);
+        $this->me = User::factory()->inDepartment('Customer Service')->role(Role::KepalaDepartment)->create(['email' => 'rina@contoh.test']);
     }
 
     private function as(?User $user = null): static
@@ -37,8 +37,8 @@ class ImportMergeTest extends TestCase
             'records' => [
                 ['_row' => 6, 'kode sumber' => 'CP-0001', 'nama' => 'PT Contoh Sejahtera'], // baris contoh template, dilewati
                 array_merge(['_row' => 7, 'kode sumber' => 'LEG-001', 'nama' => 'PT Maju Bersama', 'kategori' => 'client', 'email pic' => 'rina@contoh.test',
-                    'department pemilik' => 'Commercial', 'sumber' => 'website', 'nama kontak utama' => 'Andi', 'email kontak' => 'andi@maju.test', 'kota' => 'Bandung'], $overrideRecord),
-                ['_row' => 8, 'kode sumber' => 'LEG-002', 'nama' => 'Komunitas Sepeda', 'kategori' => 'Planet', 'email pic' => 'rina@contoh.test', 'department pemilik' => 'Commercial'],
+                    'department pemilik' => 'Customer Service', 'sumber' => 'website', 'nama kontak utama' => 'Andi', 'email kontak' => 'andi@maju.test', 'kota' => 'Bandung'], $overrideRecord),
+                ['_row' => 8, 'kode sumber' => 'LEG-002', 'nama' => 'Komunitas Sepeda', 'kategori' => 'Planet', 'email pic' => 'rina@contoh.test', 'department pemilik' => 'Customer Service'],
             ],
             'interactions' => [
                 ['_row' => 6, 'kode sumber' => 'LI-001', 'kode client & partner' => 'LEG-001', 'tanggal' => '05/10/2026', 'jenis' => 'meeting',

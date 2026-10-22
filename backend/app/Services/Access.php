@@ -10,6 +10,7 @@ use App\Models\AccessGrant;
 use App\Models\ClientPartner;
 use App\Models\Deal;
 use App\Models\Interaction;
+use App\Models\Pipeline;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -35,10 +36,14 @@ class Access
         if ($user->isSuperAdmin()) {
             return AccessLevel::M;
         }
+        // Department lintas divisi (Executive) mengelola semua data; Viewer-nya tetap hanya melihat.
+        if ($user->department?->sees_all) {
+            return $user->role === Role::Viewer ? AccessLevel::R : AccessLevel::M;
+        }
 
         $level = AccessLevel::from($this->raw($user, $entity) ?? 'N');
 
-        // Viewer selalu hanya bisa melihat.
+        // Viewer selalu hanya bisa melihat, termasuk lewat pengecualian per orang.
         if ($user->role === Role::Viewer && $level !== AccessLevel::N) {
             return AccessLevel::R;
         }
@@ -101,7 +106,7 @@ class Access
         return false;
     }
 
-    /** M bisa mengubah semua data yang boleh dilihatnya, C hanya data yang PIC-nya dia sendiri. */
+    /** M bisa mengubah semua data yang boleh dilihatnya; C data yang PIC-nya dia sendiri, atau semua data divisinya untuk Kepala Department/Koordinator. */
     public function canEditRecord(User $user, ClientPartner $record): bool
     {
         if (! $this->canViewRecord($user, $record)) {
@@ -109,7 +114,7 @@ class Access
         }
         $level = $this->level($user, $record->category->entity());
 
-        return $level === AccessLevel::M || ($level === AccessLevel::C && $record->pic_id === $user->id);
+        return $level === AccessLevel::M || ($level === AccessLevel::C && ($record->pic_id === $user->id || $user->role->isLead()));
     }
 
     /** Arsip, pulihkan, dan gabung data ganda hanya untuk level M, pada data yang boleh dilihat. */
@@ -118,21 +123,28 @@ class Access
         return $this->canViewRecord($user, $record) && $this->level($user, $record->category->entity()) === AccessLevel::M;
     }
 
-    /**
-     * Serah terima ke PIC atau divisi lain, ke arah mana pun (termasuk ke dan dari Customer Service):
-     * yang boleh mengubah data itu dan berlevel M atau Kepala Department/Koordinator.
-     */
+    /** Pindah PIC atau divisi, ke arah mana pun (termasuk ke dan dari Customer Service): siapa pun yang boleh mengubah data itu. */
     public function canHandover(User $user, ClientPartner $record): bool
     {
-        return $this->canEditRecord($user, $record)
-            && ($this->level($user, $record->category->entity()) === AccessLevel::M || $user->role->isLead());
+        return $this->canEditRecord($user, $record);
+    }
+
+    /** Deal terlihat kalau boleh melihat deal dan relasinya (deal ikut divisi pemilik relasi). */
+    public function canViewDeal(User $user, Deal $deal): bool
+    {
+        return $this->can($user, 'deal', AccessLevel::R)
+            && $deal->clientPartner !== null
+            && $this->canViewRecord($user, $deal->clientPartner);
     }
 
     public function canEditDeal(User $user, Deal $deal): bool
     {
+        if (! $this->canViewDeal($user, $deal)) {
+            return false;
+        }
         $level = $this->level($user, 'deal');
 
-        return $level === AccessLevel::M || ($level === AccessLevel::C && $deal->owner_id === $user->id);
+        return $level === AccessLevel::M || ($level === AccessLevel::C && ($deal->owner_id === $user->id || $user->role->isLead()));
     }
 
     /**
@@ -144,7 +156,10 @@ class Access
         if (! $user->active) {
             return false;
         }
-        if ($user->isSuperAdmin() || ($deal && $deal->owner_id === $user->id)) {
+        if ($deal && ! $this->canViewDeal($user, $deal)) {
+            return false;
+        }
+        if ($this->seesAllDivisions($user) || ($deal && $deal->owner_id === $user->id)) {
             return true;
         }
 
@@ -161,7 +176,7 @@ class Access
         if (! $user->active) {
             return false;
         }
-        if ($user->isSuperAdmin()) {
+        if ($this->seesAllDivisions($user)) {
             return true;
         }
 
@@ -174,32 +189,23 @@ class Access
 
     public function canManageRateCard(User $user): bool
     {
-        return $user->active && ($user->isSuperAdmin() || $this->raw($user, 'rate') === 'M');
+        return $user->active && ($user->isSuperAdmin() || ($this->seesAllDivisions($user) && $user->role !== Role::Viewer) || $this->raw($user, 'rate') === 'M');
     }
 
     /**
-     * Membuka kembali deal (SRS 4.3 dan bagian 3).
-     * Won: Super Admin, atau Kepala Department dari department PIC deal ("Kepala Department terkait").
-     * Lost dan On Hold: PIC deal atau atasannya (Kepala Department atau Koordinator di department yang sama),
-     * dan tetap harus boleh mengubah deal.
+     * Membuka kembali deal, dan tetap harus boleh mengubah deal itu.
+     * Won: Super Admin atau Kepala Department. Lost dan On Hold: PIC deal, Kepala Department/Koordinator, atau Super Admin.
      */
     public function canReopenDeal(User $user, Deal $deal): bool
     {
-        if (! $user->active || $deal->status === DealStatus::Open) {
+        if ($deal->status === DealStatus::Open || ! $this->canEditDeal($user, $deal)) {
             return false;
         }
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        $sameDept = $deal->owner()->value('department_id') === $user->department_id;
-
         if ($deal->status === DealStatus::Won) {
-            return $user->role === Role::KepalaDepartment && $sameDept;
+            return $user->isSuperAdmin() || $user->role === Role::KepalaDepartment;
         }
 
-        return $this->canEditDeal($user, $deal)
-            && ($deal->owner_id === $user->id || ($user->role->isLead() && $sameDept));
+        return $user->isSuperAdmin() || $deal->owner_id === $user->id || $user->role->isLead();
     }
 
     /** Interaksi terlihat kalau boleh melihat interaksi dan data Client & Partner-nya. */
@@ -218,10 +224,22 @@ class Access
             && $this->can($user, 'interaksi', AccessLevel::C);
     }
 
-    /** Mengatur pipeline dan stage tanpa developer (SRS 4.3). */
-    public function canConfigurePipeline(User $user): bool
+    /** Pipeline yang terlihat: pipeline divisinya sendiri, atau semua untuk yang melihat lintas divisi. */
+    public function scopePipelines(Builder $query, User $user): Builder
     {
-        return $user->active && in_array($user->role, [Role::SuperAdmin, Role::KepalaDepartment], true);
+        return $this->seesAllDivisions($user) ? $query : $query->where('department_id', $user->department_id);
+    }
+
+    public function canViewPipeline(User $user, Pipeline $pipeline): bool
+    {
+        return $user->active && ($this->seesAllDivisions($user) || $pipeline->department_id === $user->department_id);
+    }
+
+    /** Mengatur pipeline dan stage tanpa developer (SRS 4.3): Super Admin atau Kepala Department, untuk pipeline divisinya. */
+    public function canConfigurePipeline(User $user, ?Pipeline $pipeline = null): bool
+    {
+        return $user->active && in_array($user->role, [Role::SuperAdmin, Role::KepalaDepartment], true)
+            && ($pipeline === null || $this->canViewPipeline($user, $pipeline));
     }
 
     /** Hanya Super Admin yang mengelola pengguna, department, role, dan hak akses. */

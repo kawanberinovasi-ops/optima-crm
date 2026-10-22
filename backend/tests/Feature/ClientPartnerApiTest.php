@@ -25,7 +25,7 @@ class ClientPartnerApiTest extends TestCase
         $this->seed(ReferenceDataSeeder::class);
     }
 
-    private function user(string $dept = 'Commercial', Role $role = Role::Staf): User
+    private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User
     {
         return User::factory()->inDepartment($dept)->role($role)->create();
     }
@@ -49,18 +49,18 @@ class ClientPartnerApiTest extends TestCase
 
     public function test_list_only_contains_records_of_own_division(): void
     {
-        $this->record($this->user('Commercial'), Category::Lead, ['name' => 'Lead Commercial']);
+        $this->record($this->user('Customer Service'), Category::Lead, ['name' => 'Lead CS']);
         $this->record($this->user('Digital Campaign'), Category::Lead, ['name' => 'Lead DC']);
 
         $names = collect($this->as($this->user('Digital Campaign'))->getJson('/api/client-partners?all=1')->assertOk()->json('data'))->pluck('name');
 
         $this->assertContains('Lead DC', $names);
-        $this->assertNotContains('Lead Commercial', $names);
+        $this->assertNotContains('Lead CS', $names);
     }
 
     public function test_opening_a_record_of_another_division_by_url_is_refused(): void
     {
-        $other = $this->record($this->user('Commercial'));
+        $other = $this->record($this->user('Customer Service'));
         $viewer = $this->user('Digital Campaign');
 
         $this->as($viewer)->getJson('/api/client-partners/'.$other->id)->assertForbidden();
@@ -71,10 +71,10 @@ class ClientPartnerApiTest extends TestCase
     public function test_create_is_always_lead_with_creator_as_pic_and_own_division(): void
     {
         $me = $this->user('Digital Campaign');
-        $someoneElse = $this->user('Commercial');
+        $someoneElse = $this->user('Customer Service');
 
         $res = $this->as($me)->postJson('/api/client-partners', [
-            'name' => 'PT Cahaya Baru', 'cat' => 'Client', 'picId' => $someoneElse->id, 'dept' => 'Commercial', // diabaikan server
+            'name' => 'PT Cahaya Baru', 'cat' => 'Client', 'picId' => $someoneElse->id, 'dept' => 'Customer Service', // diabaikan server
             'service' => 'KOL', 'contact' => 'Budi', 'cEmail' => 'budi@contoh.test',
         ])->assertCreated();
 
@@ -95,8 +95,10 @@ class ClientPartnerApiTest extends TestCase
 
     public function test_cannot_create_without_lead_input_right(): void
     {
-        $this->as($this->user('Business Operation'))->postJson('/api/client-partners', ['name' => 'Lead Baru'])->assertForbidden();
-        $this->as($this->user('Commercial', Role::Viewer))->postJson('/api/client-partners', ['name' => 'Lead Baru'])->assertForbidden();
+        $noLead = $this->user('Business Operation');
+        AccessOverride::create(['user_id' => $noLead->id, 'entity' => 'lead', 'level' => 'R']);
+        $this->as($noLead)->postJson('/api/client-partners', ['name' => 'Lead Baru'])->assertForbidden();
+        $this->as($this->user('Customer Service', Role::Viewer))->postJson('/api/client-partners', ['name' => 'Lead Baru'])->assertForbidden();
     }
 
     public function test_validation_messages_for_required_fields(): void
@@ -150,11 +152,11 @@ class ClientPartnerApiTest extends TestCase
 
     public function test_archive_needs_level_m_and_reason_and_can_be_restored(): void
     {
-        $record = $this->record($this->user('Commercial'));
+        $record = $this->record($this->user('Customer Service'));
 
         $this->as($this->user('CampusNet'))->postJson('/api/client-partners/'.$record->id.'/archive', ['reason' => 'Tutup'])->assertForbidden();
 
-        $manager = $this->user('Commercial');
+        $manager = $this->user('Customer Service');
         $this->as($manager)->postJson('/api/client-partners/'.$record->id.'/archive', [])->assertUnprocessable();
         $this->as($manager)->postJson('/api/client-partners/'.$record->id.'/archive', ['reason' => 'Perusahaan tutup'])
             ->assertOk()->assertJsonPath('data.archived', true)->assertJsonPath('data.archiveReason', 'Perusahaan tutup');
@@ -175,7 +177,7 @@ class ClientPartnerApiTest extends TestCase
     public function test_duplicate_check_covers_all_divisions_but_hides_details(): void
     {
         $visible = $this->record($this->user('Digital Campaign'), Category::Lead, ['name' => 'PT Sinar Kreasi Nusantara']);
-        $hidden = $this->record($this->user('Commercial'), Category::Lead, ['name' => 'Sinar Kreasi Nusantara Media']);
+        $hidden = $this->record($this->user('Customer Service'), Category::Lead, ['name' => 'Sinar Kreasi Nusantara Media']);
         $viewer = $this->user('Digital Campaign');
 
         $res = $this->as($viewer)->postJson('/api/client-partners/duplicates', ['name' => 'Sinar Kreasi Nusantara'])->assertOk();

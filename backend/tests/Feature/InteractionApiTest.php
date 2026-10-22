@@ -24,7 +24,7 @@ class InteractionApiTest extends TestCase
         $this->seed(ReferenceDataSeeder::class);
     }
 
-    private function user(string $dept = 'Commercial', Role $role = Role::Staf): User
+    private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User
     {
         return User::factory()->inDepartment($dept)->role($role)->create();
     }
@@ -85,7 +85,8 @@ class InteractionApiTest extends TestCase
         $me = $this->user();
         $record = $this->record($me);
         $first = $this->log($me, $record, ['dealId' => 'new', 'dealTitle' => 'Website', 'lineId' => Pipeline::first()->id]);
-        $stages = Pipeline::first()->stages;
+        $stages = Pipeline::find($first['deal']['lineId'])->stages;
+        $this->assertSame('Customer Service', Pipeline::find($first['deal']['lineId'])->department->name, 'deal baru masuk pipeline divisi relasi');
 
         $moved = $this->log($me, $record, ['dealId' => $first['deal']['id'], 'toStage' => $stages->firstWhere('name', 'Meeting')->id]);
         $this->assertSame((string) $stages->firstWhere('name', 'Meeting')->id, $moved['deal']['stageId']);
@@ -107,11 +108,12 @@ class InteractionApiTest extends TestCase
 
     public function test_interaction_is_cancelled_with_reason_never_deleted(): void
     {
-        $me = $this->user();
+        // CampusNet berlevel C untuk interaksi: staf lain tidak bisa membatalkan catatan orang lain.
+        $me = $this->user('CampusNet');
         $res = $this->log($me, $this->record($me));
         $id = $res['data']['id'];
 
-        $this->as($this->user())->postJson('/api/interactions/'.$id.'/cancel', ['reason' => 'x'])->assertForbidden();
+        $this->as($this->user('CampusNet'))->postJson('/api/interactions/'.$id.'/cancel', ['reason' => 'x'])->assertForbidden();
         $this->as($me)->postJson('/api/interactions/'.$id.'/cancel', [])->assertUnprocessable();
         $cancelled = $this->as($me)->postJson('/api/interactions/'.$id.'/cancel', ['reason' => 'Salah pilih client'])->assertOk()->json('data');
 
@@ -123,7 +125,7 @@ class InteractionApiTest extends TestCase
 
     public function test_interactions_of_hidden_records_are_not_sent(): void
     {
-        $owner = $this->user('Commercial');
+        $owner = $this->user('Customer Service');
         $this->log($owner, $this->record($owner, Category::Lead));
         $viewer = $this->user('Digital Campaign'); // divisi lain
 

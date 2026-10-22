@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Pengaturan pipeline (SRS 4.3): lini bisnis dan stage bisa ditambah, diganti nama, dan dihapus tanpa developer.
+ * Pengaturan pipeline (SRS 4.3): satu pipeline per divisi; stage bisa ditambah, diganti nama, dan dihapus tanpa developer.
  * Setiap pipeline punya tepat satu stage Closing di urutan terakhir.
  */
 class PipelineController extends Controller
@@ -23,6 +23,7 @@ class PipelineController extends Controller
     public function store(Request $request): JsonResponse
     {
         $this->authorizeConfig($request);
+        $me = $request->user();
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', 'unique:pipelines,name'],
             'stages' => ['nullable', 'string', 'max:2000'],
@@ -34,8 +35,9 @@ class PipelineController extends Controller
             $names = collect(['Lead']);
         }
 
-        $pipeline = DB::transaction(function () use ($data, $names) {
-            $pipeline = Pipeline::create(['name' => trim($data['name']), 'position' => (int) Pipeline::max('position') + 1]);
+        // Pipeline baru milik divisi pembuatnya.
+        $pipeline = DB::transaction(function () use ($data, $names, $me) {
+            $pipeline = Pipeline::create(['name' => trim($data['name']), 'department_id' => $me->department_id, 'position' => (int) Pipeline::max('position') + 1]);
             foreach ($names->push('Closing') as $i => $name) {
                 $pipeline->stages()->create(['name' => $name, 'position' => $i, 'is_closing' => $name === 'Closing']);
             }
@@ -50,7 +52,7 @@ class PipelineController extends Controller
     /** Stage baru disisipkan setelah stage tertentu (atau di awal), selalu sebelum Closing. */
     public function storeStage(Request $request, Pipeline $pipeline): JsonResponse
     {
-        $this->authorizeConfig($request);
+        $this->authorizeConfig($request, $pipeline);
         $data = $request->validate(['name' => ['required', 'string', 'max:100'], 'after' => ['nullable', 'integer']], ['name.required' => 'Nama stage wajib diisi.']);
         $this->assertUniqueName($pipeline, $data['name']);
 
@@ -68,7 +70,7 @@ class PipelineController extends Controller
 
     public function updateStage(Request $request, Stage $stage): JsonResponse
     {
-        $this->authorizeConfig($request);
+        $this->authorizeConfig($request, $stage->pipeline);
         $data = $request->validate(['name' => ['required', 'string', 'max:100']], ['name.required' => 'Nama stage wajib diisi.']);
         if ($stage->is_closing) {
             throw ValidationException::withMessages(['name' => 'Stage Closing ga bisa diganti nama.']);
@@ -84,7 +86,7 @@ class PipelineController extends Controller
 
     public function destroyStage(Request $request, Stage $stage): JsonResponse
     {
-        $this->authorizeConfig($request);
+        $this->authorizeConfig($request, $stage->pipeline);
         abort_if($stage->is_closing, 422, 'Stage Closing ga bisa dihapus.');
         $count = $stage->pipeline->deals()->where('stage_id', $stage->id)->count();
         abort_if($count > 0, 422, 'Masih ada '.$count.' deal di stage '.$stage->name.'. Pindahkan dulu deal-nya.');
@@ -112,13 +114,14 @@ class PipelineController extends Controller
         }
     }
 
-    private function authorizeConfig(Request $request): void
+    private function authorizeConfig(Request $request, ?Pipeline $pipeline = null): void
     {
         abort_unless($this->access->canConfigurePipeline($request->user()), 403, 'Cuma Super Admin dan Kepala Department yang bisa mengatur pipeline.');
+        abort_unless($this->access->canConfigurePipeline($request->user(), $pipeline), 403, 'Pipeline ini milik divisi lain.');
     }
 
     private function respond(Pipeline $pipeline, int $status = 200): JsonResponse
     {
-        return response()->json(['data' => FrontShape::line($pipeline->fresh('stages'))], $status);
+        return response()->json(['data' => FrontShape::line($pipeline->fresh(['stages', 'department']))], $status);
     }
 }

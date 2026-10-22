@@ -1,6 +1,8 @@
 # Alur Lead dan Client (perubahan 22 Oktober 2026)
 
-Perubahan alur bisnis di atas SRS v0.2. Desain dan susunan halaman tetap. Aturan di bawah diperiksa di **backend**
+Perubahan alur bisnis di atas SRS v0.2, disamakan dengan pratinjau klien
+(`kawanberinovasi-ops.github.io/optima-crm`) **kecuali cakupan halaman**: aplikasi tetap lengkap (My Work, Dashboard,
+import, dan export tetap aktif, tidak dibatasi ke S-01–S-06 seperti pratinjau). Desain dan susunan halaman tetap. Aturan di bawah diperiksa di **backend**
 (Laravel) untuk setiap cara mengakses data. Prototipe tanpa backend (`serve.py`) meniru aturan yang sama di browser,
 tapi itu **simulasi tampilan, bukan keamanan**: datanya ada di browser dan bisa diubah siapa pun yang membuka DevTools.
 
@@ -23,34 +25,59 @@ tapi itu **simulasi tampilan, bukan keamanan**: datanya ada di browser dan bisa 
 
 | Siapa | Melihat |
 |---|---|
-| Pengguna biasa | Lead dan Client milik divisinya saja, sesuai level role (R lihat, C tambah dan ubah punya sendiri, M kelola semua di divisinya) |
-| Department dengan "lihat lintas divisi" (awal: Executive) | Semua divisi, tetap sesuai level role (Viewer Executive hanya melihat) |
+| Pengguna biasa | Lead dan Client milik divisinya saja, sesuai level role (R lihat, C tambah dan ubah data yang PIC-nya dia sendiri, M kelola semua di divisinya). Kepala Department dan Koordinator berlevel C boleh mengubah semua data divisinya |
+| Department dengan "lihat lintas divisi" (awal: Executive) | Semua divisi dengan level M; Viewer Executive hanya melihat |
 | Super Admin | Semua |
 
 Cakupan yang sama berlaku untuk detail data, pencarian, interaksi, deal, pipeline, dashboard, export, cek data ganda
 (hanya alasan yang terlihat untuk data divisi lain), import, dan email ringkasan. Flag "lihat lintas divisi" bisa diubah
 Super Admin di Akses & Audit → Department. Kepala department **tidak** otomatis jadi Super Admin.
 
-Matriks hak akses disesuaikan: kolom Community, KOL/KOC, dan Media dihapus (sekarang layanan). Supaya pengguna yang
-punya hak input bisa menerima Lead, Lead naik dari R ke C untuk Customer Service dan Creative & Media. Business Operation
-tetap hanya melihat. Ini menyimpang dari tabel SRS bagian 3 dan perlu disetujui di revisi SRS.
+Matriks hak akses awal (sama dengan pratinjau klien, sumbernya `App\Support\DivisionDefaults`):
 
-## 4. Serah terima
+| Department | Lead | Client | Interaksi | Deal | Nilai deal | Rate card |
+|---|---|---|---|---|---|---|
+| Executive | M | M | M | M | Ya | M |
+| Customer Service | M | M | M | M | Ya* | Tidak |
+| Digital Campaign | C | C | C | C | Ya* | M |
+| Creative & Media, CampusNet, DietPartner, Business Operation | C | C | C | C | Ya* | Tidak |
+
+Ya* = hanya Kepala Department dan Koordinator (PIC deal tetap melihat nilai deal miliknya). Executive selalu melihat
+nilai deal dan rate card. Pengecualian per orang untuk Viewer tetap dibatasi ke R. **Commercial dilebur ke Customer
+Service**: pengguna, data, serah terima, dan layanannya pindah ke CS. Kolom Community, KOL/KOC, dan Media dihapus
+(sekarang layanan). Semua ini menyimpang dari tabel SRS bagian 3 dan perlu disetujui di revisi SRS.
+
+## 3a. Pipeline per divisi
+
+- Setiap divisi punya satu pipeline (nama = nama divisi) dengan stage Lead, Qualified, Meeting, Proposal, Negotiation,
+  Closing. Department baru otomatis mendapat pipeline; ganti nama department ikut mengganti nama pipeline-nya.
+- Pengguna melihat pipeline divisinya; Executive dan Super Admin melihat semua. Stage diatur Super Admin atau Kepala
+  Department, hanya untuk pipeline divisinya (Executive untuk semua). Pipeline baru dari menu jadi milik divisi pembuatnya.
+- Deal baru otomatis masuk pipeline divisi pemilik relasi (pilihan lini bisnis dari klien diabaikan server). PIC deal
+  bawaan = PIC relasi, dan harus pengguna aktif, bukan Viewer, dari divisi itu. Berlaku juga untuk Catat interaksi dan import.
+- **Migrasi** (`2026_10_22_000002_division_pipelines`): pipeline lama tanpa divisi diarsipkan (tidak dihapus), deal-nya
+  pindah ke pipeline divisi relasinya dengan stage dicocokkan lewat nama (kalau tidak ada, urutan; Won ke Closing).
+
+## 4. Pindah PIC / divisi (serah terima)
 
 - Dari divisi mana pun ke divisi mana pun, termasuk ke dan dari Customer Service. Pengguna memilih divisi tujuan dan
   PIC penerima yang aktif (bukan Viewer) di divisi itu, plus alasan wajib.
-- Yang boleh menyerahkan: yang boleh mengubah data itu, berlevel M atau berperan Kepala Department/Koordinator.
+- Yang boleh memindahkan: siapa pun yang boleh mengubah data itu (aturan pratinjau klien). Divisi tujuan bawaan di form
+  adalah divisi yang menangani layanannya.
 - Tercatat di tabel `handovers` dan audit log: PIC dan divisi asal, PIC dan divisi tujuan, waktu, yang menyerahkan, alasan.
   Riwayatnya tampil di drawer detail.
 - Divisi pemilik ikut pindah, jadi akses pindah ke divisi penerima. Executive tetap melihat. Pembuat awal tidak berubah.
-- Interaksi dan deal tetap di relasi yang sama. Deal yang masih berjalan (Open/On Hold) ikut dipegang PIC baru supaya
-  tetap terurus; deal Won/Lost tetap tercatat atas PIC lama.
+- Interaksi dan deal tetap di relasi yang sama. Semua deal pindah ke **pipeline divisi penerima** (stage dicocokkan lewat
+  nama, Won tetap di Closing) dan dicatat di riwayat deal. Deal yang masih berjalan (Open/On Hold) ikut dipegang PIC baru;
+  deal Won/Lost tetap tercatat atas PIC lama. Gabung data ganda juga memindahkan deal ke pipeline divisi data yang disimpan.
 
 ## 5. Status vs layanan
 
 - Lead/Client = status relasi. KOL, Community, Media, Digital Campaign = **layanan** (boleh kosong).
-- Pemetaan awal: Media → Creative & Media, Digital Campaign → Digital Campaign, KOL dan Community → Digital Campaign
-  (**sementara**, menunggu keputusan). Bisa diubah Super Admin di Akses & Audit → Daftar pilihan.
+- Pemetaan awal: Media → Creative & Media, Digital Campaign → Digital Campaign, CampusNet → CampusNet,
+  DietPartner → DietPartner, KOL dan Community → Digital Campaign (**sementara**, menunggu keputusan). Bisa diubah
+  Super Admin di Akses & Audit → Layanan & Divisi.
+- Daftar Client & Partner punya filter Layanan (termasuk "Belum ditentukan"), dan tampilan tersimpan ikut menyimpan filter itu.
 - Memilih atau mengubah layanan, atau mengubah pemetaannya, tidak memindahkan PIC atau divisi. Itu lewat serah terima.
 - Rate card berlaku untuk layanan KOL.
 - **Migrasi data lama** (`2026_10_22_000001_lead_client_flow`): kategori KOL/KOC, Community, dan Media jadi layanan

@@ -14,17 +14,18 @@ const keepModal = () => { const f = document.querySelector('[data-form=int]'); c
 const Modals = {
   confirm: (m) => modalShell(m.title, m.sub || 'Konfirmasi', '<p style="margin:0;color:var(--ink2)">' + m.text + '</p>', '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="button" class="btn ' + (m.danger ? 'btn-d' : '') + '" data-a="confirmok">' + esc(m.ok || 'Lanjut') + '</button>'),
   record: (m) => {
-    // Data baru selalu Lead, PIC dan divisi otomatis dari yang mengisi. Status jadi Client lewat deal Won; PIC dan divisi lewat Serah terima.
+    // Data baru selalu Lead, PIC dan divisi otomatis dari yang mengisi. Status jadi Client lewat deal Won; PIC dan divisi lewat Pindah PIC / divisi.
     const r = m.rec || {}; const u = me(); const v = Object.assign({ source: 'Referensi', service: '' }, r, m.val || {});
     const svcs = serviceList().map(x => x.name); if (v.service && !svcs.includes(v.service)) svcs.unshift(v.service);
-    const owner = r.id
-      ? '<div class="fld" style="grid-column:1/-1"><span>Status, PIC, dan divisi</span><div class="small" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg)">' + catChip(r.cat) + '<span>PIC <b>' + esc(userName(r.picId)) + '</b> · ' + esc(r.dept) + '</span></div><small>Status jadi Client otomatis setelah deal Won. PIC dan divisi diganti lewat Serah terima.</small></div>'
-      : '<div class="fld" style="grid-column:1/-1"><span>Masuk sebagai</span><div class="small" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg)">' + catChip('Lead') + '<span>PIC <b>' + esc(u.name) + '</b> (kamu) · divisi <b>' + esc(u.dept) + '</b></span></div><small>Data baru selalu Lead dengan kamu sebagai PIC. Kalau perlu ditangani divisi lain, serahkan setelah disimpan.</small></div>';
+    const svc = serviceList().find(x => x.name === v.service);
     return modalShell(r.id ? 'Edit data' : 'Lead baru', r.id ? esc(r.code) : 'Client & Partner',
+      '<p class="small muted" style="margin:0">' + (r.id ? 'Status jadi Client otomatis setelah deal Won. Pindahkan penanganan lewat Pindah PIC / divisi.' : 'Siapa pun bisa menerima Lead langsung. PIC awal otomatis akun pengisi, divisi awal mengikuti divisi akunmu. CS juga bisa menerima lead umum.') + '</p>' +
       '<div class="form-grid">' +
       '<label class="fld" style="grid-column:1/-1"><span>Nama *</span><input class="inp" id="f-name" name="name" value="' + esc(v.name) + '"' + inv(m, 'name') + ' placeholder="Contoh: PT Maju Bersama" autofocus>' + fieldErr(m, 'name') + '</label>' +
-      owner +
-      '<label class="fld"><span>Layanan</span><select class="inp" name="service"' + inv(m, 'service') + '>' + opt('', v.service, 'Belum ditentukan') + svcs.map(x => opt(x, v.service)).join('') + '</select><small>Boleh dikosongkan dulu. Ga memindahkan PIC.</small>' + fieldErr(m, 'service') + '</label>' +
+      '<div class="fld"><span>Status</span><div>' + catChip(r.cat || 'Lead') + '</div><small>Client setelah closing / Won.</small></div>' +
+      '<label class="fld"><span>Layanan</span><select class="inp" name="service" data-ch="record-service"' + inv(m, 'service') + '>' + opt('', v.service, 'Belum ditentukan') + svcs.map(x => opt(x, v.service)).join('') + '</select>' + fieldErr(m, 'service') + '<small>' + (svc && svc.dept ? 'Divisi layanan yang disarankan: ' + esc(svc.dept) + '. Serah terima tetap lewat Pindah PIC / divisi.' : 'Layanan bisa ditentukan setelah kebutuhan Lead diketahui.') + '</small></label>' +
+      '<div class="fld"><span>PIC' + (r.id ? '' : ' awal (otomatis)') + '</span><input class="inp" value="' + esc(r.id ? userName(r.picId) : u.name) + '" disabled></div>' +
+      '<div class="fld"><span>Divisi pemilik</span><input class="inp" value="' + esc(r.id ? r.dept : u.dept) + '" disabled></div>' +
       '<label class="fld"><span>Segmen</span><input class="inp" name="segment" value="' + esc(v.segment) + '" placeholder="Korporat, pendidikan, …"></label>' +
       '<label class="fld"><span>Sumber</span><select class="inp" name="source">' + optList('sources').map(x => opt(x, v.source)).join('') + '</select></label>' +
       '<label class="fld"><span>Kota</span><input class="inp" name="city" value="' + esc(v.city) + '"></label>' +
@@ -47,7 +48,7 @@ const Modals = {
     let pipe = '';
     if (rec && canDeal) {
       const d = deals.find(x => x.id === v.dealId);
-      const line = d ? lineById(d.lineId) : (lineById(v.lineId) || Store.db.lines[0]);
+      const line = d ? lineById(d.lineId) : (lineForDivision(rec.dept) || lineById(v.lineId) || Store.db.lines[0]);
       const cur = d ? line.stages.findIndex(s => s.id === d.stageId) : -1;
       const editable = d ? canEditDeal(d) : canNew;
       const stOpts = d ? line.stages : line.stages.slice(0, -1);
@@ -56,7 +57,7 @@ const Modals = {
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span class="lbl" style="color:var(--p)">Langkah berikutnya di pipeline</span>' + (d ? '<span class="chip c-info"><span class="dot"></span>Sekarang: ' + esc(line.stages[cur].name) + '</span>' : '') + '</div>' +
         '<div class="form-grid">' +
         '<label class="fld"><span>Deal</span><select class="inp" name="dealId" data-ch="int-deal">' + deals.map(x => opt(x.id, v.dealId, x.title + ' · ' + ((stageOf(x) || {}).name || ''))).join('') + (canNew ? opt('new', v.dealId, '+ Buat deal baru') : '') + opt('', v.dealId, 'Tanpa deal') + '</select></label>' +
-        (v.dealId === 'new' ? (Store.db.lines.length > 1 ? '<label class="fld"><span>Pipeline</span><select class="inp" name="lineId" data-ch="int-deal">' + Store.db.lines.map(l => opt(l.id, line.id, l.name)).join('') + '</select></label>' : '<input type="hidden" name="lineId" value="' + line.id + '">') + '<label class="fld"><span>Judul deal *</span><input class="inp" name="dealTitle" value="' + esc(v.dealTitle || '') + '"' + inv(m, 'dealTitle') + ' placeholder="Contoh: Website ' + esc(rec.name) + '">' + fieldErr(m, 'dealTitle') + '</label>' : '') +
+        (v.dealId === 'new' ? '<div class="fld"><span>Divisi / lini bisnis</span><input class="inp" value="' + esc(line.name) + '" disabled><input type="hidden" name="lineId" value="' + line.id + '"></div>' + '<label class="fld"><span>Judul deal *</span><input class="inp" name="dealTitle" value="' + esc(v.dealTitle || '') + '"' + inv(m, 'dealTitle') + ' placeholder="Contoh: Website ' + esc(rec.name) + '">' + fieldErr(m, 'dealTitle') + '</label>' : '') +
         (v.dealId ? '<label class="fld"' + (v.dealId === 'new' ? ' style="grid-column:1/-1"' : '') + '><span>' + (d ? 'Pindah ke stage' : 'Mulai di stage') + '</span><select class="inp" name="toStage"' + (editable ? '' : ' disabled') + '>' + stOpts.map((s, i) => opt(s.id, def, (d && i === cur ? 'Tetap di ' : '') + s.name + (d && i < cur ? ' (mundur)' : ''))).join('') + '</select>' + (editable ? '<small>Kartu deal di Pipeline ikut pindah begitu disimpan.' + (d ? ' Kalau pilih Closing, kamu diminta isi hasilnya.' : '') + '</small>' : '<small>Kamu ga bisa ubah deal ini.</small>') + '</label>' : '') +
         '</div></div>';
     }
@@ -74,8 +75,12 @@ const Modals = {
   },
   deal: (m) => {
     const d = m.deal || {}; const ro = d.id && !canEditDeal(d);
-    const v = Object.assign({ lineId: App.ui.pl.line, ownerId: me().id, target: addDays(30), recordId: m.recordId || '' }, d, m.val || {});
-    const line = lineById(v.lineId) || Store.db.lines[0];
+    const v = Object.assign({ lineId: App.ui.pl.line, ownerId: '', target: addDays(30), recordId: m.recordId || '' }, d, m.val || {});
+    // Pipeline otomatis dari divisi pemilik relasi; PIC deal bawaan = PIC relasi, dipilih dari divisi itu.
+    const rec = recById(v.recordId);
+    const line = (d.id ? lineById(d.lineId) : rec && lineForDivision(rec.dept)) || lineById(v.lineId) || visibleLines()[0] || Store.db.lines[0];
+    const owners = divisionUsers(rec ? rec.dept : line.dept || me().dept);
+    if (!v.ownerId || !owners.some(u => u.id === v.ownerId)) v.ownerId = rec && owners.some(u => u.id === rec.picId) ? rec.picId : (owners.some(u => u.id === me().id) ? me().id : (owners[0] || {}).id || '');
     const stages = d.id ? line.stages : line.stages.slice(0, -1);
     const sid = v.stageId && line.stages.some(s => s.id === v.stageId) ? v.stageId : (m.stage || stages[0].id);
     const seeV = canSeeValue(d.id ? d : { ownerId: v.ownerId });
@@ -83,12 +88,12 @@ const Modals = {
     return modalShell(d.id ? esc(d.title) : 'Deal baru', d.id ? esc(d.code) + ' · ' + esc(line.name) : 'Pipeline',
       (d.id ? '<div style="display:flex;gap:8px;flex-wrap:wrap">' + statusChip(d.status) + '<span class="chip c-n">' + esc((stageOf(d) || {}).name || '') + '</span>' + (ro ? '<span class="chip c-n">' + ic('lock', 'ic-s') + 'Lihat saja</span>' : '') + '</div>' : '') +
       '<div class="form-grid"><label class="fld" style="grid-column:1/-1"><span>Judul deal *</span><input class="inp" name="title" value="' + esc(v.title) + '"' + inv(m, 'title') + dis + ' placeholder="Contoh: Website company profile">' + fieldErr(m, 'title') + '</label>' +
-      '<label class="fld" style="grid-column:1/-1"><span>Client & Partner *</span><select class="inp" name="recordId"' + inv(m, 'recordId') + dis + '>' + opt('', v.recordId, 'Pilih data…') + visibleRecs().map(r => opt(r.id, v.recordId, r.name + ' · ' + r.cat)).join('') + '</select>' + fieldErr(m, 'recordId') + '</label>' +
-      '<label class="fld"><span>Lini bisnis</span><select class="inp" name="lineId" data-ch="deal-line"' + (d.id ? ' disabled' : '') + '>' + Store.db.lines.map(l => opt(l.id, line.id, l.name)).join('') + '</select></label>' +
+      '<label class="fld" style="grid-column:1/-1"><span>Client & Partner *</span><select class="inp" name="recordId" data-ch="deal-record"' + inv(m, 'recordId') + dis + '>' + opt('', v.recordId, 'Pilih data…') + visibleRecs().map(r => opt(r.id, v.recordId, r.name + ' · ' + r.cat)).join('') + '</select>' + fieldErr(m, 'recordId') + '</label>' +
+      '<div class="fld"><span>Divisi / lini bisnis</span><input class="inp" value="' + esc(line.name) + '" disabled><input type="hidden" name="lineId" value="' + esc(line.id) + '"><small>Otomatis mengikuti divisi pemilik relasi.</small></div>' +
       '<label class="fld"><span>Stage</span><select class="inp" name="stageId"' + (d.id ? ' disabled' : '') + '>' + stages.map(s => opt(s.id, sid, s.name)).join('') + '</select>' + (d.id ? '<small>Pindah stage lewat board.</small>' : '') + '</label>' +
       '<label class="fld"><span>Nilai penawaran (Rp)</span>' + (seeV ? '<input class="inp num" name="offer" value="' + esc(v.offer) + '" inputmode="numeric" placeholder="120000000"' + dis + '>' : '<input class="inp" value="Terkunci sesuai hak akses" disabled>') + '</label>' +
       '<label class="fld"><span>Target closing</span><input class="inp" type="date" name="target" value="' + esc(v.target) + '"' + dis + '></label>' +
-      '<label class="fld"><span>PIC deal</span><select class="inp" name="ownerId"' + dis + '>' + activeUsers().map(u => opt(u.id, v.ownerId, u.name)).join('') + '</select></label>' +
+      '<label class="fld"><span>PIC deal</span><select class="inp" name="ownerId"' + inv(m, 'ownerId') + dis + '>' + (owners.length ? '' : opt('', '', 'Belum ada pengguna aktif di divisi ini')) + owners.map(u => opt(u.id, v.ownerId, u.name)).join('') + (d.id && !owners.some(u => u.id === d.ownerId) ? opt(d.ownerId, v.ownerId, userName(d.ownerId) + ' (divisi lain)') : '') + '</select>' + fieldErr(m, 'ownerId') + '</label>' +
       '<label class="fld"><span>Layanan</span><input class="inp" name="service" value="' + esc(v.service) + '"' + dis + '></label>' +
       (d.id && d.status !== 'Open' ? '<div class="fld" style="grid-column:1/-1;padding:14px;border-radius:16px;background:var(--bg)"><span>Hasil closing</span><span class="small">' + esc(d.status) + (d.status === 'Won' ? ' · ' + (seeV ? fmtRp(d.value) : 'nilai terkunci') + ' · ' + fmtDate(d.closedAt) : '') + (d.reason ? ' · ' + esc(d.reason) : '') + '</span></div>' : '') + '</div>',
       (d.id && perm('deal') === 'M' ? '<button type="button" class="btn btn-s" data-a="deldeal" data-v="' + d.id + '" style="margin-right:auto">' + ic('trash', 'ic-s') + 'Hapus</button>' : '') + '<button type="button" class="btn btn-s" data-a="close">' + (ro ? 'Tutup' : 'Batal') + '</button>' + (ro ? '' : '<button type="submit" class="btn">' + ic('check', 'ic-s') + 'Simpan</button>'), true, ro ? null : 'deal');
@@ -157,7 +162,7 @@ const Actions = {
   plallc: () => { App.ui.pl.allC = !App.ui.pl.allC; render(); },
   plper: (el) => { App.ui.pl.per = el.dataset.v; App.ui.pl.val = ''; render(); },
   cpcat: (el) => { App.ui.cp.cat = el.dataset.v; App.ui.cp.page = 0; render(); },
-  cpreset: () => { Object.assign(App.ui.cp, { cat: 'all', q: '', dept: 'all', page: 0 }); render(); },
+  cpreset: () => { Object.assign(App.ui.cp, { cat: 'all', q: '', dept: 'all', service: 'all', page: 0 }); render(); },
   cppage: (el) => { App.ui.cp.page += +el.dataset.v; render(); },
   move: (el, e) => { e.stopPropagation(); const d = findDeal(el.dataset.v); const line = lineById(d.lineId); const i = line.stages.findIndex(s => s.id === d.stageId) + (+el.dataset.dir); if (line.stages[i]) moveDeal(d.id, line.stages[i].id); },
   closest: (el) => { const f = document.querySelector('[data-form=closing]'); const o = f ? fd(f) : {}; App.modal = Object.assign(App.modal, { st: el.dataset.v, err: {}, value: o.value, reason: o.reason }); render(); },
@@ -205,12 +210,14 @@ const Inputs = {
 const Changes = {
   'int-deal': () => { const v = keepModal(); v.toStage = ''; render(); },
   cpdept: (el) => { App.ui.cp.dept = el.value; App.ui.cp.page = 0; render(); },
+  cpservice: (el) => { App.ui.cp.service = el.value; App.ui.cp.page = 0; render(); },
   cpsort: (el) => { App.ui.cp.sort = el.value; render(); },
   dbval: (el) => { App.ui.db.val = el.value; App.anim = true; render(); },
   dbfl: (el) => { App.ui.db.fline = el.value; render(); },
   plval: (el) => { App.ui.pl.val = el.value; render(); },
   akact: (el) => { App.ui.ak.act = el.value; render(); },
   akby: (el) => { App.ui.ak.by = el.value; render(); },
+  'deal-record': (el) => { const f = el.closest('form'); const r = recById(el.value); App.modal.val = Object.assign(fd(f), { recordId: el.value, ownerId: r ? r.picId : '', lineId: r && lineForDivision(r.dept) ? lineForDivision(r.dept).id : '', stageId: '' }); App.modal.stage = ''; render(); },
   'deal-line': (el) => { const f = el.closest('form'); App.modal.val = Object.assign(fd(f), { lineId: el.value, stageId: '' }); App.modal.stage = ''; render(); },
   udept: (el) => { const u = userById(el.dataset.v); audit('Ubah', 'Pengguna', u.name + ' pindah department ' + u.dept + ' ke ' + el.value); u.dept = el.value; commit(); },
   urole: (el) => { const u = userById(el.dataset.v); audit('Ubah', 'Pengguna', u.name + ' role ' + u.role + ' jadi ' + el.value); u.role = el.value; commit(); },
@@ -242,8 +249,9 @@ const Forms = {
     const r = recById(o.recordId);
     let deal = null, toClosing = false, stageNote = '';
     if (o.dealId === 'new') {
-      const line = lineById(o.lineId) || Store.db.lines[0];
-      deal = { id: uid('dl'), code: nextCode('d'), title: o.dealTitle, recordId: r.id, lineId: line.id, stageId: o.toStage || line.stages[0].id, status: 'Open', offer: '', value: '', ownerId: me().id, target: addDays(30), closedAt: '', reason: '', service: '', createdAt: today() };
+      const line = lineForDivision(r.dept) || lineById(o.lineId) || Store.db.lines[0];
+      const owner = divisionUsers(r.dept).some(u => u.id === me().id) ? me().id : r.picId;
+      deal = { id: uid('dl'), code: nextCode('d'), title: o.dealTitle, recordId: r.id, lineId: line.id, stageId: line.stages.some(s => s.id === o.toStage) ? o.toStage : line.stages[0].id, status: 'Open', offer: '', value: '', ownerId: owner, target: addDays(30), closedAt: '', reason: '', service: '', createdAt: today() };
       deal.history = []; dealLog(deal, '', stageOf(deal).name, 'Open', 'Deal dibuat dari catat interaksi');
       Store.db.deals.push(deal); audit('Tambah', 'Deal', deal.title + ' dari catat interaksi, mulai di ' + stageOf(deal).name);
       stageNote = 'Deal baru di ' + stageOf(deal).name;
@@ -293,7 +301,7 @@ const Forms = {
   line: (o) => {
     if (!o.name) { App.modal.err = { name: 'Nama wajib diisi.' }; render(); return; }
     const id = uid('ln'); const names = (o.stages || '').split('\n').map(s => s.trim()).filter(Boolean).filter(s => s.toLowerCase() !== 'closing');
-    Store.db.lines.push({ id, name: o.name, stages: names.concat(['Closing']).map((n, i) => ({ id: id + 's' + i, name: n })) });
+    Store.db.lines.push({ id, name: o.name, dept: me().dept, stages: names.concat(['Closing']).map((n, i) => ({ id: id + 's' + i, name: n })) });
     audit('Tambah', 'Pipeline', o.name); App.ui.pl.line = id; App.modal = null; Store.save(); go('pipeline'); toast('Pipeline baru!', o.name + ' udah ada.');
   },
   user: (o) => {

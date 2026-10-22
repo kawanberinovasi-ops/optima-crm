@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
 use App\Services\ChangeHistory;
+use App\Services\Deals;
 use App\Services\Duplicates;
 use App\Support\Codes;
 use App\Support\FrontShape;
@@ -31,7 +32,7 @@ class ClientPartnerController extends Controller
 {
     public const ENTITY = 'Client & Partner';
 
-    public function __construct(private Access $access, private Audit $audit) {}
+    public function __construct(private Access $access, private Audit $audit, private Deals $deals) {}
 
     /** Daftar dengan filter dan halaman. all=1 mengembalikan semua data yang boleh dilihat (dipakai frontend saat ini). */
     public function index(Request $request): JsonResponse
@@ -41,6 +42,7 @@ class ClientPartnerController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'cat' => ['nullable', Rule::enum(Category::class)],
             'dept' => ['nullable', 'string'],
+            'service' => ['nullable', 'string', 'max:100'],
             'archived' => ['nullable', 'boolean'],
             'sort' => ['nullable', Rule::in(['name', 'new'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
@@ -53,6 +55,7 @@ class ClientPartnerController extends Controller
             ->when(isset($f['archived']), fn ($q) => $f['archived'] ? $q->whereNotNull('archived_at') : $q->whereNull('archived_at'))
             ->when($f['cat'] ?? null, fn ($q, $cat) => $q->where('category', $cat))
             ->when($f['dept'] ?? null, fn ($q, $dept) => $q->whereHas('department', fn ($d) => $d->where('name', $dept)))
+            ->when($f['service'] ?? null, fn ($q, $svc) => $svc === '-' ? $q->whereNull('service_id') : $q->whereHas('service', fn ($d) => $d->where('name', $svc)))
             ->when($f['q'] ?? null, function ($q, $term) {
                 $like = '%'.addcslashes($term, '%_\\').'%';
                 $q->where(fn ($w) => $w->where('name', 'ilike', $like)->orWhere('code', 'ilike', $like)->orWhere('city', 'ilike', $like)
@@ -199,7 +202,7 @@ class ClientPartnerController extends Controller
     {
         $me = $request->user();
         $this->authorizeView($me, $clientPartner);
-        abort_unless($this->access->canHandover($me, $clientPartner), 403, 'Kamu ga bisa menyerahkan data ini.');
+        abort_unless($this->access->canHandover($me, $clientPartner), 403, 'Kamu ga bisa memindahkan PIC atau divisi data ini.');
         abort_if($clientPartner->archived_at !== null, 409, 'Data yang diarsipkan ga bisa diserahkan.');
         $data = $request->validate([
             'deptId' => ['required', 'integer', Rule::exists('departments', 'id')],
@@ -226,13 +229,19 @@ class ClientPartnerController extends Controller
             $original = $clientPartner->getRawOriginal();
             $clientPartner->update(['pic_id' => $to->id, 'department_id' => $to->department_id]);
 
+            // Semua deal ikut pipeline divisi baru; yang masih berjalan (Open/On Hold) dipegang PIC baru.
+            $pipeline = $this->deals->pipelineFor($to->department_id);
+            $note = 'Pindah ke '.$to->name.' ('.$to->department->name.')';
+            foreach ($clientPartner->deals()->with('stage', 'pipeline')->get() as $deal) {
+                $this->deals->moveToDivision($me, $deal, $pipeline, $note);
+            }
             $running = $clientPartner->deals()->whereIn('status', [DealStatus::Open, DealStatus::OnHold])->where('owner_id', '<>', $to->id)->get();
             foreach ($running as $deal) {
                 $deal->update(['owner_id' => $to->id]);
                 $deal->histories()->create([
                     'user_id' => $me->id, 'from_stage_id' => $deal->stage_id, 'from_stage_name' => $deal->stage->name,
                     'to_stage_id' => $deal->stage_id, 'to_stage_name' => $deal->stage->name, 'status' => $deal->status,
-                    'note' => 'Serah terima ke '.$to->name.' ('.$to->department->name.')', 'created_at' => now(),
+                    'note' => $note, 'created_at' => now(),
                 ]);
             }
 
@@ -241,7 +250,7 @@ class ClientPartnerController extends Controller
                 'to_user_id' => $to->id, 'to_department_id' => $to->department_id, 'by_user_id' => $me->id,
                 'reason' => $data['reason'], 'deals_moved' => $running->count(), 'created_at' => now(),
             ]);
-            $this->audit->changed(self::ENTITY, $clientPartner, $original, 'Serah terima '.($fromDept?->name ?? '-').' ke '.$to->department->name.': '.$data['reason']);
+            $this->audit->changed(self::ENTITY, $clientPartner, $original, 'Penanganan diserahkan '.($fromDept?->name ?? '-').' ke '.$to->department->name.': '.$data['reason']);
             Notify::send($to, $me->name.' menyerahkan '.$clientPartner->name.' ke kamu', 'rec:'.$clientPartner->id);
             if ($from && $from->id !== $to->id && $from->id !== $me->id) {
                 Notify::send($from, $clientPartner->name.' sekarang dipegang '.$to->name.' ('.$to->department->name.')');
@@ -270,6 +279,11 @@ class ClientPartnerController extends Controller
         $moved = DB::transaction(function () use ($clientPartner, $source, $me) {
             $ints = $source->interactions()->update(['client_partner_id' => $clientPartner->id]);
             $deals = $source->deals()->update(['client_partner_id' => $clientPartner->id]);
+            // Deal pindahan ikut pipeline divisi data yang disimpan.
+            $pipeline = $this->deals->pipelineFor($clientPartner->department_id);
+            foreach ($clientPartner->deals()->with('stage', 'pipeline')->get() as $deal) {
+                $this->deals->moveToDivision($me, $deal, $pipeline, 'Digabung dari '.$source->name);
+            }
             $emails = $clientPartner->contacts()->pluck('email')->filter()->map(fn ($e) => strtolower($e))->all();
             $contacts = 0;
             foreach ($source->contacts as $c) {

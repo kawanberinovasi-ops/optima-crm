@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AccessLevel;
 use App\Enums\Category;
 use App\Enums\DealStatus;
+use App\Enums\Role;
 use App\Models\ClientPartner;
 use App\Models\Deal;
 use App\Models\Department;
@@ -50,7 +51,9 @@ class Importer
         $sources = OptionList::where(['list' => 'sources', 'active' => true])->pluck('value');
         $types = OptionList::where(['list' => 'interaction_types', 'active' => true])->pluck('value');
         $lostReasons = OptionList::where(['list' => 'lost_reasons', 'active' => true])->pluck('value');
-        $pipelines = Pipeline::with('stages')->get()->keyBy(fn ($p) => strtolower($p->name));
+        // Satu pipeline per divisi: deal masuk ke pipeline divisi pemilik relasinya, kolom Lini bisnis hanya keterangan.
+        $pipelines = Pipeline::with('stages')->whereNotNull('department_id')->whereNull('archived_at')->orderBy('position')->get()->unique('department_id')->keyBy('department_id');
+        $fileDepts = [];
         $services = Service::where('active', true)->get()->keyBy(fn ($sv) => strtolower($sv->name));
 
         $rows = [];
@@ -85,6 +88,7 @@ class Importer
             };
             if (! $err) {
                 $fileCodes[$code] = true;
+                $fileDepts[$code] = $existing?->department_id ?? $dept->id;
             }
             $source = trim($o['sumber'] ?? '');
             $rows[] = $this->row('records', $o, $err, $err ? null : [
@@ -139,7 +143,8 @@ class Importer
             $code = trim($o['kode sumber'] ?? '');
             $cp = trim($o['kode client & partner'] ?? '');
             $owner = $users[strtolower(trim($o['email pic'] ?? ''))] ?? null;
-            $pipeline = $pipelines[strtolower(trim($o['lini bisnis'] ?? ''))] ?? null;
+            $recordDept = $fileDepts[$cp] ?? ClientPartner::where('code', $cp)->value('department_id');
+            $pipeline = $recordDept ? ($pipelines[$recordDept] ?? null) : null;
             $status = collect(DealStatus::cases())->first(fn ($s) => strtolower($s->value) === strtolower(trim($o['status'] ?? '')));
             $stage = $pipeline?->stages->first(fn ($s) => strtolower($s->name) === strtolower(trim($o['stage'] ?? '')));
             if ($pipeline && $status === DealStatus::Won) {
@@ -153,9 +158,10 @@ class Importer
             $err = match (true) {
                 $code === '' || $cp === '' => 'Kode wajib diisi.',
                 ! $recordExists($cp) => 'Kode Client & Partner '.$cp.' ga ketemu.',
-                ! $pipeline => 'Lini bisnis "'.($o['lini bisnis'] ?? '').'" belum ada.',
+                ! $pipeline => 'Divisi pemilik data ini belum punya pipeline.',
                 ! $status => 'Status harus Open, Won, Lost, atau On Hold.',
                 ! $owner => 'Email PIC belum terdaftar.',
+                $owner->role === Role::Viewer || $owner->department_id !== $recordDept => 'PIC deal harus pengguna aktif dari divisi pemilik data.',
                 ! $this->access->can($by, 'deal', AccessLevel::C) => 'Akun ini ga boleh menambah deal.',
                 ! $stage || ($stage->is_closing && $status !== DealStatus::Won) => 'Stage "'.($o['stage'] ?? '').'" ga ada di '.$pipeline->name.'.',
                 $status === DealStatus::Won && (! $value || ! $closedAt) => 'Deal Won wajib ada nilai deal dan tanggal closing.',

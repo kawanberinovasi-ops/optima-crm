@@ -205,7 +205,7 @@
       // Akses ikut divisi penerima: muat ulang supaya data, deal, dan interaksi yang terlihat sesuai cakupan baru.
       const stillVisible = seesAll(me()) || o.dept === me().dept;
       await loadBootstrap(); App.modal = null; if (!stillVisible) App.drawer = null; render();
-      toast('Diserahkan', 'Sekarang dipegang ' + userName(o.picId) + ' (' + o.dept + ').' + (stillVisible ? '' : ' Data ini ga muncul lagi di divisimu.'));
+      toast('Penanganan diserahkan', o.dept + ' · ' + userName(o.picId) + (stillVisible ? '' : '. Data ini ga muncul lagi di divisimu.'), 'info');
     } catch (e) { m.val = o; fail(e, m); }
   };
   Forms.contact = async (o) => {
@@ -338,7 +338,7 @@
   Forms.view = async (o) => {
     const m = App.modal; if (!o.name) { m.err = { name: 'Kasih nama tampilannya.' }; m.still = true; render(); return; }
     const ui = App.ui.cp;
-    try { Store.db.views = (await Api.post('saved-views', { name: o.name, filter: { cat: ui.cat, dept: ui.dept, q: ui.q, sort: ui.sort, arch: !!ui.arch } })).data; Store.save(); App.modal = null; render(); toast('Tampilan disimpan', o.name + ' bisa dipakai kapan aja.'); } catch (e) { fail(e, m); }
+    try { Store.db.views = (await Api.post('saved-views', { name: o.name, filter: { cat: ui.cat, dept: ui.dept, service: ui.service || 'all', q: ui.q, sort: ui.sort, arch: !!ui.arch } })).data; Store.save(); App.modal = null; render(); toast('Tampilan disimpan', o.name + ' bisa dipakai kapan aja.'); } catch (e) { fail(e, m); }
   };
   Actions.viewdel = async (el) => { try { Store.db.views = (await Api.del('saved-views/' + el.dataset.v)).data; Store.save(); render(); } catch (e) { fail(e); } };
   // Audit log dan riwayat data dimuat ulang setiap kali halaman Akses & Audit dibuka.

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\AccessLevel;
 use App\Models\ClientPartner;
 use App\Models\Deal;
-use App\Models\Pipeline;
 use App\Models\Stage;
 use App\Models\User;
 use App\Services\Access;
@@ -31,7 +30,7 @@ class DealController extends Controller
         // Deal mengikuti divisi pemilik relasinya.
         $records = $this->access->scopeClientPartners(ClientPartner::query(), $me)->select('id');
 
-        return response()->json(['data' => Deal::with('histories')->whereIn('client_partner_id', $records)->orderBy('id')->get()
+        return response()->json(['data' => Deal::with('histories', 'clientPartner')->whereIn('client_partner_id', $records)->orderBy('id')->get()
             ->map(fn (Deal $d) => FrontShape::deal($d, $me, $this->access))->values()]);
     }
 
@@ -42,7 +41,7 @@ class DealController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:200'],
             'recordId' => ['required', 'integer', Rule::exists('client_partners', 'id')->whereNull('archived_at')],
-            'lineId' => ['required', 'integer', Rule::exists('pipelines', 'id')],
+            'lineId' => ['nullable', 'integer'],
             'stageId' => ['nullable', 'integer'],
             'ownerId' => ['nullable', 'integer', Rule::exists('users', 'id')->where('active', true)],
             'target' => ['nullable', 'date'],
@@ -52,8 +51,10 @@ class DealController extends Controller
 
         $record = ClientPartner::findOrFail($data['recordId']);
         abort_unless($this->access->canViewRecord($me, $record), 403, 'Kamu ga punya akses ke data ini.');
-        $owner = isset($data['ownerId']) ? User::find($data['ownerId']) : $me;
-        $pipeline = Pipeline::findOrFail($data['lineId']);
+        // Pipeline selalu pipeline divisi pemilik relasi; PIC deal bawaan = PIC relasi.
+        $pipeline = $this->deals->pipelineFor($record->department_id);
+        $owner = User::find($data['ownerId'] ?? $record->pic_id);
+        $this->deals->assertOwner($owner, $record);
         $stage = isset($data['stageId']) ? Stage::find($data['stageId']) : null;
 
         $deal = $this->deals->create($me, $record, $pipeline, $stage, [
@@ -87,8 +88,15 @@ class DealController extends Controller
                 $fields[$col] = $data[$in];
             }
         }
-        if (isset($fields['client_partner_id'])) {
-            abort_unless($this->access->canViewRecord($me, ClientPartner::findOrFail($fields['client_partner_id'])), 403, 'Kamu ga punya akses ke data ini.');
+        $record = isset($fields['client_partner_id']) ? ClientPartner::findOrFail($fields['client_partner_id']) : $deal->clientPartner;
+        abort_unless($this->access->canViewRecord($me, $record), 403, 'Kamu ga punya akses ke data ini.');
+        if (isset($fields['owner_id']) || $record->department_id !== $deal->clientPartner->department_id) {
+            $owner = User::find($fields['owner_id'] ?? $deal->owner_id);
+            if (! isset($fields['owner_id']) && $owner?->department_id !== $record->department_id) {
+                $owner = $record->pic;
+                $fields['owner_id'] = $owner?->id;
+            }
+            $this->deals->assertOwner($owner, $record);
         }
         // Nilai penawaran hanya bisa diubah oleh yang boleh melihatnya.
         if (array_key_exists('offer', $data) && $this->access->canSeeDealValue($me, $deal)) {
@@ -97,6 +105,7 @@ class DealController extends Controller
 
         $original = $deal->getRawOriginal();
         $deal->update($fields);
+        $this->deals->moveToDivision($me, $deal->fresh(), $this->deals->pipelineFor($record->department_id), 'Relasi deal diganti');
         $this->audit->changed(Deals::ENTITY, $deal, $original, $deal->title);
         if ($deal->wasChanged('owner_id') && $deal->owner_id !== $me->id) {
             Notify::send($deal->owner, 'Deal '.$deal->title.' sekarang kamu yang pegang', 'deal:'.$deal->id);
@@ -170,7 +179,7 @@ class DealController extends Controller
     private function authorizeView(User $me, Deal $deal): void
     {
         abort_unless($this->access->can($me, 'deal', AccessLevel::R), 403, 'Akun ini ga punya akses ke deal.');
-        abort_unless($this->access->canViewRecord($me, $deal->clientPartner), 403, 'Deal ini milik divisi lain.');
+        abort_unless($this->access->canViewDeal($me, $deal), 403, 'Deal ini milik divisi lain.');
     }
 
     private function authorizeEdit(User $me, Deal $deal): void
