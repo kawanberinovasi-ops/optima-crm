@@ -57,17 +57,32 @@ class Access
         return array_values(array_filter(Category::cases(), fn (Category $c) => $this->can($user, $c->entity(), AccessLevel::R)));
     }
 
-    /** Batasi query Client & Partner ke kategori yang boleh dilihat. Dipakai daftar, pencarian, dashboard, dan export. */
+    /** Super Admin dan department dengan sees_all (Executive) melihat Lead dan Client semua divisi. */
+    public function seesAllDivisions(User $user): bool
+    {
+        return $user->active && ($user->isSuperAdmin() || (bool) $user->department?->sees_all);
+    }
+
+    /**
+     * Batasi query Client & Partner ke status yang boleh dilihat dan ke divisi pemilik pengguna.
+     * Dipakai daftar, pencarian, interaksi, deal, dashboard, export, dan email ringkasan.
+     */
     public function scopeClientPartners(Builder $query, User $user): Builder
     {
         $categories = array_map(fn (Category $c) => $c->value, $this->visibleCategories($user));
+        if ($categories === []) {
+            return $query->whereRaw('false');
+        }
+        $query->whereIn('category', $categories);
 
-        return $categories === [] ? $query->whereRaw('false') : $query->whereIn('category', $categories);
+        return $this->seesAllDivisions($user) ? $query : $query->where('department_id', $user->department_id);
     }
 
+    /** Boleh membuka data: level R untuk statusnya, dan data milik divisinya (kecuali yang melihat lintas divisi). */
     public function canViewRecord(User $user, ClientPartner $record): bool
     {
-        return $this->can($user, $record->category->entity(), AccessLevel::R);
+        return $this->can($user, $record->category->entity(), AccessLevel::R)
+            && ($this->seesAllDivisions($user) || $record->department_id === $user->department_id);
     }
 
     public function canCreateRecord(User $user, Category $category): bool
@@ -86,21 +101,28 @@ class Access
         return false;
     }
 
-    /** M bisa mengubah semua data di kategorinya, C hanya data yang PIC-nya dia sendiri. */
+    /** M bisa mengubah semua data yang boleh dilihatnya, C hanya data yang PIC-nya dia sendiri. */
     public function canEditRecord(User $user, ClientPartner $record): bool
     {
+        if (! $this->canViewRecord($user, $record)) {
+            return false;
+        }
         $level = $this->level($user, $record->category->entity());
 
         return $level === AccessLevel::M || ($level === AccessLevel::C && $record->pic_id === $user->id);
     }
 
-    /** Arsip, pulihkan, dan gabung data ganda hanya untuk level M. */
+    /** Arsip, pulihkan, dan gabung data ganda hanya untuk level M, pada data yang boleh dilihat. */
     public function canArchiveRecord(User $user, ClientPartner $record): bool
     {
-        return $this->level($user, $record->category->entity()) === AccessLevel::M;
+        return $this->canViewRecord($user, $record) && $this->level($user, $record->category->entity()) === AccessLevel::M;
     }
 
-    public function canMovePic(User $user, ClientPartner $record): bool
+    /**
+     * Serah terima ke PIC atau divisi lain, ke arah mana pun (termasuk ke dan dari Customer Service):
+     * yang boleh mengubah data itu dan berlevel M atau Kepala Department/Koordinator.
+     */
+    public function canHandover(User $user, ClientPartner $record): bool
     {
         return $this->canEditRecord($user, $record)
             && ($this->level($user, $record->category->entity()) === AccessLevel::M || $user->role->isLead());

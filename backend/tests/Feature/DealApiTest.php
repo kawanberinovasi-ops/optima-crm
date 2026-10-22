@@ -80,12 +80,15 @@ class DealApiTest extends TestCase
     {
         $deal = $this->newDeal($this->user('Commercial', Role::KepalaDepartment));
 
-        $row = collect($this->as($this->user('Business Operation'))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
+        // Staf Commercial (Ya*) melihat deal divisinya, tapi nilainya hanya untuk Kepala Department dan Koordinator.
+        $row = collect($this->as($this->user('Commercial'))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
         $this->assertSame('', $row['offer']);
         $this->assertTrue($row['valueHidden']);
 
-        $row = collect($this->as($this->user('Business Operation', Role::Koordinator))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
-        $this->assertSame(50000000, $row['offer'], 'Lihat* untuk Koordinator');
+        $row = collect($this->as($this->user('Commercial', Role::Koordinator))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']);
+        $this->assertSame(50000000, $row['offer'], 'Ya* untuk Koordinator');
+
+        $this->assertNull(collect($this->as($this->user('Business Operation', Role::Koordinator))->getJson('/api/deals')->json('data'))->firstWhere('id', $deal['id']), 'divisi lain tidak menerima deal');
     }
 
     public function test_move_stage_and_history(): void

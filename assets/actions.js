@@ -14,22 +14,25 @@ const keepModal = () => { const f = document.querySelector('[data-form=int]'); c
 const Modals = {
   confirm: (m) => modalShell(m.title, m.sub || 'Konfirmasi', '<p style="margin:0;color:var(--ink2)">' + m.text + '</p>', '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="button" class="btn ' + (m.danger ? 'btn-d' : '') + '" data-a="confirmok">' + esc(m.ok || 'Lanjut') + '</button>'),
   record: (m) => {
-    const r = m.rec || {}; const v = Object.assign({ cat: CATS.find(c => can(catEnt(c), 'C')) || 'Lead', picId: me().id, dept: me().dept, source: 'Referensi' }, r, m.val || {});
-    const cats = CATS.filter(c => can(catEnt(c), 'C') || c === r.cat);
-    return modalShell(r.id ? 'Edit data' : 'Data baru', r.id ? esc(r.code) : 'Client & Partner',
+    // Data baru selalu Lead, PIC dan divisi otomatis dari yang mengisi. Status jadi Client lewat deal Won; PIC dan divisi lewat Serah terima.
+    const r = m.rec || {}; const u = me(); const v = Object.assign({ source: 'Referensi', service: '' }, r, m.val || {});
+    const svcs = serviceList().map(x => x.name); if (v.service && !svcs.includes(v.service)) svcs.unshift(v.service);
+    const owner = r.id
+      ? '<div class="fld" style="grid-column:1/-1"><span>Status, PIC, dan divisi</span><div class="small" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg)">' + catChip(r.cat) + '<span>PIC <b>' + esc(userName(r.picId)) + '</b> · ' + esc(r.dept) + '</span></div><small>Status jadi Client otomatis setelah deal Won. PIC dan divisi diganti lewat Serah terima.</small></div>'
+      : '<div class="fld" style="grid-column:1/-1"><span>Masuk sebagai</span><div class="small" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg)">' + catChip('Lead') + '<span>PIC <b>' + esc(u.name) + '</b> (kamu) · divisi <b>' + esc(u.dept) + '</b></span></div><small>Data baru selalu Lead dengan kamu sebagai PIC. Kalau perlu ditangani divisi lain, serahkan setelah disimpan.</small></div>';
+    return modalShell(r.id ? 'Edit data' : 'Lead baru', r.id ? esc(r.code) : 'Client & Partner',
       '<div class="form-grid">' +
       '<label class="fld" style="grid-column:1/-1"><span>Nama *</span><input class="inp" id="f-name" name="name" value="' + esc(v.name) + '"' + inv(m, 'name') + ' placeholder="Contoh: PT Maju Bersama" autofocus>' + fieldErr(m, 'name') + '</label>' +
-      '<label class="fld"><span>Kategori *</span><select class="inp" name="cat">' + cats.map(c => opt(c, v.cat)).join('') + '</select></label>' +
+      owner +
+      '<label class="fld"><span>Layanan</span><select class="inp" name="service"' + inv(m, 'service') + '>' + opt('', v.service, 'Belum ditentukan') + svcs.map(x => opt(x, v.service)).join('') + '</select><small>Boleh dikosongkan dulu. Ga memindahkan PIC.</small>' + fieldErr(m, 'service') + '</label>' +
       '<label class="fld"><span>Segmen</span><input class="inp" name="segment" value="' + esc(v.segment) + '" placeholder="Korporat, pendidikan, …"></label>' +
-      '<label class="fld"><span>PIC *</span><select class="inp" name="picId">' + activeUsers().map(u => opt(u.id, v.picId, u.name + ' · ' + u.dept)).join('') + '</select></label>' +
-      '<label class="fld"><span>Department pemilik *</span><select class="inp" name="dept">' + Store.db.departments.map(d => opt(d.name, v.dept)).join('') + '</select></label>' +
-      '<label class="fld"><span>Sumber</span><select class="inp" name="source">' + optList('sources').map(s => opt(s, v.source)).join('') + '</select></label>' +
+      '<label class="fld"><span>Sumber</span><select class="inp" name="source">' + optList('sources').map(x => opt(x, v.source)).join('') + '</select></label>' +
       '<label class="fld"><span>Kota</span><input class="inp" name="city" value="' + esc(v.city) + '"></label>' +
       '<label class="fld"><span>Nama kontak utama</span><input class="inp" name="contact" value="' + esc(v.contact) + '"></label>' +
       '<label class="fld"><span>Jabatan kontak</span><input class="inp" name="title" value="' + esc(v.title) + '"></label>' +
       '<label class="fld"><span>Email kontak</span><input class="inp" type="email" name="cEmail" value="' + esc(v.cEmail) + '"' + inv(m, 'cEmail') + '>' + fieldErr(m, 'cEmail') + '</label>' +
       '<label class="fld"><span>Telepon kontak</span><input class="inp" name="phone" value="' + esc(v.phone) + '" inputmode="tel"></label>' +
-      (canSeeRate() ? '<label class="fld"><span>Rate card (KOL/KOC)</span><input class="inp" name="rate" value="' + esc(v.rate) + '" inputmode="numeric" placeholder="Angka saja"><small>Diisi kalau kategori KOL/KOC.</small></label>' : '') +
+      (canSeeRate() ? '<label class="fld"><span>Rate card (KOL)</span><input class="inp" name="rate" value="' + esc(v.rate) + '" inputmode="numeric" placeholder="Angka saja"><small>Diisi kalau layanannya KOL.</small></label>' : '') +
       '<label class="fld" style="grid-column:1/-1"><span>Catatan</span><textarea class="inp" name="note">' + esc(v.note) + '</textarea></label></div>' +
       (m.dupe ? '<div style="padding:12px 14px;border-radius:16px;background:#FFF3DA;color:#6A4300" class="small"><strong>Nama mirip udah ada:</strong> ' + esc(m.dupe) + '. Simpan sekali lagi kalau memang beda.</div>' : ''),
       '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="submit" class="btn">' + ic('check', 'ic-s') + 'Simpan</button>', true, 'record');
@@ -334,18 +337,20 @@ function parseWorkbook(wb) {
   R.slice(0, 2000).forEach(o => {
     if (o['kode sumber'] === 'CP-0001' && o['nama'] === 'PT Contoh Sejahtera') { out.skippedExample = true; return; }
     const row = 'Sheet 7 baris ' + o._row + ': ';
-    const cat = CATS.find(c => c.toLowerCase() === (o['kategori'] || '').toLowerCase());
+    const LEG = { 'kol/koc': 'KOL', kol: 'KOL', community: 'Community', media: 'Media', 'digital campaign': 'Digital Campaign' }; const k = (o['kategori'] || '').toLowerCase().trim();
+    const cat = k === '' || LEG[k] ? 'Lead' : CATS.find(c => c.toLowerCase() === k); const service = o['layanan'] || LEG[k] || '';
     const pic = uByEmail(o['email pic']); const dept = Store.db.departments.find(d => d.name.toLowerCase() === (o['department pemilik'] || '').toLowerCase());
     if (!o['kode sumber'] || !o['nama']) return out.errors.push(row + 'Kode sumber dan Nama wajib diisi.');
     if (codes[o['kode sumber']]) return out.errors.push(row + 'Kode sumber ' + o['kode sumber'] + ' dobel di file.');
     if (!cat) return out.errors.push(row + 'Kategori "' + (o['kategori'] || '') + '" ga dikenal.');
     if (!pic) return out.errors.push(row + 'Email PIC "' + (o['email pic'] || '') + '" belum terdaftar di CRM.');
     if (!dept) return out.errors.push(row + 'Department "' + (o['department pemilik'] || '') + '" belum ada.');
-    if (!can(catEnt(cat), 'C')) return out.errors.push(row + 'Akun ini ga boleh menambah kategori ' + cat + '.');
+    if (!can(catEnt(cat), 'C')) return out.errors.push(row + 'Akun ini ga boleh menambah ' + cat + '.');
+    if (!seesAll(me()) && dept.name !== me().dept) return out.errors.push(row + 'Divisi pemilik harus divisi kamu (' + me().dept + '). Data divisi lain diserahkan lewat serah terima.');
     const ex = Store.db.records.find(r => r.code === o['kode sumber']);
     if (ex && !canEditRec(ex)) return out.errors.push(row + 'Data ' + ex.name + ' udah ada dan akun ini ga boleh mengubahnya.');
     codes[o['kode sumber']] = true;
-    out.records.push({ isNew: !ex, ex, data: { code: o['kode sumber'], name: o['nama'], cat, segment: o['segmen'] || '', picId: pic.id, dept: dept.name, source: optList('sources').includes(o['sumber']) ? o['sumber'] : (o['sumber'] || 'Lainnya'), contact: o['nama kontak utama'] || '', title: o['jabatan kontak'] || '', cEmail: o['email kontak'] || '', phone: o['telepon kontak'] || '', city: o['kota'] || '', rate: num(o['rate card (kol/koc)']), note: o['catatan'] || '' } });
+    out.records.push({ isNew: !ex, ex, data: { code: o['kode sumber'], name: o['nama'], cat, service, createdBy: me().id, segment: o['segmen'] || '', picId: pic.id, dept: dept.name, source: optList('sources').includes(o['sumber']) ? o['sumber'] : (o['sumber'] || 'Lainnya'), contact: o['nama kontak utama'] || '', title: o['jabatan kontak'] || '', cEmail: o['email kontak'] || '', phone: o['telepon kontak'] || '', city: o['kota'] || '', rate: num(o['rate card (kol/koc)']), note: o['catatan'] || '' } });
   });
   const recByCode = (c) => codes[c] ? { code: c } : Store.db.records.find(r => r.code === c);
   (sheetRows(wb, '8', 'kode sumber') || []).forEach(o => {
@@ -393,7 +398,7 @@ function exportXlsx() {
   const recs = (App.route === 'cp' ? cpFiltered().list.map(x => x.r) : Store.db.records.filter(canSeeRec));
   const ids = new Set(recs.map(r => r.id)); const seeRate = canSeeRate();
   const wb = XLSX.utils.book_new();
-  const s7 = [['Kode sumber *', 'Nama *', 'Kategori *', 'Segmen', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan']].concat(recs.map(r => [r.code, r.name, r.cat, r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate ? r.rate : '', r.note]));
+  const s7 = [['Kode sumber *', 'Nama *', 'Kategori *', 'Segmen', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan', 'Layanan']].concat(recs.map(r => [r.code, r.name, r.cat, r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate ? r.rate : '', r.note, r.service || '']));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s7), '7 Data Client & Partner');
   if (can('interaksi', 'R')) { const s8 = [['Kode sumber *', 'Kode Client & Partner *', 'Tanggal *', 'Jenis *', 'Hasil pembicaraan *', 'Langkah berikutnya', 'Tanggal follow-up', 'Email pencatat *', 'Catatan']].concat(Store.db.interactions.filter(i => ids.has(i.recordId)).map(i => [i.code, (recById(i.recordId) || {}).code, i.date, i.type, i.result, i.next, i.fuDate, (userById(i.by) || {}).email || '', i.done ? 'Follow-up selesai' : ''])); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s8), '8 Data Interaksi'); }
   if (can('deal', 'R')) { const s9 = [['Kode sumber *', 'Kode Client & Partner *', 'Lini bisnis *', 'Stage *', 'Status *', 'Layanan', 'Nilai penawaran (Rp)', 'Nilai deal (Rp)', 'Target closing', 'Tanggal closing', 'Alasan Lost / On Hold', 'Email PIC *', 'Catatan']].concat(Store.db.deals.filter(d => ids.has(d.recordId)).map(d => [d.code, (recById(d.recordId) || {}).code, (lineById(d.lineId) || {}).name, (stageOf(d) || {}).name, d.status, d.service || d.title, canSeeValue(d) ? d.offer : '', canSeeValue(d) ? d.value : '', d.target, d.closedAt, d.reason, (userById(d.ownerId) || {}).email || '', ''])); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s9), '9 Data Deal'); }

@@ -6,6 +6,7 @@ use App\Models\AccessGrant;
 use App\Models\Department;
 use App\Models\OptionList;
 use App\Models\Pipeline;
+use App\Models\Service;
 use Illuminate\Database\Seeder;
 
 /**
@@ -27,7 +28,15 @@ class ReferenceDataSeeder extends Seeder
         $data = SampleData::load();
 
         foreach ($data['departments'] as $name) {
-            Department::firstOrCreate(['name' => $name]);
+            Department::firstOrCreate(['name' => $name], ['sees_all' => in_array($name, $data['sees_all'] ?? [], true)]);
+        }
+
+        // Layanan dan divisi yang menanganinya. Hanya mengisi yang belum diatur, supaya ubahan admin tidak tertimpa.
+        foreach ($data['services'] ?? [] as $i => $svc) {
+            $service = Service::firstOrCreate(['name' => $svc['name']], ['position' => $i]);
+            if (! $service->department_id && $svc['department']) {
+                $service->update(['department_id' => Department::where('name', $svc['department'])->value('id')]);
+            }
         }
 
         foreach ($data['access'] as $deptName => $grants) {

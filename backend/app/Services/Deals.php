@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Category;
 use App\Enums\DealStatus;
 use App\Models\ClientPartner;
 use App\Models\Deal;
@@ -76,6 +77,7 @@ class Deals
             $deal->update(['stage_id' => $closing->id, 'status' => DealStatus::Won, 'deal_value' => $value, 'closed_at' => $closedAt,
                 'hold_reason' => null, 'review_date' => null, 'lost_reason' => null, 'lost_note' => null]);
             $this->history($deal, $by, $from, $closing, DealStatus::Won, 'Closing');
+            $this->promoteToClient($deal, $by);
             $this->audit->log('Ubah', self::ENTITY, $deal->id, $deal->title.' dari '.$from->name.' ke Closing, Won',
                 ['stage' => $from->name, 'status' => 'Open'], ['stage' => $closing->name, 'status' => 'Won', 'closed_at' => $closedAt->toDateString()], $by);
 
@@ -130,6 +132,21 @@ class Deals
 
             return $deal->fresh();
         });
+    }
+
+    /**
+     * Lead jadi Client otomatis setelah deal Won (satu-satunya jalan Lead jadi Client). Client tetap Client
+     * walaupun deal berikutnya Lost, On Hold, atau dibuka kembali.
+     */
+    private function promoteToClient(Deal $deal, User $by): void
+    {
+        $record = $deal->clientPartner;
+        if ($record->category !== Category::Lead) {
+            return;
+        }
+        $record->update(['category' => Category::Client, 'converted_at' => now()]);
+        $this->audit->log('Ubah', 'Client & Partner', $record->id, $record->name.' jadi Client karena deal '.$deal->title.' Won',
+            ['category' => 'Lead'], ['category' => 'Client'], $by);
     }
 
     private function history(Deal $deal, User $by, ?Stage $from, Stage $to, DealStatus $status, string $note): void

@@ -7,6 +7,7 @@ use App\Models\ClientPartner;
 use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\DealHistory;
+use App\Models\Handover;
 use App\Models\Interaction;
 use App\Models\Pipeline;
 use App\Models\Stage;
@@ -134,6 +135,8 @@ class FrontShape
             'code' => $r->code,
             'name' => $r->name,
             'cat' => $r->category->value,
+            'service' => (string) $r->service?->name,
+            'createdBy' => $r->created_by ? (string) $r->created_by : '',
             'segment' => (string) $r->segment,
             'status' => (string) $r->status,
             'picId' => (string) $r->pic_id,
@@ -156,7 +159,13 @@ class FrontShape
             'title' => $primary['title'] ?? '',
             'cEmail' => $primary['email'] ?? '',
             'phone' => $primary['phone'] ?? '',
+            'handovers' => $r->handovers->map(fn (Handover $h) => [
+                'at' => $h->created_at?->toIso8601String(), 'from' => (string) $h->from_user_id, 'fromDept' => (string) $h->fromDepartment?->name,
+                'to' => (string) $h->to_user_id, 'toDept' => (string) $h->toDepartment?->name, 'by' => (string) $h->by_user_id,
+                'reason' => $h->reason, 'dealsMoved' => $h->deals_moved,
+            ])->values()->all(),
             'canEdit' => $access->canEditRecord($viewer, $r),
+            'canHandover' => $access->canHandover($viewer, $r),
             'canArchive' => $access->canArchiveRecord($viewer, $r),
         ];
     }

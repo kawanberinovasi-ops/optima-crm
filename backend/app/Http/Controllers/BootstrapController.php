@@ -54,7 +54,7 @@ class BootstrapController extends Controller
         $options = AdminController::optionsShape();
 
         $records = $access->scopeClientPartners(ClientPartner::query(), $me)
-            ->with(['contacts', 'department'])
+            ->with(['contacts', 'department', 'service', 'handovers.fromDepartment', 'handovers.toDepartment'])
             ->whereNull('merged_into_id')
             ->orderBy('name')
             ->get()
@@ -63,7 +63,8 @@ class BootstrapController extends Controller
 
         $canDeal = $access->can($me, 'deal', AccessLevel::R);
         $deals = $canDeal
-            ? Deal::with('histories')->orderBy('id')->get()->map(fn (Deal $d) => FrontShape::deal($d, $me, $access))->values()
+            ? Deal::with('histories')->whereIn('client_partner_id', $access->scopeClientPartners(ClientPartner::query(), $me)->select('id'))
+                ->orderBy('id')->get()->map(fn (Deal $d) => FrontShape::deal($d, $me, $access))->values()
             : [];
         $interactions = $access->can($me, 'interaksi', AccessLevel::R)
             ? Interaction::whereIn('client_partner_id', $access->scopeClientPartners(ClientPartner::query(), $me)->select('id'))
@@ -76,7 +77,8 @@ class BootstrapController extends Controller
             'deals' => $deals,
             'interactions' => $interactions,
             'users' => User::with('department')->orderBy('id')->get()->map(fn (User $u) => FrontShape::user($u))->values(),
-            'departments' => Department::orderBy('id')->get()->map(fn (Department $d) => ['id' => (string) $d->id, 'name' => $d->name])->values(),
+            'departments' => Department::orderBy('id')->get()->map(fn (Department $d) => ['id' => (string) $d->id, 'name' => $d->name, 'seesAll' => $d->sees_all])->values(),
+            'services' => AdminController::servicesShape(),
             'access' => $access_,
             'overrides' => $overrides,
             'options' => $options,

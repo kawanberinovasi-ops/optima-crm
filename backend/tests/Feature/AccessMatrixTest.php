@@ -14,8 +14,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * Matriks hak akses awal harus sama dengan tabel SRS bagian 3 (halaman 4).
- * Tabel di bawah disalin dari SRS, bukan dari seeder, supaya selisih antara SRS dan data langsung ketahuan.
+ * Matriks hak akses awal: tabel SRS bagian 3 (halaman 4) dengan perubahan alur bisnis 22 Okt 2026.
+ * - Kolom Community, KOL/KOC, dan Media dihapus: sekarang layanan, bukan status relasi.
+ * - Lead C untuk department yang punya hak input interaksi (Customer Service, Creative & Media), supaya siapa pun
+ *   yang punya hak input bisa menerima Lead langsung.
+ * Tabel ditulis di sini, bukan dibaca dari seeder, supaya selisih dengan keputusan bisnis langsung ketahuan.
  */
 class AccessMatrixTest extends TestCase
 {
@@ -27,19 +30,19 @@ class AccessMatrixTest extends TestCase
         $this->seed(ReferenceDataSeeder::class);
     }
 
-    /** Department => [Lead, Client, Community, KOL/KOC, Media, Interaksi, Deal, Nilai deal, Rate card] */
+    /** Department => [Lead, Client, Interaksi, Deal, Nilai deal, Rate card] */
     private const SRS = [
-        'Executive' => ['M', 'M', 'M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
-        'Commercial' => ['M', 'M', 'R', 'R', 'R', 'C', 'M', 'Ya*', 'R*'],
-        'Customer Service' => ['R', 'R', 'R', 'R', 'R', 'M', 'R', 'Tidak', 'Tidak'],
-        'Digital Campaign' => ['C', 'R', 'R', 'M', 'R', 'C', 'N', 'Tidak', 'M'],
-        'Creative & Media' => ['R', 'R', 'R', 'R', 'M', 'C', 'N', 'Tidak', 'Tidak'],
-        'CampusNet' => ['C', 'R', 'M', 'R', 'C', 'C', 'N', 'Tidak', 'Tidak'],
-        'DietPartner' => ['C', 'R', 'M', 'R', 'C', 'C', 'N', 'Tidak', 'Tidak'],
-        'Business Operation' => ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'Lihat*', 'Tidak'],
+        'Executive' => ['M', 'M', 'M', 'M', 'Ya', 'Ya'],
+        'Commercial' => ['M', 'M', 'C', 'M', 'Ya*', 'R*'],
+        'Customer Service' => ['C', 'R', 'M', 'R', 'Tidak', 'Tidak'],
+        'Digital Campaign' => ['C', 'R', 'C', 'N', 'Tidak', 'M'],
+        'Creative & Media' => ['C', 'R', 'C', 'N', 'Tidak', 'Tidak'],
+        'CampusNet' => ['C', 'R', 'C', 'N', 'Tidak', 'Tidak'],
+        'DietPartner' => ['C', 'R', 'C', 'N', 'Tidak', 'Tidak'],
+        'Business Operation' => ['R', 'R', 'R', 'R', 'Lihat*', 'Tidak'],
     ];
 
-    private const ENTITIES = ['lead', 'client', 'community', 'kol', 'media', 'interaksi', 'deal'];
+    private const ENTITIES = ['lead', 'client', 'interaksi', 'deal'];
 
     public static function departments(): array
     {
@@ -69,7 +72,7 @@ class AccessMatrixTest extends TestCase
     #[DataProvider('departments')]
     public function test_deal_value_and_rate_card_follow_srs_stars(string $dept): void
     {
-        [$nilai, $rate] = array_slice(self::SRS[$dept], 7);
+        [$nilai, $rate] = array_slice(self::SRS[$dept], 4);
         $head = $this->user($dept, Role::KepalaDepartment);
         $coord = $this->user($dept, Role::Koordinator);
         $staff = $this->user($dept, Role::Staf);
@@ -152,9 +155,9 @@ class AccessMatrixTest extends TestCase
 
         $this->assertSame(Category::cases(), $this->access()->visibleCategories($digital));
 
-        AccessOverride::create(['user_id' => $digital->id, 'entity' => 'media', 'level' => 'N']);
+        AccessOverride::create(['user_id' => $digital->id, 'entity' => 'client', 'level' => 'N']);
         $this->access()->forget($digital);
 
-        $this->assertNotContains(Category::Media, $this->access()->visibleCategories($digital));
+        $this->assertNotContains(Category::Client, $this->access()->visibleCategories($digital));
     }
 }

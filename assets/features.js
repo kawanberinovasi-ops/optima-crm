@@ -84,13 +84,14 @@ function Drawer() {
   ensureRec(r);
   const ints = Store.db.interactions.filter(i => i.recordId === r.id).sort((a, b) => b.date.localeCompare(a.date));
   const deals = can('deal', 'R') ? Store.db.deals.filter(d => d.recordId === r.id) : [];
-  const info = [['Kota', r.city], ['Segmen', r.segment], ['Sumber', r.source], ['PIC', userName(r.picId)], ['Department pemilik', r.dept], ['Dibuat', fmtDate(r.createdAt)]];
-  if (r.cat === 'KOL/KOC' && canSeeRate()) info.push(['Rate card', r.rate ? fmtRp(r.rate) : '-']);
+  const info = [['Status', r.cat], ['Layanan', r.service || 'Belum ditentukan'], ['PIC aktif', userName(r.picId)], ['Divisi pemilik', r.dept], ['Kota', r.city], ['Segmen', r.segment], ['Sumber', r.source],
+    ['Dibuat oleh', (r.createdBy ? userName(r.createdBy) + ' · ' : '') + fmtDate(r.createdAt)]];
+  if (r.service === 'KOL' && canSeeRate()) info.push(['Rate card', r.rate ? fmtRp(r.rate) : '-']);
   const ed = canEditRec(r) && !r.archived;
   const hb = (a, icon, label, extra) => '<button type="button" class="btn btn-sm" style="background:rgba(255,255,255,.14)" data-a="' + a + '" data-v="' + r.id + '"' + (extra || '') + '>' + ic(icon, 'ic-s') + label + '</button>';
   const more = [];
-  if (ed && r.cat === 'Lead' && can('client', 'C')) more.push(['convert', 'check', 'Jadikan Client']);
-  if (canMovePic(r) && !r.archived) more.push(['movepic', 'swap', 'Pindah PIC']);
+  // Lead jadi Client hanya lewat deal Won, jadi tidak ada tombol konversi manual.
+  if (canHandover(r) && !r.archived) more.push(['handover', 'swap', 'Serah terima']);
   if (canDelRec(r) && !r.archived) more.push(['mergerec', 'users', 'Gabung data ganda']);
   if (canDelRec(r)) more.push(r.archived ? ['restorerec', 'refresh', 'Pulihkan dari arsip'] : ['delrec', 'file', 'Arsipkan']);
   const ch = (Store.db.changes || []).filter(c => c.kind === 'record' && c.refId === r.id);
@@ -112,6 +113,7 @@ function Drawer() {
     '<section style="display:flex;flex-direction:column;gap:10px"><span class="lbl">Riwayat interaksi (' + ints.filter(i => !i.cancelled).length + ')</span><div class="tl">' + (ints.length ? ints.map(i => '<div class="tl-i' + (i.cancelled ? ' cancelled' : '') + '"><span class="tile">' + ic(icn(i.type)) + '</span><div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong class="small">' + esc(i.type) + ' · ' + fmtDate(i.date) + '</strong><span class="small muted">' + esc(userName(i.by)) + '</span></div><span class="small struck-t">' + esc(i.result) + '</span>' +
       (i.cancelled ? '<span class="chip c-warn" style="align-self:flex-start"><span class="dot"></span>Dibatalkan ' + esc(userName(i.cancelledBy)) + ': ' + esc(i.cancelReason) + '</span>' :
         '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">' + (i.next ? '<span class="small muted">Next: ' + esc(i.next) + '</span>' + (i.done ? '<span class="chip c-ok"><span class="dot"></span>Selesai</span>' : fuChip(i.fuDate) + (can('interaksi', 'C') && i.fuDate ? '<button type="button" class="btn-ghost small" data-a="fudone" data-v="' + i.id + '">Tandai selesai</button>' : '')) : '') + (canCancelInt(i) ? '<button type="button" class="btn-ghost small" data-a="cancelint" data-v="' + i.id + '" style="color:#8F1D21">Batalkan</button>' : '') + '</div>') + '</div></div>').join('') : empty('Belum ada interaksi.', 'Catat obrolan pertama biar tim tau progresnya.', can('interaksi', 'C') && !r.archived ? '<button type="button" class="btn btn-sm" data-a="newint" data-v="' + r.id + '">+ Catat interaksi</button>' : '')) + '</div></section>' +
+    handoverList(r) +
     '<details class="hist"><summary><span class="lbl">Riwayat perubahan (' + ch.length + ')</span></summary>' + historyList(ch) + '</details></div></aside>';
 };
 function historyList(ch) {
@@ -126,7 +128,7 @@ Pages.pipeline = function () {
   if (!can('deal', 'R')) return hero('Terkunci') + empty('Pipeline terkunci.', 'Akun ini ga punya akses ke deal. Minta Super Admin kalau butuh.', '<a class="btn btn-sm" href="#/mywork">Balik ke My Work</a>');
   const line = lineById(ui.line) || Store.db.lines[0]; ui.line = line.id;
   const range = periodRange(ui.per, ui.val); const q = ui.q.trim().toLowerCase();
-  const deals = Store.db.deals.filter(d => d.lineId === line.id && inRange(d.status === 'Open' || d.status === 'On Hold' ? (d.createdAt || d.target) : (d.closedAt || d.target), range) && (!q || (d.title + ' ' + ((recById(d.recordId) || {}).name || '')).toLowerCase().includes(q)));
+  const deals = scopedDeals().filter(d => d.lineId === line.id && inRange(d.status === 'Open' || d.status === 'On Hold' ? (d.createdAt || d.target) : (d.closedAt || d.target), range) && (!q || (d.title + ' ' + ((recById(d.recordId) || {}).name || '')).toLowerCase().includes(q)));
   const open = deals.filter(d => d.status === 'Open'); const seeV = canSeeValue(null);
   const won = deals.filter(d => d.status === 'Won'); const lost = deals.filter(d => d.status === 'Lost'); const hold = deals.filter(d => d.status === 'On Hold');
   const wonV = won.reduce((a, d) => a + (+d.value || 0), 0);
@@ -159,7 +161,7 @@ Pages.pipeline = function () {
         : empty('Ga ada deal di filter ini.', 'Ganti status atau periode.', '<button type="button" class="btn btn-sm" data-a="plst" data-v="all">Lihat semua</button>')) + '</section>';
   }
   return hero(line.name, stats) +
-    '<div class="enter s1" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px"><div style="display:flex;flex-wrap:wrap;gap:10px">' + seg([['board', 'Papan'], ['list', 'Daftar']], ui.view, 'plview', 'Tampilan') + seg(Store.db.lines.map(l => [l.id, l.name, Store.db.deals.filter(d => d.lineId === l.id && d.status === 'Open').length]), line.id, 'plline', 'Lini bisnis', 'tablist') + '</div>' +
+    '<div class="enter s1" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px"><div style="display:flex;flex-wrap:wrap;gap:10px">' + seg([['board', 'Papan'], ['list', 'Daftar']], ui.view, 'plview', 'Tampilan') + seg(Store.db.lines.map(l => [l.id, l.name, scopedDeals().filter(d => d.lineId === l.id && d.status === 'Open').length]), line.id, 'plline', 'Lini bisnis', 'tablist') + '</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' + seg([['all', 'Semua'], ['m', 'Bulan'], ['q', 'Quarter'], ['y', 'Tahun']], ui.per, 'plper', 'Jenis periode') + (ui.per !== 'all' ? '<label><span class="sr">Pilih periode</span><select id="pl-val" class="inp" data-ch="plval" style="width:auto;min-height:44px;font-weight:700;color:var(--p)">' + periodOptions(ui.per).map(o => opt(o[0], ui.val || periodOptions(ui.per)[0][0], o[1])).join('') + '</select></label>' : '') + '<label class="search" style="width:220px">' + ic('search', 'ic-s') + '<span class="sr">Cari deal</span><input id="pl-q" data-in="plq" value="' + esc(ui.q) + '" placeholder="Cari deal"></label></div></div>' +
     (ui.per !== 'all' ? '<p class="small muted" style="margin:-8px 0 0">Deal yang masih jalan dihitung dari tanggal dibuat, deal Won dan Lost dari tanggal closing.</p>' : '') + body +
     pageNote('Deal yang masuk Closing berstatus Won. Lost dan On Hold diatur dari detail deal, dan stage terakhirnya tetap tersimpan.');
@@ -193,7 +195,7 @@ const _mywork = Pages.mywork;
 Pages.mywork = function () {
   let html = _mywork();
   if (!can('deal', 'R')) return html;
-  const due = Store.db.deals.filter(d => d.status === 'On Hold' && d.ownerId === me().id && d.reviewDate && dayDiff(d.reviewDate) <= 3).sort((a, b) => a.reviewDate.localeCompare(b.reviewDate));
+  const due = scopedDeals().filter(d => d.status === 'On Hold' && d.ownerId === me().id && d.reviewDate && dayDiff(d.reviewDate) <= 3).sort((a, b) => a.reviewDate.localeCompare(b.reviewDate));
   if (!due.length) return html;
   const box = '<section class="card pad enter s4" aria-label="Deal On Hold" style="display:flex;flex-direction:column;gap:12px"><div class="sec-h"><div><span class="lbl">Tinjau ulang</span><h2 class="disp h2" style="font-size:30px">Deal On Hold kamu</h2></div><a href="#/pipeline" style="font-size:14px;font-weight:700">Pipeline</a></div>' +
     due.map(d => '<div class="lrow"><button type="button" data-a="opendeal" data-v="' + d.id + '" style="all:unset;cursor:pointer;flex:1 1 260px;min-width:0;display:flex;flex-direction:column"><strong>' + esc(d.title) + '</strong><span class="small" style="color:var(--ink2)">' + esc((recById(d.recordId) || {}).name || '') + ' · ' + esc(d.reason || '') + '</span></button>' + fuChip(d.reviewDate) + (canReopen(d) ? '<button type="button" class="btn btn-sm" data-a="reopen" data-v="' + d.id + '">Buka lagi</button>' : '') + '</div>').join('') + '</section>';
@@ -212,10 +214,10 @@ Pages.dashboard = function () {
   let rest = html.slice(cut);
   if (can('deal', 'R')) {
     const r = periodRange(ui.per, ui.val || periodOptions(ui.per)[0][0]);
-    const lost = Store.db.deals.filter(d => d.status === 'Lost' && inRange(d.closedAt, r));
+    const lost = scopedDeals().filter(d => d.status === 'Lost' && inRange(d.closedAt, r));
     const reasons = {}; lost.forEach(d => { const k = d.lostReason || 'Lainnya'; reasons[k] = (reasons[k] || 0) + 1; });
     const rs = Object.entries(reasons).sort((a, b) => b[1] - a[1]); const rmax = Math.max(1, ...rs.map(x => x[1]));
-    const sc = DEAL_STATUS.map(s => [s, Store.db.deals.filter(d => d.status === s && (s === 'Open' || s === 'On Hold' || inRange(d.closedAt, r))).length]);
+    const sc = DEAL_STATUS.map(s => [s, scopedDeals().filter(d => d.status === s && (s === 'Open' || s === 'On Hold' || inRange(d.closedAt, r))).length]);
     const extra = '<div class="row-f" style="align-items:stretch"><section class="card pad enter s6" style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:12px"><div><span class="lbl">Status deal</span><h2 class="disp h2" style="font-size:30px">Open, Won, Lost, On Hold</h2></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">' + sc.map(([s, n]) => '<div style="padding:14px;border-radius:18px;background:var(--bg);display:flex;justify-content:space-between;align-items:center">' + statusChip(s) + '<span class="disp num" style="font-size:32px;color:var(--p)">' + n + '</span></div>').join('') + '</div><span class="small muted">Won dan Lost dihitung di periode terpilih.</span></section>' +
       '<section class="card pad enter s7" style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:12px"><div><span class="lbl">Alasan gagal · ' + esc(perLabel(ui.per, ui.val)) + '</span><h2 class="disp h2" style="font-size:30px">Kenapa deal lepas</h2></div>' +
       (rs.length ? rs.map(([k, n]) => '<div style="display:grid;grid-template-columns:170px 1fr 30px;gap:10px;align-items:center"><span class="small" style="font-weight:600">' + esc(k) + '</span><div class="bar" style="height:14px"><i class="growx" style="width:' + (n / rmax * 100) + '%;background:linear-gradient(90deg,#C9343A,#E5484D)"></i></div><span class="num" style="font-weight:800;text-align:right">' + n + '</span></div>').join('') : '<p class="small muted" style="margin:0">Ga ada deal Lost di periode ini.</p>') + '</section></div>';
@@ -353,7 +355,7 @@ Object.assign(Actions, {
   editcontact: (el) => { App.modal = { kind: 'contact', recId: el.dataset.v, cid: el.dataset.c }; render(); },
   cprimary: (el) => { const r = recById(el.dataset.v); const i = r.contacts.findIndex(c => c.id === el.dataset.c); const [c] = r.contacts.splice(i, 1); const old = r.contacts[0]; r.contacts.unshift(c); trackChange('record', r.id, 'Kontak utama', old ? old.name : '', c.name); syncPrimary(r); audit('Ubah', 'Client & Partner', r.name + ': kontak utama jadi ' + c.name); commit(); },
   cremove: (el) => { const r = recById(el.dataset.v); const c = r.contacts.find(x => x.id === el.dataset.c); App.modal = { kind: 'confirm', title: 'Lepas kontak ' + esc(c.name) + '?', text: 'Kontak ini ga muncul lagi di data ' + esc(r.name) + '. Perubahannya tercatat di riwayat.', ok: 'Lepas', fn: () => { r.contacts = r.contacts.filter(x => x.id !== c.id); syncPrimary(r); trackChange('record', r.id, 'Kontak', c.name, '', 'Kontak dilepas'); audit('Ubah', 'Client & Partner', r.name + ': kontak ' + c.name + ' dilepas'); } }; render(); },
-  convert: (el) => { const r = recById(el.dataset.v); App.modal = { kind: 'confirm', sub: 'Lead jadi Client', title: 'Jadikan ' + esc(r.name) + ' Client?', text: 'Kategori berubah dari Lead jadi Client. Riwayat interaksi dan deal tetap ikut.', ok: 'Jadikan Client', fn: () => { trackChange('record', r.id, 'Kategori', r.cat, 'Client', 'Konversi Lead'); r.cat = 'Client'; r.convertedAt = today(); audit('Ubah', 'Client & Partner', r.name + ' dikonversi dari Lead jadi Client'); toast('Selamat, jadi Client!', r.name + ' udah naik kelas.'); } }; render(); },
+  _convertRemoved: (el) => { const r = recById(el.dataset.v); App.modal = { kind: 'confirm', sub: 'Lead jadi Client', title: 'Jadikan ' + esc(r.name) + ' Client?', text: 'Kategori berubah dari Lead jadi Client. Riwayat interaksi dan deal tetap ikut.', ok: 'Jadikan Client', fn: () => { trackChange('record', r.id, 'Kategori', r.cat, 'Client', 'Konversi Lead'); r.cat = 'Client'; r.convertedAt = today(); audit('Ubah', 'Client & Partner', r.name + ' dikonversi dari Lead jadi Client'); toast('Selamat, jadi Client!', r.name + ' udah naik kelas.'); } }; render(); },
   movepic: (el) => { App.modal = { kind: 'pic', id: el.dataset.v }; render(); },
   mergerec: (el) => { App.modal = { kind: 'merge', keepId: el.dataset.v }; render(); },
   viewsave: () => { App.modal = { kind: 'view' }; render(); },
@@ -390,14 +392,14 @@ Object.assign(Forms, {
     if (dupes.length && !m.dupeOk) { m.dupes = dupes.map(x => ({ id: x.r.id, vis: canSeeRec(x.r), why: x.why })); m.dupeOk = true; m.val = o; m.err = {}; m.still = true; render(); return; }
     if ('rate' in o) o.rate = num(o.rate);
     if (m.rec) {
-      const r = ensureRec(m.rec); const L = { name: 'Nama', cat: 'Kategori', segment: 'Segmen', dept: 'Department pemilik', source: 'Sumber', city: 'Kota', note: 'Catatan', rate: 'Rate card' };
+      const r = ensureRec(m.rec); const L = { name: 'Nama', service: 'Layanan', segment: 'Segmen', source: 'Sumber', city: 'Kota', note: 'Catatan', rate: 'Rate card' };
       Object.keys(L).forEach(k => { if (k in o) { trackChange('record', r.id, L[k], k === 'rate' && r[k] ? fmtRp(r[k]) : r[k], k === 'rate' && o[k] ? fmtRp(o[k]) : o[k]); r[k] = o[k]; } });
       const c0 = r.contacts[0] || (r.contacts[0] = { id: uid('c') });
       [['contact', 'name', 'Nama kontak utama'], ['title', 'title', 'Jabatan kontak'], ['cEmail', 'email', 'Email kontak'], ['phone', 'phone', 'Telepon kontak']].forEach(([f, cf, l]) => { if (f in o) { trackChange('record', r.id, l, c0[cf], o[f]); c0[cf] = o[f]; } });
       syncPrimary(r); r.updatedAt = today(); audit('Ubah', 'Client & Partner', r.name); toast('Tersimpan!', r.name + ' udah diperbarui.');
     } else {
-      const r = { id: uid('r'), code: nextCode('r'), createdAt: today(), updatedAt: today(), name: o.name, cat: o.cat, segment: o.segment || '', picId: o.picId, dept: o.dept, source: o.source, city: o.city || '', note: o.note || '', rate: o.rate || '', archived: false, contacts: [{ id: uid('c'), name: o.contact || '', title: o.title || '', email: o.cEmail || '', phone: o.phone || '' }] };
-      syncPrimary(r); Store.db.records.push(r); audit('Tambah', 'Client & Partner', r.name + ' (' + r.code + ')'); notify(r.picId, me().name + ' menjadikan kamu PIC ' + r.name, 'rec:' + r.id); toast('Masuk, mantap!', r.name + ' ditambahkan.'); App.drawer = { id: r.id };
+      const r = { id: uid('r'), code: nextCode('r'), createdAt: today(), updatedAt: today(), name: o.name, cat: 'Lead', service: o.service || '', createdBy: me().id, segment: o.segment || '', picId: me().id, dept: me().dept, source: o.source, city: o.city || '', note: o.note || '', rate: o.rate || '', archived: false, contacts: [{ id: uid('c'), name: o.contact || '', title: o.title || '', email: o.cEmail || '', phone: o.phone || '' }] };
+      syncPrimary(r); Store.db.records.push(r); audit('Tambah', 'Client & Partner', r.name + ' (' + r.code + ') sebagai Lead, PIC ' + me().name); toast('Masuk, mantap!', r.name + ' ditambahkan.'); App.drawer = { id: r.id };
     }
     App.modal = null; commit();
   },
@@ -423,6 +425,7 @@ Object.assign(Forms, {
     if (Object.keys(err).length) { m.err = err; m.value = o.value; m.closedAt = o.closedAt; m.still = true; render(); return; }
     const line = lineById(d.lineId); const from = stageOf(d);
     d.stageId = line.stages[line.stages.length - 1].id; d.status = 'Won'; d.value = num(o.value); d.closedAt = o.closedAt; d.reason = ''; d.lostReason = ''; d.reviewDate = '';
+    promoteToClient(d);
     dealLog(d, from ? from.name : '', stageOf(d).name, 'Won', 'Closing'); audit('Ubah', 'Deal', d.title + ' dari ' + (from ? from.name : '-') + ' ke Closing, Won');
     App.modal = null; commit(); toast('Deal won. Keren!', d.title + (canSeeValue(d) ? ', ' + fmtRp(d.value) : '') + '.');
   },

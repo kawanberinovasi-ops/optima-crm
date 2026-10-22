@@ -9,8 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/** Data lead, client, community, KOL/KOC, dan media (SRS 4.2). Tidak pernah dihapus permanen. */
-#[Fillable(['code', 'name', 'category', 'segment', 'status', 'pic_id', 'department_id', 'source', 'city', 'note', 'rate_card', 'client_info', 'converted_at', 'archived_at', 'archived_by', 'archive_reason', 'merged_into_id', 'created_by'])]
+/**
+ * Relasi Client & Partner. category = status relasi (Lead/Client), service_id = layanan (KOL, Community, Media, ...).
+ * created_by = pembuat data (tidak pernah berubah), pic_id = PIC aktif, department_id = divisi pemilik. Tidak pernah dihapus permanen.
+ */
+#[Fillable(['code', 'name', 'category', 'service_id', 'segment', 'status', 'pic_id', 'department_id', 'source', 'city', 'note', 'rate_card', 'client_info', 'converted_at', 'archived_at', 'archived_by', 'archive_reason', 'merged_into_id', 'created_by'])]
 class ClientPartner extends Model
 {
     protected function casts(): array
@@ -32,6 +35,21 @@ class ClientPartner extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function service(): BelongsTo
+    {
+        return $this->belongsTo(Service::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function handovers(): HasMany
+    {
+        return $this->hasMany(Handover::class)->orderBy('id');
     }
 
     public function contacts(): HasMany

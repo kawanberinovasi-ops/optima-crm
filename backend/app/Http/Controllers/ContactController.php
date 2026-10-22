@@ -122,6 +122,6 @@ class ContactController extends Controller
 
     private function respond(Request $request, ClientPartner $record, int $status = 200): JsonResponse
     {
-        return response()->json(['data' => FrontShape::record($record->fresh(['contacts', 'department']), $request->user(), $this->access)], $status);
+        return response()->json(['data' => FrontShape::record($record->fresh(['contacts', 'department', 'service', 'handovers.fromDepartment', 'handovers.toDepartment']), $request->user(), $this->access)], $status);
     }
 }

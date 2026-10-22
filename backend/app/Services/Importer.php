@@ -12,6 +12,7 @@ use App\Models\Import;
 use App\Models\Interaction;
 use App\Models\OptionList;
 use App\Models\Pipeline;
+use App\Models\Service;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -50,6 +51,7 @@ class Importer
         $types = OptionList::where(['list' => 'interaction_types', 'active' => true])->pluck('value');
         $lostReasons = OptionList::where(['list' => 'lost_reasons', 'active' => true])->pluck('value');
         $pipelines = Pipeline::with('stages')->get()->keyBy(fn ($p) => strtolower($p->name));
+        $services = Service::where('active', true)->get()->keyBy(fn ($sv) => strtolower($sv->name));
 
         $rows = [];
         $skippedExample = false;
@@ -63,17 +65,21 @@ class Importer
             }
             $err = null;
             $code = trim($o['kode sumber'] ?? '');
-            $cat = collect(Category::cases())->first(fn ($c) => strtolower($c->value) === strtolower(trim($o['kategori'] ?? '')));
+            // Kolom Kategori lama boleh berisi KOL/KOC, Community, atau Media: itu layanan, statusnya Lead.
+            [$cat, $serviceName] = self::statusAndService($o['kategori'] ?? '', $o['layanan'] ?? '');
+            $service = $serviceName === null ? null : ($services[strtolower($serviceName)] ?? false);
             $pic = $users[strtolower(trim($o['email pic'] ?? ''))] ?? null;
             $dept = $depts[strtolower(trim($o['department pemilik'] ?? ''))] ?? null;
             $existing = $code !== '' ? ClientPartner::where('code', $code)->first() : null;
             $err = match (true) {
                 $code === '' || trim($o['nama'] ?? '') === '' => 'Kode sumber dan Nama wajib diisi.',
                 isset($fileCodes[$code]) => 'Kode sumber '.$code.' dobel di file.',
-                ! $cat => 'Kategori "'.($o['kategori'] ?? '').'" ga dikenal.',
+                ! $cat => 'Kategori "'.($o['kategori'] ?? '').'" ga dikenal. Pakai Lead atau Client; KOL/Community/Media isi di kolom Layanan.',
+                $service === false => 'Layanan "'.$serviceName.'" belum ada di daftar.',
                 ! $pic => 'Email PIC "'.($o['email pic'] ?? '').'" belum terdaftar di CRM.',
                 ! $dept => 'Department "'.($o['department pemilik'] ?? '').'" belum ada.',
-                ! $this->access->canCreateRecord($by, $cat) => 'Akun ini ga boleh menambah kategori '.$cat->value.'.',
+                ! $existing && ! $this->access->canCreateRecord($by, $cat) => 'Akun ini ga boleh menambah '.$cat->value.'.',
+                ! $existing && ! $this->access->seesAllDivisions($by) && $dept->id !== $by->department_id => 'Divisi pemilik harus divisi kamu ('.$by->department->name.'). Data divisi lain diserahkan lewat serah terima.',
                 $existing && ! $this->access->canEditRecord($by, $existing) => 'Data '.$existing->name.' udah ada dan akun ini ga boleh mengubahnya.',
                 default => null,
             };
@@ -82,7 +88,8 @@ class Importer
             }
             $source = trim($o['sumber'] ?? '');
             $rows[] = $this->row('records', $o, $err, $err ? null : [
-                'code' => $code, 'name' => trim($o['nama']), 'category' => $cat->value, 'segment' => trim($o['segmen'] ?? '') ?: null,
+                'code' => $code, 'name' => trim($o['nama']), 'category' => $cat->value, 'service_id' => $service ? $service->id : null,
+                'service_name' => $service ? $service->name : null, 'segment' => trim($o['segmen'] ?? '') ?: null,
                 'pic_id' => $pic->id, 'department_id' => $dept->id, 'source' => $source === '' ? 'Lainnya' : ($sources->first(fn ($s) => strtolower($s) === strtolower($source)) ?? $source),
                 'city' => trim($o['kota'] ?? '') ?: null, 'note' => trim($o['catatan'] ?? '') ?: null,
                 'rate' => self::digits($o['rate card (kol/koc)'] ?? ''),
@@ -197,11 +204,16 @@ class Importer
 
             foreach ($rows->get('records', collect()) as $row) {
                 $d = $row->data;
-                $fields = collect($d)->only(['name', 'category', 'segment', 'pic_id', 'department_id', 'source', 'city', 'note'])->all();
-                if ($d['category'] === Category::KolKoc->value && $d['rate'] && $this->access->canManageRateCard($by)) {
+                $existing = ClientPartner::where('code', $d['code'])->first();
+                // Data yang sudah ada: status, PIC, dan divisi tidak diubah lewat import (status lewat Won, PIC dan divisi lewat serah terima).
+                $keys = $existing ? ['name', 'segment', 'source', 'city', 'note'] : ['name', 'category', 'segment', 'pic_id', 'department_id', 'source', 'city', 'note'];
+                $fields = collect($d)->only($keys)->all();
+                if ($d['service_id'] ?? null) {
+                    $fields['service_id'] = $d['service_id'];
+                }
+                if (($d['service_name'] ?? null) === 'KOL' && $d['rate'] && $this->access->canManageRateCard($by)) {
                     $fields['rate_card'] = ['rate' => (int) $d['rate']];
                 }
-                $existing = ClientPartner::where('code', $d['code'])->first();
                 if ($existing) {
                     $before = $existing->only(array_keys($fields));
                     $existing->update($fields);
@@ -242,6 +254,9 @@ class Importer
                 $row->update(['entity_type' => 'Deal', 'entity_id' => $deal->id, 'action' => 'created']);
             }
 
+            // Relasi yang punya deal Won (dari import ini atau sebelumnya) jadi Client, sama seperti lewat Pipeline.
+            $wonRecords = Deal::where('status', DealStatus::Won)->whereIn('client_partner_id', array_values($recordIds))->pluck('client_partner_id');
+            ClientPartner::whereIn('id', $wonRecords)->where('category', Category::Lead)->update(['category' => Category::Client, 'converted_at' => now()]);
             $import->update(['status' => 'committed', 'committed_at' => now()]);
             $count = fn ($k) => $rows->get($k, collect())->count();
             $this->audit->log('Import', 'Client & Partner', null, $import->filename.': '.$count('records').' data, '.$count('interactions').' interaksi, '.$count('deals').' deal'
@@ -330,6 +345,21 @@ class Importer
             'sheet' => $sheet, 'row_no' => (int) ($o['_row'] ?? 0), 'data' => $data ?? array_diff_key($o, ['_row' => 1]),
             'errors' => $error ? [$error] : null, 'source_key' => $key ?: null,
         ];
+    }
+
+    /**
+     * Status relasi dan layanan dari kolom Kategori (lama) dan Layanan.
+     *
+     * @return array{0: ?Category, 1: ?string}
+     */
+    private static function statusAndService(string $kategori, string $layanan): array
+    {
+        $k = strtolower(trim($kategori));
+        $legacy = ['kol/koc' => 'KOL', 'kol' => 'KOL', 'koc' => 'KOL', 'community' => 'Community', 'media' => 'Media', 'digital campaign' => 'Digital Campaign'];
+        $status = $k === '' ? Category::Lead : (collect(Category::cases())->first(fn ($c) => strtolower($c->value) === $k) ?? (isset($legacy[$k]) ? Category::Lead : null));
+        $service = trim($layanan) !== '' ? trim($layanan) : ($legacy[$k] ?? null);
+
+        return [$status, $service];
     }
 
     private static function digits(?string $s): ?int

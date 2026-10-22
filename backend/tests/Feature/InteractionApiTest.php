@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\Category;
 use App\Enums\Role;
-use App\Models\AccessOverride;
 use App\Models\ClientPartner;
 use App\Models\Deal;
 use App\Models\Interaction;
@@ -124,10 +123,9 @@ class InteractionApiTest extends TestCase
 
     public function test_interactions_of_hidden_records_are_not_sent(): void
     {
-        $owner = $this->user();
-        $this->log($owner, $this->record($owner, Category::Media));
-        $viewer = $this->user('Digital Campaign');
-        AccessOverride::create(['user_id' => $viewer->id, 'entity' => 'media', 'level' => 'N']);
+        $owner = $this->user('Commercial');
+        $this->log($owner, $this->record($owner, Category::Lead));
+        $viewer = $this->user('Digital Campaign'); // divisi lain
 
         $this->as($viewer)->getJson('/api/interactions')->assertOk()->assertJsonCount(0, 'data');
         $this->as($this->user('Business Operation', Role::Viewer))->postJson('/api/interactions', ['recordId' => 1])->assertForbidden();

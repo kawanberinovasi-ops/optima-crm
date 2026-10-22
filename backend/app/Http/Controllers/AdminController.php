@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\ClientPartner;
 use App\Models\Department;
 use App\Models\OptionList;
+use App\Models\Service;
 use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
@@ -27,7 +28,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class AdminController extends Controller
 {
-    private const DATA_ENTITIES = ['lead', 'client', 'community', 'kol', 'media', 'interaksi', 'deal'];
+    private const DATA_ENTITIES = ['lead', 'client', 'interaksi', 'deal'];
 
     private const OPTION_KEYS = ['segments' => 'segments', 'sources' => 'sources', 'intTypes' => 'interaction_types', 'lostReasons' => 'lost_reasons'];
 
@@ -122,11 +123,20 @@ class AdminController extends Controller
     public function updateDepartment(Request $request, Department $department): JsonResponse
     {
         $this->authorizeAdmin($request);
-        $data = $request->validate(['name' => ['required', 'string', 'max:100', Rule::unique('departments', 'name')->ignore($department->id)]], ['name.required' => 'Nama wajib diisi.', 'name.unique' => 'Nama udah dipakai.']);
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:100', Rule::unique('departments', 'name')->ignore($department->id)],
+            'seesAll' => ['sometimes', 'boolean'],
+        ], ['name.required' => 'Nama wajib diisi.', 'name.unique' => 'Nama udah dipakai.']);
 
-        $old = $department->name;
-        $department->update(['name' => trim($data['name'])]);
-        $this->audit->log('Ubah', 'Department', $department->id, $old.' jadi '.$department->name, ['name' => $old], ['name' => $department->name]);
+        $before = ['name' => $department->name, 'sees_all' => $department->sees_all];
+        $department->update(array_filter(['name' => isset($data['name']) ? trim($data['name']) : null, 'sees_all' => $data['seesAll'] ?? null], fn ($v) => $v !== null));
+        $after = ['name' => $department->name, 'sees_all' => $department->sees_all];
+        $summary = $before['name'] !== $after['name'] ? $before['name'].' jadi '.$after['name'] : $department->name;
+        if ($before['sees_all'] !== $after['sees_all']) {
+            $summary .= $after['sees_all'] ? ': bisa melihat data lintas divisi' : ': hanya melihat data divisinya';
+        }
+        $this->audit->log('Ubah', 'Department', $department->id, $summary, $before, $after);
+        $this->access->forget();
 
         return $this->deptResponse($department);
     }
@@ -200,6 +210,52 @@ class AdminController extends Controller
             ['level' => $override->level], ['level' => null]);
 
         return response()->json(['ok' => true]);
+    }
+
+    /* ---------- layanan dan pemetaan ke divisi ---------- */
+
+    /** Layanan baru, atau ubah divisi penanganan / status aktif layanan yang ada. Tidak memindahkan PIC data mana pun. */
+    public function storeService(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100', Rule::unique('services', 'name')],
+            'deptId' => ['nullable', 'integer', Rule::exists('departments', 'id')],
+        ], ['name.required' => 'Nama layanan wajib diisi.', 'name.unique' => 'Layanan ini udah ada.']);
+        $service = Service::create(['name' => trim($data['name']), 'department_id' => $data['deptId'] ?? null, 'position' => (int) Service::max('position') + 1]);
+        $this->audit->log('Tambah', 'Layanan', $service->id, $service->name.' ditangani '.($service->department?->name ?? 'belum ditentukan'));
+
+        return response()->json(['data' => self::servicesShape()], 201);
+    }
+
+    public function updateService(Request $request, Service $service): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $data = $request->validate([
+            'deptId' => ['sometimes', 'nullable', 'integer', Rule::exists('departments', 'id')],
+            'active' => ['sometimes', 'boolean'],
+        ]);
+        $before = ['department' => $service->department?->name, 'active' => $service->active];
+        $fields = [];
+        if (array_key_exists('deptId', $data)) {
+            $fields['department_id'] = $data['deptId'];
+        }
+        if (array_key_exists('active', $data)) {
+            $fields['active'] = (bool) $data['active'];
+        }
+        $service->update($fields);
+        $service->load('department');
+        $after = ['department' => $service->department?->name, 'active' => $service->active];
+        $this->audit->log('Ubah', 'Layanan', $service->id, $service->name.': ditangani '.($after['department'] ?? 'belum ditentukan').($after['active'] ? '' : ', nonaktif'), $before, $after);
+
+        return response()->json(['data' => self::servicesShape()]);
+    }
+
+    public static function servicesShape(): array
+    {
+        return Service::with('department')->orderBy('position')->get()->map(fn (Service $s) => [
+            'id' => (string) $s->id, 'name' => $s->name, 'dept' => (string) $s->department?->name, 'deptId' => $s->department_id ? (string) $s->department_id : '', 'active' => $s->active,
+        ])->values()->all();
     }
 
     /* ---------- daftar pilihan ---------- */

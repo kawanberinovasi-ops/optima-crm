@@ -8,6 +8,7 @@ use App\Models\Deal;
 use App\Models\Department;
 use App\Models\Interaction;
 use App\Models\Pipeline;
+use App\Models\Service;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -40,6 +41,8 @@ class SampleDataSeeder extends Seeder
             $cp = ClientPartner::updateOrCreate(['code' => $r['code']], [
                 'name' => $r['name'],
                 'category' => $r['category'],
+                'service_id' => $r['service'] ? Service::where('name', $r['service'])->value('id') : null,
+                'converted_at' => $day($r['converted_days'] ?? null),
                 'segment' => $r['segment'],
                 'pic_id' => $users[$r['pic']],
                 'department_id' => $dept[$r['department']],
@@ -47,7 +50,7 @@ class SampleDataSeeder extends Seeder
                 'city' => $r['city'],
                 'note' => $r['note'],
                 'rate_card' => $r['rate_card'],
-                'created_by' => $users[$r['pic']],
+                'created_by' => $users[$r['created_by'] ?? $r['pic']],
             ]);
             $cp->timestamps = false;
             $cp->forceFill(['created_at' => $day($r['created_days']), 'updated_at' => $day($r['updated_days'])])->save();

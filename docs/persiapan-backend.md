@@ -7,6 +7,8 @@ import dan batalkan import, Akses & Audit, pemberitahuan, tampilan tersimpan, da
 Persiapan deploy ke Laravel Cloud ada di [deploy-laravel-cloud.md](deploy-laravel-cloud.md): paket frontend, konfigurasi
 produksi, scheduler, dan backup harian dengan uji pemulihan.
 Yang belum: login cadangan kode email (FR-AUT-04, Should) dan tes login Google sungguhan.
+Perubahan alur bisnis 22 Okt 2026 (status Lead/Client vs layanan, akses per divisi, serah terima, akun internal):
+lihat [alur-lead-client.md](alur-lead-client.md).
 
 ## 1. Keputusan
 

@@ -36,8 +36,8 @@ Route::middleware('crm')->group(function () {
     Route::get('client-partners/{clientPartner}/history', [ClientPartnerController::class, 'history']);
     Route::post('client-partners/{clientPartner}/archive', [ClientPartnerController::class, 'archive']);
     Route::post('client-partners/{clientPartner}/restore', [ClientPartnerController::class, 'restore']);
-    Route::post('client-partners/{clientPartner}/convert', [ClientPartnerController::class, 'convert']);
-    Route::post('client-partners/{clientPartner}/move-pic', [ClientPartnerController::class, 'movePic']);
+    // Lead jadi Client hanya lewat deal Won (tidak ada konversi manual). Pindah PIC dan divisi lewat serah terima.
+    Route::post('client-partners/{clientPartner}/handover', [ClientPartnerController::class, 'handover']);
     Route::post('client-partners/{clientPartner}/merge', [ClientPartnerController::class, 'merge']);
 
     Route::post('client-partners/{clientPartner}/contacts', [ContactController::class, 'store']);
@@ -84,6 +84,8 @@ Route::middleware('crm')->group(function () {
     Route::put('access-grants', [AdminController::class, 'updateGrant']);
     Route::post('access-overrides', [AdminController::class, 'storeOverride']);
     Route::delete('access-overrides/{override}', [AdminController::class, 'destroyOverride']);
+    Route::post('services', [AdminController::class, 'storeService']);
+    Route::patch('services/{service}', [AdminController::class, 'updateService']);
     Route::post('option-lists', [AdminController::class, 'storeOption']);
     Route::delete('option-lists', [AdminController::class, 'destroyOption']);
     Route::get('audit-logs', [AdminController::class, 'auditLogs']);

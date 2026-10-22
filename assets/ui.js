@@ -40,7 +40,7 @@ const seg = (items, cur, act, label, role) => '<div class="seg" role="' + (role 
 const opt = (v, cur, label) => '<option value="' + esc(v) + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + esc(label == null ? v : label) + '</option>';
 const fuChip = (d) => { if (!d) return ''; const n = dayDiff(d); if (n < 0) return '<span class="chip c-bad ping"><span class="dot"></span>Telat ' + (-n) + ' hari</span>'; if (n === 0) return '<span class="chip c-warn"><span class="dot"></span>Hari ini</span>'; return '<span class="chip c-info"><span class="dot"></span>' + fmtShort(d) + '</span>'; };
 const statusChip = (s) => '<span class="chip ' + ({ Open: 'c-info', Won: 'c-ok', Lost: 'c-bad', 'On Hold': 'c-warn' }[s] || 'c-n') + '"><span class="dot"></span>' + esc(s) + '</span>';
-const catChip = (c) => '<span class="chip ' + ({ Client: 'c-info', Lead: 'c-n', Community: 'c-y', 'KOL/KOC': 'c-y', Media: 'c-n' }[c] || 'c-n') + '">' + esc(c) + '</span>';
+const catChip = (c) => '<span class="chip ' + (c === 'Client' ? 'c-ok' : 'c-info') + '"><span class="dot"></span>' + esc(c) + '</span>';
 const valOrLock = (deal, v) => canSeeValue(deal) ? fmtRp(v) : '<span title="Nilai disembunyikan sesuai hak akses" style="display:inline-flex;align-items:center;gap:6px">' + ic('lock', 'ic-s') + 'Rp ···</span>';
 
 /* ---------- state & router ---------- */

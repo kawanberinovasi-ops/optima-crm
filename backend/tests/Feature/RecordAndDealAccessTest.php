@@ -75,24 +75,29 @@ class RecordAndDealAccessTest extends TestCase
         $this->assertFalse($this->access()->canArchiveRecord($a, $own), 'arsip butuh level M');
     }
 
-    public function test_level_m_edits_and_archives_any_record_in_category(): void
+    public function test_level_m_edits_and_archives_any_record_in_own_division_only(): void
     {
         $commercial = $this->user('Commercial');
-        $record = $this->record($this->user('CampusNet'), Category::Client);
+        $sameDivision = $this->record($this->user('Commercial'), Category::Client);
+        $otherDivision = $this->record($this->user('CampusNet'), Category::Client);
 
-        $this->assertTrue($this->access()->canEditRecord($commercial, $record));
-        $this->assertTrue($this->access()->canArchiveRecord($commercial, $record));
+        $this->assertTrue($this->access()->canEditRecord($commercial, $sameDivision));
+        $this->assertTrue($this->access()->canArchiveRecord($commercial, $sameDivision));
+        $this->assertFalse($this->access()->canEditRecord($commercial, $otherDivision));
+        $this->assertFalse($this->access()->canViewRecord($commercial, $otherDivision));
     }
 
-    public function test_moving_pic_needs_level_m_or_lead_role(): void
+    public function test_handover_needs_level_m_or_lead_role(): void
     {
         $staff = $this->user('CampusNet');
         $coord = $this->user('CampusNet', Role::Koordinator);
         $staffRecord = $this->record($staff);
         $coordRecord = $this->record($coord);
 
-        $this->assertFalse($this->access()->canMovePic($staff, $staffRecord));
-        $this->assertTrue($this->access()->canMovePic($coord, $coordRecord));
+        $this->assertFalse($this->access()->canHandover($staff, $staffRecord));
+        $this->assertTrue($this->access()->canHandover($coord, $coordRecord));
+        $this->assertTrue($this->access()->canHandover($this->user('Commercial'), $this->record($this->user('Commercial'))), 'level M di divisinya');
+        $this->assertFalse($this->access()->canHandover($this->user('Commercial'), $staffRecord), 'data divisi lain');
     }
 
     public function test_commercial_staff_sees_value_only_of_own_deals(): void
@@ -122,7 +127,7 @@ class RecordAndDealAccessTest extends TestCase
 
     public function test_rate_card_is_removed_for_users_without_permission(): void
     {
-        $kol = $this->record($this->user('Digital Campaign'), Category::KolKoc, ['rate_card' => ['rate' => 6_000_000]]);
+        $kol = $this->record($this->user('Digital Campaign'), Category::Lead, ['rate_card' => ['rate' => 6_000_000]]);
         $payload = $kol->only(['id', 'name', 'rate_card']);
 
         $this->assertArrayHasKey('rate_card', $this->access()->filterClientPartner($this->user('Digital Campaign'), $payload));

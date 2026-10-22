@@ -52,6 +52,21 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class);
     }
 
+    /** Email lain milik orang yang sama (satu identitas untuk login SSO). */
+    public function alternateEmails(): HasMany
+    {
+        return $this->hasMany(UserEmail::class);
+    }
+
+    /** Cari pengguna lewat email utama atau email alternatif. */
+    public static function findByAnyEmail(string $email): ?self
+    {
+        $email = strtolower(trim($email));
+
+        return self::where('email', $email)->first()
+            ?? self::whereIn('id', UserEmail::where('email', $email)->select('user_id'))->first();
+    }
+
     public function accessOverrides(): HasMany
     {
         return $this->hasMany(AccessOverride::class);

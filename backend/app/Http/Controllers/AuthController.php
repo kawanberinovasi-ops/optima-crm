@@ -105,7 +105,8 @@ class AuthController extends Controller
     /** @return string|null kode galat, atau null kalau berhasil masuk */
     private function startSession(Request $request, string $email, string $via, ?string $ssoSubject = null): ?string
     {
-        $user = User::where('email', $email)->first();
+        // Email utama atau email alternatif milik orang yang sama: masuk ke satu identitas.
+        $user = User::findByAnyEmail($email);
         if (! $user) {
             $this->audit->log('Login ditolak', 'Sesi', null, 'Email belum terdaftar: '.$email.' (lewat '.$via.')');
 

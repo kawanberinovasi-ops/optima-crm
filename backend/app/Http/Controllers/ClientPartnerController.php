@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Category;
+use App\Enums\DealStatus;
+use App\Enums\Role;
 use App\Models\ClientPartner;
 use App\Models\Contact;
-use App\Models\Department;
+use App\Models\Handover;
+use App\Models\Service;
 use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
@@ -18,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Client & Partner Database (SRS 4.2, FR-REL-01..08). Hak akses diperiksa di sini untuk setiap cara mengakses data,
@@ -44,7 +48,7 @@ class ClientPartnerController extends Controller
         ]);
 
         $query = $this->access->scopeClientPartners(ClientPartner::query(), $me)
-            ->with(['contacts', 'department'])
+            ->with(['contacts', 'department', 'service', 'handovers.fromDepartment', 'handovers.toDepartment'])
             ->whereNull('merged_into_id')
             ->when(isset($f['archived']), fn ($q) => $f['archived'] ? $q->whereNotNull('archived_at') : $q->whereNull('archived_at'))
             ->when($f['cat'] ?? null, fn ($q, $cat) => $q->where('category', $cat))
@@ -80,34 +84,33 @@ class ClientPartnerController extends Controller
         return $this->respond($request->user(), $clientPartner);
     }
 
+    /**
+     * Data baru selalu Lead, dengan PIC dan divisi pemilik otomatis dari pengguna yang mengisi (siapa pun yang punya hak
+     * input, dari divisi mana pun). Kategori, PIC, dan divisi dari form diabaikan. Pembuat dan waktu dibuat disimpan permanen.
+     */
     public function store(Request $request): JsonResponse
     {
         $me = $request->user();
+        abort_unless($this->access->canCreateRecord($me, Category::Lead), 403, 'Kamu ga punya izin menambah Lead.');
         $data = $request->validate($this->rules(creating: true));
-        $category = Category::from($data['cat']);
-        abort_unless($this->access->canCreateRecord($me, $category), 403, 'Kamu ga punya izin menambah data '.$category->value.'.');
+        $service = $this->service($data);
 
-        $pic = isset($data['picId']) ? User::find($data['picId']) : $me;
-        if (! $pic?->active) {
-            return $this->invalid('picId', 'PIC harus pengguna yang aktif.');
-        }
-
-        $record = DB::transaction(function () use ($data, $category, $me, $pic) {
+        $record = DB::transaction(function () use ($data, $me, $service) {
             [$id, $code] = Codes::next('client_partners', 'CP');
             $record = new ClientPartner;
             $record->forceFill([
                 'id' => $id,
                 'code' => $code,
                 'name' => trim($data['name']),
-                'category' => $category,
+                'category' => Category::Lead,
+                'service_id' => $service?->id,
                 'segment' => $data['segment'] ?? null,
-                'status' => $data['status'] ?? null,
-                'pic_id' => $pic->id,
-                'department_id' => isset($data['dept']) ? Department::where('name', $data['dept'])->value('id') : $me->department_id,
+                'pic_id' => $me->id,
+                'department_id' => $me->department_id,
                 'source' => $data['source'] ?? null,
                 'city' => $data['city'] ?? null,
                 'note' => $data['note'] ?? null,
-                'rate_card' => $this->rateCard($me, $category, $data),
+                'rate_card' => $this->rateCard($me, $service, $data),
                 'created_by' => $me->id,
             ])->save();
             if (($data['contact'] ?? '') !== '' || ($data['cEmail'] ?? '') !== '' || ($data['phone'] ?? '') !== '') {
@@ -116,10 +119,7 @@ class ClientPartnerController extends Controller
                     'email' => $data['cEmail'] ?? null, 'phone' => $data['phone'] ?? null, 'is_primary' => true,
                 ]);
             }
-            $this->audit->log('Tambah', self::ENTITY, $record->id, $record->name.' ('.$record->code.')', null, $record->getAttributes());
-            if ($pic->id !== $me->id) {
-                Notify::send($pic, $me->name.' menjadikan kamu PIC '.$record->name, 'rec:'.$record->id);
-            }
+            $this->audit->log('Tambah', self::ENTITY, $record->id, $record->name.' ('.$record->code.') sebagai Lead, PIC '.$me->name, null, $record->getAttributes());
 
             return $record;
         });
@@ -132,29 +132,24 @@ class ClientPartnerController extends Controller
         $me = $request->user();
         $this->authorizeView($me, $clientPartner);
         abort_unless($this->access->canEditRecord($me, $clientPartner), 403, 'Kamu ga bisa mengubah data ini.');
+        // Status relasi berubah hanya lewat deal Won, divisi dan PIC hanya lewat serah terima.
         $data = $request->validate($this->rules(creating: false));
-
-        if (isset($data['cat']) && $data['cat'] !== $clientPartner->category->value
-            && ! $this->access->canCreateRecord($me, Category::from($data['cat']))) {
-            abort(403, 'Kamu ga punya izin memindahkan data ke kategori '.$data['cat'].'.');
-        }
 
         DB::transaction(function () use ($me, $clientPartner, $data) {
             $original = $clientPartner->getRawOriginal();
-            $fields = array_filter([
-                'name' => isset($data['name']) ? trim($data['name']) : null,
-                'category' => $data['cat'] ?? null,
-            ], fn ($v) => $v !== null);
-            foreach (['segment', 'status', 'source', 'city', 'note'] as $k) {
+            $fields = isset($data['name']) ? ['name' => trim($data['name'])] : [];
+            foreach (['segment', 'source', 'city', 'note'] as $k) {
                 if (array_key_exists($k, $data)) {
                     $fields[$k] = $data[$k];
                 }
             }
-            if (array_key_exists('dept', $data) && $data['dept']) {
-                $fields['department_id'] = Department::where('name', $data['dept'])->value('id');
+            $service = $clientPartner->service;
+            if (array_key_exists('service', $data)) {
+                $service = $this->service($data);
+                $fields['service_id'] = $service?->id;
             }
             if (array_key_exists('rate', $data) && $this->access->canManageRateCard($me)) {
-                $fields['rate_card'] = $this->rateCard($me, Category::from($fields['category'] ?? $clientPartner->category->value), $data);
+                $fields['rate_card'] = $this->rateCard($me, $service, $data);
             }
             $clientPartner->update($fields);
             $this->audit->changed(self::ENTITY, $clientPartner, $original, $clientPartner->name);
@@ -195,41 +190,65 @@ class ClientPartnerController extends Controller
         return $this->respond($me, $clientPartner);
     }
 
-    /** Lead yang sudah memenuhi syarat menjadi Client (FR-REL-07). */
-    public function convert(Request $request, ClientPartner $clientPartner): JsonResponse
+    /**
+     * Serah terima Lead/Client ke divisi dan PIC lain, ke arah mana pun (termasuk ke dan dari Customer Service).
+     * Divisi pemilik ikut pindah, jadi akses mengikuti divisi baru. Pembuat data tidak berubah. Interaksi dan deal tetap
+     * di relasi yang sama; deal yang masih berjalan (Open/On Hold) ikut dipegang PIC baru supaya tetap terurus.
+     */
+    public function handover(Request $request, ClientPartner $clientPartner): JsonResponse
     {
         $me = $request->user();
         $this->authorizeView($me, $clientPartner);
-        abort_unless($clientPartner->category === Category::Lead, 409, 'Cuma Lead yang bisa dijadikan Client.');
-        abort_unless($this->access->canEditRecord($me, $clientPartner) && $this->access->canCreateRecord($me, Category::Client), 403, 'Kamu ga bisa menjadikan data ini Client.');
-
-        $original = $clientPartner->getRawOriginal();
-        $clientPartner->update(['category' => Category::Client, 'converted_at' => now()]);
-        $this->audit->changed(self::ENTITY, $clientPartner, $original, $clientPartner->name.' dikonversi dari Lead jadi Client');
-
-        return $this->respond($me, $clientPartner);
-    }
-
-    /** Pindah PIC (FR-REL-06): wajib alasan, PIC baru dapat pemberitahuan. */
-    public function movePic(Request $request, ClientPartner $clientPartner): JsonResponse
-    {
-        $me = $request->user();
-        $this->authorizeView($me, $clientPartner);
-        abort_unless($this->access->canMovePic($me, $clientPartner), 403, 'Kamu ga bisa memindahkan PIC data ini.');
+        abort_unless($this->access->canHandover($me, $clientPartner), 403, 'Kamu ga bisa menyerahkan data ini.');
+        abort_if($clientPartner->archived_at !== null, 409, 'Data yang diarsipkan ga bisa diserahkan.');
         $data = $request->validate([
-            'picId' => ['required', Rule::exists('users', 'id')->where('active', true), Rule::notIn([$clientPartner->pic_id])],
+            'deptId' => ['required', 'integer', Rule::exists('departments', 'id')],
+            'picId' => ['required', 'integer', Rule::exists('users', 'id')->where('active', true)],
             'reason' => ['required', 'string', 'max:255'],
         ], [
-            'picId.required' => 'Pilih PIC baru.', 'picId.exists' => 'PIC harus pengguna yang aktif.',
-            'picId.not_in' => 'Pilih orang lain dari PIC sekarang.', 'reason.required' => 'Alasan wajib diisi.',
+            'deptId.required' => 'Pilih divisi tujuan.', 'picId.required' => 'Pilih PIC penerima.',
+            'picId.exists' => 'PIC penerima harus pengguna yang aktif.', 'reason.required' => 'Alasan wajib diisi.',
         ]);
+        $to = User::with('department')->find($data['picId']);
+        if ($to->department_id !== (int) $data['deptId']) {
+            return $this->invalid('picId', 'PIC penerima harus dari divisi tujuan.');
+        }
+        if ($to->role === Role::Viewer) {
+            return $this->invalid('picId', 'Viewer ga bisa jadi PIC.');
+        }
+        if ($to->id === $clientPartner->pic_id && $to->department_id === $clientPartner->department_id) {
+            return $this->invalid('picId', 'Pilih PIC atau divisi yang berbeda dari sekarang.');
+        }
 
-        $original = $clientPartner->getRawOriginal();
-        $clientPartner->update(['pic_id' => (int) $data['picId']]);
-        $this->audit->changed(self::ENTITY, $clientPartner, $original, 'Pindah PIC: '.$data['reason']);
-        Notify::send(User::find($data['picId']), $me->name.' menjadikan kamu PIC '.$clientPartner->name, 'rec:'.$clientPartner->id);
+        $from = $clientPartner->pic;
+        $fromDept = $clientPartner->department;
+        DB::transaction(function () use ($me, $clientPartner, $to, $from, $fromDept, $data) {
+            $original = $clientPartner->getRawOriginal();
+            $clientPartner->update(['pic_id' => $to->id, 'department_id' => $to->department_id]);
 
-        return $this->respond($me, $clientPartner);
+            $running = $clientPartner->deals()->whereIn('status', [DealStatus::Open, DealStatus::OnHold])->where('owner_id', '<>', $to->id)->get();
+            foreach ($running as $deal) {
+                $deal->update(['owner_id' => $to->id]);
+                $deal->histories()->create([
+                    'user_id' => $me->id, 'from_stage_id' => $deal->stage_id, 'from_stage_name' => $deal->stage->name,
+                    'to_stage_id' => $deal->stage_id, 'to_stage_name' => $deal->stage->name, 'status' => $deal->status,
+                    'note' => 'Serah terima ke '.$to->name.' ('.$to->department->name.')', 'created_at' => now(),
+                ]);
+            }
+
+            Handover::create([
+                'client_partner_id' => $clientPartner->id, 'from_user_id' => $from?->id, 'from_department_id' => $fromDept?->id,
+                'to_user_id' => $to->id, 'to_department_id' => $to->department_id, 'by_user_id' => $me->id,
+                'reason' => $data['reason'], 'deals_moved' => $running->count(), 'created_at' => now(),
+            ]);
+            $this->audit->changed(self::ENTITY, $clientPartner, $original, 'Serah terima '.($fromDept?->name ?? '-').' ke '.$to->department->name.': '.$data['reason']);
+            Notify::send($to, $me->name.' menyerahkan '.$clientPartner->name.' ke kamu', 'rec:'.$clientPartner->id);
+            if ($from && $from->id !== $to->id && $from->id !== $me->id) {
+                Notify::send($from, $clientPartner->name.' sekarang dipegang '.$to->name.' ('.$to->department->name.')');
+            }
+        });
+
+        return $this->respond($me, $clientPartner->fresh());
     }
 
     /**
@@ -276,7 +295,7 @@ class ClientPartnerController extends Controller
             return ['interactions' => $ints, 'deals' => $deals, 'contacts' => $contacts];
         });
 
-        return response()->json(['data' => FrontShape::record($clientPartner->fresh(['contacts', 'department']), $me, $this->access), 'moved' => $moved, 'mergedId' => (string) $source->id]);
+        return response()->json(['data' => FrontShape::record($clientPartner->fresh(['contacts', 'department', 'service', 'handovers.fromDepartment', 'handovers.toDepartment']), $me, $this->access), 'moved' => $moved, 'mergedId' => (string) $source->id]);
     }
 
     /** Cek data ganda sebelum menyimpan (FR-REL-03). */
@@ -334,11 +353,8 @@ class ClientPartnerController extends Controller
 
         return [
             'name' => [$req, 'string', 'max:200'],
-            'cat' => [$req, Rule::enum(Category::class)],
+            'service' => ['nullable', 'string', 'max:100'],
             'segment' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'picId' => ['nullable', 'integer', Rule::exists('users', 'id')],
-            'dept' => ['nullable', 'string', Rule::exists('departments', 'name')],
             'source' => ['nullable', 'string', 'max:100'],
             'city' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:5000'],
@@ -350,14 +366,26 @@ class ClientPartnerController extends Controller
         ];
     }
 
-    /** Rate card hanya untuk KOL/KOC dan hanya disimpan oleh pengguna yang boleh mengelolanya. */
-    private function rateCard(User $me, Category $category, array $data): ?array
+    /** Rate card hanya untuk layanan KOL dan hanya disimpan oleh pengguna yang boleh mengelolanya. */
+    private function rateCard(User $me, ?Service $service, array $data): ?array
     {
-        if ($category !== Category::KolKoc || ! $this->access->canManageRateCard($me) || ($data['rate'] ?? '') === '') {
+        if ($service?->name !== 'KOL' || ! $this->access->canManageRateCard($me) || ($data['rate'] ?? '') === '') {
             return null;
         }
 
         return ['rate' => (int) $data['rate']];
+    }
+
+    /** Layanan dari form (nama), boleh kosong: layanan bisa belum ditentukan saat Lead masuk. */
+    private function service(array $data): ?Service
+    {
+        $name = trim((string) ($data['service'] ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        return Service::where('name', $name)->where('active', true)->first()
+            ?? throw ValidationException::withMessages(['service' => 'Layanan "'.$name.'" belum ada di daftar.']);
     }
 
     private function authorizeView(User $user, ClientPartner $record): void
@@ -372,6 +400,6 @@ class ClientPartnerController extends Controller
 
     private function respond(User $me, ClientPartner $record, int $status = 200): JsonResponse
     {
-        return response()->json(['data' => FrontShape::record($record->load(['contacts', 'department']), $me, $this->access)], $status);
+        return response()->json(['data' => FrontShape::record($record->load(['contacts', 'department', 'service', 'handovers.fromDepartment', 'handovers.toDepartment']), $me, $this->access)], $status);
     }
 }

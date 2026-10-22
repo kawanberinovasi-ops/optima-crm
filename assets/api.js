@@ -79,7 +79,7 @@
     // Profil (foto, bio) masih disimpan di browser: bawa ke data pengguna dari server.
     const prof = {}; (db.users || []).forEach(u => { if (u.profile) prof[String(u.email).toLowerCase()] = u.profile; });
     db.users = b.users.map(u => Object.assign(u, prof[u.email.toLowerCase()] ? { profile: prof[u.email.toLowerCase()] } : {}));
-    db.departments = b.departments; db.access = b.access; db.overrides = b.overrides; db.options = b.options;
+    db.departments = b.departments; db.services = b.services; db.access = b.access; db.overrides = b.overrides; db.options = b.options;
     db.records = b.records.map(ensureRec);
     // Sejak G2 pipeline, deal, dan interaksi juga datang dari server.
     db.lines = b.lines; db.deals = b.deals; db.interactions = b.interactions;
@@ -168,7 +168,8 @@
   };
 
   /* ---------- Client & Partner lewat API ---------- */
-  const PAYLOAD = ['name', 'cat', 'segment', 'picId', 'dept', 'source', 'city', 'note', 'rate', 'contact', 'title', 'cEmail', 'phone'];
+  // Status (selalu Lead saat dibuat), PIC, dan divisi ditentukan server dari akun yang login, jadi tidak dikirim.
+  const PAYLOAD = ['name', 'service', 'segment', 'source', 'city', 'note', 'rate', 'contact', 'title', 'cEmail', 'phone'];
   Forms.record = async (o) => {
     const m = App.modal; if (m.busy) return;
     const err = {};
@@ -196,10 +197,16 @@
   };
   const confirmApi = (opts, call, done) => { App.modal = Object.assign({ kind: 'confirm' }, opts, { fn: () => { call().then(res => { const r = putRecord(res.data); render(); done(r); }).catch(e => fail(e)); } }); render(); };
   Actions.restorerec = (el) => { const r = recById(el.dataset.v); confirmApi({ title: 'Pulihkan ' + esc(r.name) + '?', text: 'Data balik ke daftar aktif dan bisa dipakai lagi.', ok: 'Pulihkan' }, () => Api.post('client-partners/' + r.id + '/restore'), x => toast('Dipulihkan!', x.name + ' aktif lagi.')); };
-  Actions.convert = (el) => { const r = recById(el.dataset.v); confirmApi({ sub: 'Lead jadi Client', title: 'Jadikan ' + esc(r.name) + ' Client?', text: 'Kategori berubah dari Lead jadi Client. Riwayat interaksi dan deal tetap ikut.', ok: 'Jadikan Client' }, () => Api.post('client-partners/' + r.id + '/convert'), x => toast('Selamat, jadi Client!', x.name + ' udah naik kelas.')); };
-  Forms.pic = async (o) => {
-    const m = App.modal; m.val = o;
-    try { const r = putRecord((await Api.post('client-partners/' + m.id + '/move-pic', { picId: o.picId || null, reason: o.reason || '' })).data); App.modal = null; render(); toast('PIC dipindah', r.name + ' sekarang dipegang ' + userName(r.picId) + '.'); } catch (e) { fail(e, m); }
+  Forms.handover = async (o) => {
+    const m = App.modal; if (handoverErr(m, o)) return;
+    const dept = Store.db.departments.find(d => d.name === o.dept);
+    try {
+      await Api.post('client-partners/' + m.id + '/handover', { deptId: Number(dept.id), picId: Number(o.picId), reason: o.reason });
+      // Akses ikut divisi penerima: muat ulang supaya data, deal, dan interaksi yang terlihat sesuai cakupan baru.
+      const stillVisible = seesAll(me()) || o.dept === me().dept;
+      await loadBootstrap(); App.modal = null; if (!stillVisible) App.drawer = null; render();
+      toast('Diserahkan', 'Sekarang dipegang ' + userName(o.picId) + ' (' + o.dept + ').' + (stillVisible ? '' : ' Data ini ga muncul lagi di divisimu.'));
+    } catch (e) { m.val = o; fail(e, m); }
   };
   Forms.contact = async (o) => {
     const m = App.modal; m.val = o;
@@ -242,7 +249,7 @@
     const m = App.modal; const err = {};
     if (!num(o.value)) err.value = 'Nilai deal wajib diisi buat Won.'; if (!o.closedAt) err.closedAt = 'Tanggal closing wajib diisi.';
     if (Object.keys(err).length) { m.err = err; m.value = o.value; m.closedAt = o.closedAt; m.still = true; render(); return; }
-    try { const d = putDeal((await Api.post('deals/' + m.dealId + '/won', { value: num(o.value), closedAt: o.closedAt })).data); App.modal = null; render(); toast('Deal won. Keren!', d.title + (canSeeValue(d) ? ', ' + fmtRp(d.value) : '') + '.'); } catch (e) { m.value = o.value; m.closedAt = o.closedAt; fail(e, m); }
+    try { const d = putDeal((await Api.post('deals/' + m.dealId + '/won', { value: num(o.value), closedAt: o.closedAt })).data); const rec = await Api.get('client-partners/' + d.recordId).catch(() => null); if (rec) putRecord(rec.data); App.modal = null; render(); toast('Deal won. Keren!', d.title + (canSeeValue(d) ? ', ' + fmtRp(d.value) : '') + '.'); } catch (e) { m.value = o.value; m.closedAt = o.closedAt; fail(e, m); }
   };
   Forms.dstatus = async (o) => {
     const m = App.modal; const st = m.st; Object.assign(m, o);
@@ -320,6 +327,11 @@
   Forms.optadd = async (o) => { if (!o.v) return; try { Store.db.options = (await Api.post('option-lists', { list: o.k, value: o.v })).data; Store.save(); render(); toast('Ditambah', o.v + ' masuk daftar.', 'info'); } catch (e) { fail(e); } };
   Actions.optdel = async (el) => { try { Store.db.options = (await req('DELETE', 'option-lists', { list: el.dataset.k, value: el.dataset.v })).data; Store.save(); render(); } catch (e) { fail(e); } };
   Actions.exportaudit = () => { location.href = BASE + '/audit-logs/export'; };
+  const svcId = (id) => Number(id);
+  Changes.svcdept = async (el) => { const d = Store.db.departments.find(x => x.name === el.value); try { Store.db.services = (await Api.patch('services/' + svcId(el.dataset.v), { deptId: d ? Number(d.id) : null })).data; Store.save(); render(); toast('Tersimpan', 'Pemetaan layanan diubah. PIC data yang ada ga berubah.', 'info'); } catch (e) { fail(e); render(); } };
+  Actions.svcactive = async (el) => { const x = Store.db.services.find(s => s.id === el.dataset.v); try { Store.db.services = (await Api.patch('services/' + svcId(x.id), { active: x.active === false })).data; Store.save(); render(); } catch (e) { fail(e); } };
+  Forms.svcadd = async (o) => { if (!o.name) return; try { Store.db.services = (await Api.post('services', { name: o.name })).data; Store.save(); render(); toast('Ditambah', o.name + ' masuk daftar layanan.', 'info'); } catch (e) { fail(e); } };
+  Actions.deptall = (el) => { const d = Store.db.departments.find(x => x.id === el.dataset.v); adminCall(() => Api.patch('departments/' + d.id, { seesAll: !d.seesAll }), 'Tersimpan', d.name + (d.seesAll ? ' sekarang hanya melihat divisinya.' : ' sekarang melihat data lintas divisi.')); };
   Actions.notifall = async () => { try { Store.db.notifs = (await Api.post('notifications/read')).data; Store.save(); render(); } catch (e) { fail(e); } };
   const _notifopen = Actions.notifopen;
   Actions.notifopen = (el) => { Api.post('notifications/read', { id: Number(el.dataset.v) }).catch(() => {}); _notifopen(el); };

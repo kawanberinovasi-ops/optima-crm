@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const src = readFileSync(new URL('../../../../assets/data.js', import.meta.url), 'utf8');
-const ctx = { console, Date, Math, JSON, String, Number, Object, Array, localStorage: undefined };
+const ctx = { console, Date, Math, JSON, String, Number, Object, Array, Set, window: {}, localStorage: undefined };
 vm.createContext(ctx);
 vm.runInContext(src + '\n;this.__seed = seed();', ctx);
 const db = ctx.__seed;
@@ -28,12 +28,15 @@ JSON.parse(m[1].replace(/'/g, '"')).forEach((h, i) => { histSpec['dh' + i] = { m
 const out = {
   generated_from: 'assets/data.js seed()',
   departments: db.departments.map((d) => d.name),
+  sees_all: db.departments.filter((d) => d.seesAll).map((d) => d.name),
+  services: db.services.map((s) => ({ name: s.name, department: s.dept })),
   access: db.access,
   options: db.options,
   users: db.users.map((u) => ({ name: u.name, email: u.email, department: u.dept, role: u.role, active: u.active })),
   pipelines: db.lines.map((l) => ({ name: l.name, stages: l.stages.map((s) => s.name) })),
   client_partners: db.records.map((r) => ({
-    code: r.code, name: r.name, category: r.cat, segment: r.segment || null, pic: userEmail[r.picId], department: r.dept,
+    code: r.code, name: r.name, category: r.cat, service: r.service || null, segment: r.segment || null, pic: userEmail[r.picId], department: r.dept,
+    created_by: userEmail[r.createdBy || r.picId], converted_days: off(r.convertedAt),
     source: r.source || null, city: r.city || null, note: r.note || null,
     rate_card: r.rate ? { rate: r.rate } : null,
     created_days: off(r.createdAt), updated_days: off(r.updatedAt),

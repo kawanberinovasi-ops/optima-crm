@@ -28,7 +28,11 @@ class DealController extends Controller
         $me = $request->user();
         abort_unless($this->access->can($me, 'deal', AccessLevel::R), 403, 'Akun ini ga punya akses ke deal.');
 
-        return response()->json(['data' => Deal::with('histories')->orderBy('id')->get()->map(fn (Deal $d) => FrontShape::deal($d, $me, $this->access))->values()]);
+        // Deal mengikuti divisi pemilik relasinya.
+        $records = $this->access->scopeClientPartners(ClientPartner::query(), $me)->select('id');
+
+        return response()->json(['data' => Deal::with('histories')->whereIn('client_partner_id', $records)->orderBy('id')->get()
+            ->map(fn (Deal $d) => FrontShape::deal($d, $me, $this->access))->values()]);
     }
 
     public function store(Request $request): JsonResponse
@@ -166,6 +170,7 @@ class DealController extends Controller
     private function authorizeView(User $me, Deal $deal): void
     {
         abort_unless($this->access->can($me, 'deal', AccessLevel::R), 403, 'Akun ini ga punya akses ke deal.');
+        abort_unless($this->access->canViewRecord($me, $deal->clientPartner), 403, 'Deal ini milik divisi lain.');
     }
 
     private function authorizeEdit(User $me, Deal $deal): void
