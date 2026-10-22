@@ -40,11 +40,11 @@ const Modals = {
     const canDeal = can('deal', 'R');
     const deals = rec && canDeal ? Store.db.deals.filter(d => d.recordId === rec.id && (d.status === 'Open' || d.status === 'On Hold')) : [];
     const canNew = can('deal', 'C');
-    if (v.dealId === undefined || (v.dealId && v.dealId !== 'new' && !deals.some(d => d.id === v.dealId))) v.dealId = deals[0] ? deals[0].id : (canNew ? 'new' : '');
+    if (v.dealId === undefined || (v.dealId && v.dealId !== 'new' && !deals.some(d => d.id === v.dealId))) v.dealId = deals[0] ? deals[0].id : '';
     let pipe = '';
     if (rec && canDeal) {
       const d = deals.find(x => x.id === v.dealId);
-      const line = d ? lineById(d.lineId) : (lineById(v.lineId) || Store.db.lines[0]);
+      const line = d ? lineById(d.lineId) : lineForDivision(rec.dept);
       const cur = d ? line.stages.findIndex(s => s.id === d.stageId) : -1;
       const editable = d ? canEditDeal(d) : canNew;
       const stOpts = d ? line.stages : line.stages.slice(0, -1);
@@ -53,7 +53,7 @@ const Modals = {
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span class="lbl" style="color:var(--p)">Langkah berikutnya di pipeline</span>' + (d ? '<span class="chip c-info"><span class="dot"></span>Sekarang: ' + esc(line.stages[cur].name) + '</span>' : '') + '</div>' +
         '<div class="form-grid">' +
         '<label class="fld"><span>Deal</span><select class="inp" name="dealId" data-ch="int-deal">' + deals.map(x => opt(x.id, v.dealId, x.title + ' · ' + ((stageOf(x) || {}).name || ''))).join('') + (canNew ? opt('new', v.dealId, '+ Buat deal baru') : '') + opt('', v.dealId, 'Tanpa deal') + '</select></label>' +
-        (v.dealId === 'new' ? (Store.db.lines.length > 1 ? '<label class="fld"><span>Pipeline</span><select class="inp" name="lineId" data-ch="int-deal">' + Store.db.lines.map(l => opt(l.id, line.id, l.name)).join('') + '</select></label>' : '<input type="hidden" name="lineId" value="' + line.id + '">') + '<label class="fld"><span>Judul deal *</span><input class="inp" name="dealTitle" value="' + esc(v.dealTitle || '') + '"' + inv(m, 'dealTitle') + ' placeholder="Contoh: Website ' + esc(rec.name) + '">' + fieldErr(m, 'dealTitle') + '</label>' : '') +
+        (v.dealId === 'new' ? ('<div class="fld"><span>Divisi / lini bisnis</span><input class="inp" value="' + esc(line.name) + '" disabled><input type="hidden" name="lineId" value="' + line.id + '"></div>') + '<label class="fld"><span>Judul deal *</span><input class="inp" name="dealTitle" value="' + esc(v.dealTitle || '') + '"' + inv(m, 'dealTitle') + ' placeholder="Contoh: Website ' + esc(rec.name) + '">' + fieldErr(m, 'dealTitle') + '</label>' : '') +
         (v.dealId ? '<label class="fld"' + (v.dealId === 'new' ? ' style="grid-column:1/-1"' : '') + '><span>' + (d ? 'Pindah ke stage' : 'Mulai di stage') + '</span><select class="inp" name="toStage"' + (editable ? '' : ' disabled') + '>' + stOpts.map((s, i) => opt(s.id, def, (d && i === cur ? 'Tetap di ' : '') + s.name + (d && i < cur ? ' (mundur)' : ''))).join('') + '</select>' + (editable ? '<small>Kartu deal di Pipeline ikut pindah begitu disimpan.' + (d ? ' Kalau pilih Closing, kamu diminta isi hasilnya.' : '') + '</small>' : '<small>Kamu ga bisa ubah deal ini.</small>') + '</label>' : '') +
         '</div></div>';
     }
@@ -72,21 +72,24 @@ const Modals = {
   deal: (m) => {
     const d = m.deal || {}; const ro = d.id && !canEditDeal(d);
     const v = Object.assign({ lineId: App.ui.pl.line, ownerId: me().id, target: addDays(30), recordId: m.recordId || '' }, d, m.val || {});
-    const line = lineById(v.lineId) || Store.db.lines[0];
+    const related = recById(v.recordId);
+    const line = d.id ? lineById(d.lineId) : related ? lineForDivision(related.dept) : (visibleLines().find(l => l.id === v.lineId) || visibleLines()[0]);
+    if (!line) return modalShell('Deal baru', 'Pipeline', '<p>Belum ada lini bisnis divisimu.</p>', '<button class="btn" data-a="close">Tutup</button>');
+    if (!d.id && related && !(divisionUsers(related.dept).some(u => u.id === v.ownerId))) v.ownerId = related.picId;
     const stages = d.id ? line.stages : line.stages.slice(0, -1);
     const sid = v.stageId && line.stages.some(s => s.id === v.stageId) ? v.stageId : (m.stage || stages[0].id);
-    const seeV = canSeeValue(d.id ? d : { ownerId: v.ownerId });
+    const seeV = canSeeValue(d.id ? d : { ownerId: v.ownerId, recordId: related ? related.id : '' });
     const dis = ro ? ' disabled' : '';
     return modalShell(d.id ? esc(d.title) : 'Deal baru', d.id ? esc(d.code) + ' · ' + esc(line.name) : 'Pipeline',
       (d.id ? '<div style="display:flex;gap:8px;flex-wrap:wrap">' + statusChip(d.status) + '<span class="chip c-n">' + esc((stageOf(d) || {}).name || '') + '</span>' + (ro ? '<span class="chip c-n">' + ic('lock', 'ic-s') + 'Lihat saja</span>' : '') + '</div>' : '') +
       '<div class="form-grid"><label class="fld" style="grid-column:1/-1"><span>Judul deal *</span><input class="inp" name="title" value="' + esc(v.title) + '"' + inv(m, 'title') + dis + ' placeholder="Contoh: Website company profile">' + fieldErr(m, 'title') + '</label>' +
-      '<label class="fld" style="grid-column:1/-1"><span>Client & Partner *</span><select class="inp" name="recordId"' + inv(m, 'recordId') + dis + '>' + opt('', v.recordId, 'Pilih data…') + visibleRecs().map(r => opt(r.id, v.recordId, r.name + ' · ' + r.cat)).join('') + '</select>' + fieldErr(m, 'recordId') + '</label>' +
-      '<label class="fld"><span>Lini bisnis</span><select class="inp" name="lineId" data-ch="deal-line"' + (d.id ? ' disabled' : '') + '>' + Store.db.lines.map(l => opt(l.id, line.id, l.name)).join('') + '</select></label>' +
+      '<label class="fld" style="grid-column:1/-1"><span>Client & Partner *</span><select class="inp" name="recordId" data-ch="deal-record"' + inv(m, 'recordId') + dis + '>' + opt('', v.recordId, 'Pilih data…') + visibleRecs().map(r => opt(r.id, v.recordId, r.name + ' · ' + r.cat)).join('') + '</select>' + fieldErr(m, 'recordId') + '</label>' +
+      '<label class="fld"><span>Divisi / lini bisnis</span><input class="inp" value="' + esc(line.name) + '" disabled><input type="hidden" name="lineId" value="' + esc(line.id) + '"></label>' +
       '<label class="fld"><span>Stage</span><select class="inp" name="stageId"' + (d.id ? ' disabled' : '') + '>' + stages.map(s => opt(s.id, sid, s.name)).join('') + '</select>' + (d.id ? '<small>Pindah stage lewat board.</small>' : '') + '</label>' +
       '<label class="fld"><span>Nilai penawaran (Rp)</span>' + (seeV ? '<input class="inp num" name="offer" value="' + esc(v.offer) + '" inputmode="numeric" placeholder="120000000"' + dis + '>' : '<input class="inp" value="Terkunci sesuai hak akses" disabled>') + '</label>' +
       '<label class="fld"><span>Target closing</span><input class="inp" type="date" name="target" value="' + esc(v.target) + '"' + dis + '></label>' +
-      '<label class="fld"><span>PIC deal</span><select class="inp" name="ownerId"' + dis + '>' + activeUsers().map(u => opt(u.id, v.ownerId, u.name)).join('') + '</select></label>' +
-      '<label class="fld"><span>Layanan</span><input class="inp" name="service" value="' + esc(v.service) + '"' + dis + '></label>' +
+      '<label class="fld"><span>PIC deal</span><select class="inp" name="ownerId"' + dis + '>' + divisionUsers(related ? related.dept : line.dept).map(u => opt(u.id, v.ownerId, u.name)).join('') + '</select></label>' +
+      '<label class="fld"><span>Layanan</span><input class="inp" value="' + esc(related ? serviceName(related.serviceId) : v.service || 'Pilih relasi dahulu') + '" disabled></label>' +
       (d.id && d.status !== 'Open' ? '<div class="fld" style="grid-column:1/-1;padding:14px;border-radius:16px;background:var(--bg)"><span>Hasil closing</span><span class="small">' + esc(d.status) + (d.status === 'Won' ? ' · ' + (seeV ? fmtRp(d.value) : 'nilai terkunci') + ' · ' + fmtDate(d.closedAt) : '') + (d.reason ? ' · ' + esc(d.reason) : '') + '</span></div>' : '') + '</div>',
       (d.id && perm('deal') === 'M' ? '<button type="button" class="btn btn-s" data-a="deldeal" data-v="' + d.id + '" style="margin-right:auto">' + ic('trash', 'ic-s') + 'Hapus</button>' : '') + '<button type="button" class="btn btn-s" data-a="close">' + (ro ? 'Tutup' : 'Batal') + '</button>' + (ro ? '' : '<button type="submit" class="btn">' + ic('check', 'ic-s') + 'Simpan</button>'), true, ro ? null : 'deal');
   },
@@ -154,7 +157,7 @@ const Actions = {
   plallc: () => { App.ui.pl.allC = !App.ui.pl.allC; render(); },
   plper: (el) => { App.ui.pl.per = el.dataset.v; App.ui.pl.val = ''; render(); },
   cpcat: (el) => { App.ui.cp.cat = el.dataset.v; App.ui.cp.page = 0; render(); },
-  cpreset: () => { Object.assign(App.ui.cp, { cat: 'all', q: '', dept: 'all', page: 0 }); render(); },
+  cpreset: () => { Object.assign(App.ui.cp, { cat: 'all', q: '', dept: 'all', service: 'all', page: 0 }); render(); },
   cppage: (el) => { App.ui.cp.page += +el.dataset.v; render(); },
   move: (el, e) => { e.stopPropagation(); const d = findDeal(el.dataset.v); const line = lineById(d.lineId); const i = line.stages.findIndex(s => s.id === d.stageId) + (+el.dataset.dir); if (line.stages[i]) moveDeal(d.id, line.stages[i].id); },
   closest: (el) => { const f = document.querySelector('[data-form=closing]'); const o = f ? fd(f) : {}; App.modal = Object.assign(App.modal, { st: el.dataset.v, err: {}, value: o.value, reason: o.reason }); render(); },
@@ -233,14 +236,19 @@ const Forms = {
   },
   int: (o) => {
     const m = App.modal; const err = {};
+    const scopedRecord = recById(o.recordId);
+    if (!scopedRecord || !canSeeRec(scopedRecord) || !can('interaksi', 'C')) { toast('Tidak ada akses', 'Pilih relasi di divisimu.', 'bad'); return; }
+    if (o.dealId && o.dealId !== 'new') { const existing = findDeal(o.dealId); if (!existing || !canSeeDeal(existing) || existing.recordId !== scopedRecord.id) { toast('Deal tidak sesuai', 'Pilih deal dari relasi yang sama.', 'bad'); return; } }
+    if (o.dealId === 'new' && !can('deal', 'C')) return;
     if (!o.recordId) err.recordId = 'Cari lalu pilih Client & Partner.'; if (!o.result) err.result = 'Isi hasil pembicaraan.'; if (o.fuDate && o.fuDate < o.date) err.fuDate = 'Follow-up ga bisa sebelum tanggal interaksi.';
     if (o.dealId === 'new' && !o.dealTitle) err.dealTitle = 'Kasih judul deal-nya.';
     if (Object.keys(err).length) { m.err = err; m.val = Object.assign({}, m.val, o); m.still = true; render(); return; }
     const r = recById(o.recordId);
     let deal = null, toClosing = false, stageNote = '';
     if (o.dealId === 'new') {
-      const line = lineById(o.lineId) || Store.db.lines[0];
-      deal = { id: uid('dl'), code: nextCode('d'), title: o.dealTitle, recordId: r.id, lineId: line.id, stageId: o.toStage || line.stages[0].id, status: 'Open', offer: '', value: '', ownerId: me().id, target: addDays(30), closedAt: '', reason: '', service: '', createdAt: today() };
+      const line = lineForDivision(r.dept);
+      if (!line.stages.slice(0, -1).some(s => s.id === o.toStage)) o.toStage = line.stages[0].id;
+      deal = { id: uid('dl'), code: nextCode('d'), title: o.dealTitle, recordId: r.id, serviceId: r.serviceId || '', lineId: line.id, stageId: o.toStage || line.stages[0].id, status: 'Open', offer: '', value: '', ownerId: me().id, target: addDays(30), closedAt: '', reason: '', service: serviceName(r.serviceId), createdAt: today() };
       deal.history = []; dealLog(deal, '', stageOf(deal).name, 'Open', 'Deal dibuat dari catat interaksi');
       Store.db.deals.push(deal); audit('Tambah', 'Deal', deal.title + ' dari catat interaksi, mulai di ' + stageOf(deal).name);
       stageNote = 'Deal baru di ' + stageOf(deal).name;
