@@ -15,3 +15,8 @@ __pycache__/
 *.pem
 *.key
 
+
+# Internal account rosters must never be published.
+*.internal.json
+optima-tim-internal.json
+.internal/
