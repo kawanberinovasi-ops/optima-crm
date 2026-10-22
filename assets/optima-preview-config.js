@@ -5,7 +5,7 @@ const CLIENT_PREVIEW = Object.freeze({
   routes: ['cp','pipeline','akses'],
   authRoutes: ['login','expired'],
   defaultRoute: 'cp',
-  adminTabs: ['users','dept','access','override']
+  adminTabs: ['users','dept','services','access','override']
 });
 function ensurePreviewAccount() {
   if (CLIENT_PREVIEW.showLogin) return;

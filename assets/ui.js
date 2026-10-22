@@ -46,7 +46,7 @@ const valOrLock = (deal, v) => canSeeValue(deal) ? fmtRp(v) : '<span title="Nila
 /* ---------- state & router ---------- */
 const App = {
   route: 'cp', anim: true, pop: null, modal: null, drawer: null, pal: null,
-  ui: { cp: { cat: 'all', q: '', dept: 'all', page: 0, sort: 'name' }, pl: { line: 'um', per: 'all', val: '', q: '' }, mw: { f: 'all' }, db: { per: 'm', val: '' }, ak: { tab: 'users', q: '', act: 'all', by: 'all' } }
+  ui: { cp: { cat: 'all', q: '', dept: 'all', service: 'all', page: 0, sort: 'name' }, pl: { line: 'um', per: 'all', val: '', q: '' }, mw: { f: 'all' }, db: { per: 'm', val: '' }, ak: { tab: 'users', q: '', act: 'all', by: 'all' } }
 };
 const ROUTES = ['login', 'mywork', 'dashboard', 'cp', 'pipeline', 'akses', 'expired'];
 function parseHash() {
@@ -109,9 +109,9 @@ function navbar() {
     : '<a class="ml" href="#/' + href + '" aria-current="' + (r === href ? 'page' : 'false') + '">' + label + '</a>') + '</div>';
   const pi = (act, v, icon, t, d, y) => '<button type="button" role="menuitem" class="pi" data-a="' + act + '" data-v="' + esc(v || '') + '"><span class="tile ' + (y ? 'y' : '') + '">' + ic(icon) + '</span><span><span class="t">' + t + '</span><span class="d">' + d + '</span></span></button>';
   const cpDrop = '<div class="pop l" role="menu">' + pi('nav', 'cp', 'list', 'Semua data', 'Cari, filter, dan buka profil') + (canCreateAny() ? pi('import', '', 'up', 'Import data', 'Pakai template Excel') : '') + pi('export', '', 'down', 'Export data', 'Unduh data sesuai hak akses') + '</div>';
-  const plDrop = '<div class="pop l" role="menu">' + Store.db.lines.map((l, i) => pi('navline', l.id, ['code', 'flag', 'pen'][i % 3] || 'deal', esc(l.name), l.stages.length + ' stage', i === 1)).join('') + (canConfigPipeline() ? pi('newline', '', 'plus', 'Lini bisnis baru', 'Tambah pipeline sendiri') : '') + '</div>';
-  const plusDrop = '<div class="pop r" role="menu" style="min-width:280px">' + (canCreateAny() ? pi('newrec', '', 'user', 'Data baru', 'Client, partner, atau lead') : '') + (can('deal', 'C') ? pi('newdeal', '', 'deal', 'Deal baru', 'Masuk ke pipeline') : '') + (can('interaksi', 'C') ? pi('newint', '', 'chat', 'Catat interaksi', 'Call, meeting, atau chat', true) : '') + (!canCreateAny() && !can('deal', 'C') && !can('interaksi', 'C') ? '<div class="pi"><span class="d">Akun ini cuma bisa melihat.</span></div>' : '') + '</div>';
-  const myN = (Store.db.notifs || []).filter(n => n.userId === u.id); const unread = myN.filter(n => !n.read).length;
+  const plDrop = '<div class="pop l" role="menu">' + visibleLines().map((l, i) => pi('navline', l.id, ['code', 'flag', 'pen'][i % 3] || 'deal', esc(l.name), l.stages.length + ' stage', i === 1)).join('') + (canConfigPipeline() ? pi('newline', '', 'plus', 'Lini bisnis baru', 'Tambah pipeline sendiri') : '') + '</div>';
+  const plusDrop = '<div class="pop r" role="menu" style="min-width:280px">' + (canCreateAny() ? pi('newrec', '', 'user', 'Data baru', 'Lead baru, PIC otomatis akunmu') : '') + (can('deal', 'C') ? pi('newdeal', '', 'deal', 'Deal baru', 'Masuk ke pipeline') : '') + (can('interaksi', 'C') ? pi('newint', '', 'chat', 'Catat interaksi', 'Call, meeting, atau chat', true) : '') + (!canCreateAny() && !can('deal', 'C') && !can('interaksi', 'C') ? '<div class="pi"><span class="d">Akun ini cuma bisa melihat.</span></div>' : '') + '</div>';
+  const myN = (Store.db.notifs || []).filter(n => n.userId === u.id && workflowNotificationVisible(n)); const unread = myN.filter(n => !n.read).length;
   const late = fu.filter(i => dayDiff(i.fuDate) < 0).length;
   const notifDrop = '<div class="pop r" role="menu" style="min-width:360px;max-height:520px;overflow-y:auto">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px"><span class="lbl">Ringkasan hari ini</span><span class="small muted">jam 08.00</span></div>' +
@@ -156,7 +156,7 @@ function Palette() {
   let res = pages.filter(p => !q || p[1].toLowerCase().includes(q)).map(p => ({ a: 'nav', v: p[0], t: p[1], d: 'Menu · ' + p[2], icon: 'home' }));
   if (q) {
     res = res.concat(Store.db.records.filter(r => !r.archived && canSeeRec(r) && (r.name + ' ' + r.contact + ' ' + r.code).toLowerCase().includes(q)).slice(0, 6).map(r => ({ a: 'openrec', v: r.id, t: r.name, d: r.cat + ' · ' + r.city, av: r })));
-    res = res.concat(can('deal', 'R') ? Store.db.deals.filter(d => d.title.toLowerCase().includes(q)).slice(0, 5).map(d => ({ a: 'opendeal', v: d.id, t: d.title, d: 'Deal · ' + (lineById(d.lineId) || {}).name + ' · ' + d.status, icon: 'deal' })) : []);
+    res = res.concat(can('deal', 'R') ? Store.db.deals.filter(d => canSeeDeal(d) && d.title.toLowerCase().includes(q)).slice(0, 5).map(d => ({ a: 'opendeal', v: d.id, t: d.title, d: 'Deal · ' + (lineById(d.lineId) || {}).name + ' · ' + d.status, icon: 'deal' })) : []);
   }
   App.pal.res = res; const sel = Math.min(App.pal.i || 0, Math.max(0, res.length - 1));
   return '<div class="scrim" data-a="scrim" style="padding-top:110px"><div class="pal" role="dialog" aria-modal="true" aria-label="Pencarian"><label class="pal-in">' + ic('search') + '<span class="sr">Cari data, deal, atau menu</span><input id="pal-q" data-in="pal" value="' + esc(App.pal.q || '') + '" placeholder="Cari client, deal, atau menu" autocomplete="off"><span class="kbd">Esc</span></label>' +

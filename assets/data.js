@@ -1,11 +1,11 @@
 /* OPTIMA CRM · data contoh, penyimpanan lokal, dan hak akses */
 'use strict';
 const DB_KEY = 'optima_crm_client_preview_v1';
-const DEPTS = ['Executive', 'Commercial', 'Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'];
+const DEPTS = ['Executive', 'Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'];
 const ROLES = ['Super Admin', 'Kepala Department', 'Koordinator', 'Staf', 'Viewer'];
-const CATS = ['Lead', 'Client', 'Community', 'KOL/KOC', 'Media'];
+const CATS = ['Lead', 'Client'];
 const CAT_KEY = { 'Lead': 'lead', 'Client': 'client', 'Community': 'community', 'KOL/KOC': 'kol', 'Media': 'media' };
-const ENTS = [['lead', 'Lead'], ['client', 'Client'], ['community', 'Community'], ['kol', 'KOL/KOC'], ['media', 'Media'], ['interaksi', 'Interaksi'], ['deal', 'Deal']];
+const ENTS = [['lead', 'Lead'], ['client', 'Client'], ['interaksi', 'Interaksi'], ['deal', 'Deal']];
 const DEFAULT_OPTS = {
   segments: ['Korporat', 'Pendidikan', 'Kesehatan', 'Komunitas', 'UMKM', 'F&B', 'Retail', 'Media lokal', 'Radio', 'Online', 'Lifestyle', 'Kuliner', 'Travel'],
   sources: ['Referensi', 'Website', 'Event', 'Media sosial', 'Kunjungan', 'Lainnya'],
@@ -37,7 +37,7 @@ function seed() {
   const departments = DEPTS.map((name, i) => ({ id: 'd' + (i + 1), name }));
   const g = { Executive: 'MMMMMMM|Ya|Ya', Commercial: 'MMRRRCM|Ya*|R*', 'Customer Service': 'RRRRRMR|Tidak|Tidak', 'Digital Campaign': 'CRRMRCN|Tidak|M', 'Creative & Media': 'RRRRMCN|Tidak|Tidak', CampusNet: 'CRMRCCN|Tidak|Tidak', DietPartner: 'CRMRCCN|Tidak|Tidak', 'Business Operation': 'RRRRRRR|Lihat*|Tidak' };
   const access = {};
-  Object.keys(g).forEach(d => { const [m, nilai, rate] = g[d].split('|'); const o = { nilai, rate }; ENTS.forEach(([k], i) => { o[k] = m[i]; }); access[d] = o; });
+  Object.keys(g).forEach(d => { const [m, nilai, rate] = g[d].split('|'); const o = { nilai, rate }; ENTS.forEach(([k]) => { o[k] = m[{lead:0,client:1,interaksi:5,deal:6}[k]]; }); access[d] = o; });
   const mk = (id, name, stages) => ({ id, name, stages: stages.map((s, i) => ({ id: id + 's' + (i + 1), name: s })) });
   const lines = [
     mk('um', 'Umum', ['Lead', 'Qualified', 'Meeting', 'Proposal', 'Negotiation', 'Closing'])
@@ -149,21 +149,21 @@ const isClosingStage = (line, stageId) => line.stages.length && line.stages[line
 const overrideOf = (u, k) => (Store.db.overrides || []).find(o => o.userId === u.id && o.key === k);
 function perm(ent, u) {
   u = u || me(); if (!u) return 'N';
-  if (u.role === 'Super Admin') return 'M';
-  const ov = overrideOf(u, ent); if (ov) return ov.value;
+  if (u.role === 'Super Admin' || u.dept === 'Executive') return u.role === 'Viewer' ? 'R' : 'M';
+  const ov = overrideOf(u, ent); if (ov) return u.role === 'Viewer' && ov.value !== 'N' ? 'R' : ov.value;
   const a = Store.db.access[u.dept]; let p = (a && a[ent]) || 'N';
   if (u.role === 'Viewer' && p !== 'N') p = 'R';
   return p;
 }
 const can = (ent, lvl) => LV[perm(ent)] >= LV[lvl];
 const catEnt = (cat) => CAT_KEY[cat] || 'lead';
-const canSeeRec = (r) => can(catEnt(r.cat), 'R');
-const canEditRec = (r) => { const p = perm(catEnt(r.cat)); return p === 'M' || (p === 'C' && r.picId === me().id); };
-const canDelRec = (r) => perm(catEnt(r.cat)) === 'M';
-const canCreateAny = () => CATS.some(c => can(catEnt(c), 'C'));
+const canSeeRec = (r) => hasDivisionScope(r) && can(catEnt(r.cat), 'R');
+const canEditRec = (r) => { if (!canSeeRec(r)) return false; const p = perm(catEnt(r.cat)); return p === 'M' || (p === 'C' && (r.picId === me().id || isLead(me()))); };
+const canDelRec = (r) => canSeeRec(r) && perm(catEnt(r.cat)) === 'M';
+const canCreateAny = () => can('lead', 'C');
 const isLead = (u) => ['Kepala Department', 'Koordinator'].includes(u.role);
 function canSeeValue(deal) {
-  const u = me(); if (u.role === 'Super Admin') return true;
+  const u = me(); if (!u) return false; if (deal && !canSeeDeal(deal)) return false; if (isExecutive(u)) return true;
   if (deal && deal.ownerId === u.id) return true;
   const ov = overrideOf(u, 'nilai'); if (ov) return ov.value === 'Ya';
   const v = (Store.db.access[u.dept] || {}).nilai || 'Tidak';
@@ -172,16 +172,16 @@ function canSeeValue(deal) {
   return false;
 }
 function canSeeRate() {
-  const u = me(); if (u.role === 'Super Admin') return true;
+  const u = me(); if (!u) return false; if (isExecutive(u)) return true;
   const ov = overrideOf(u, 'rate'); if (ov) return ov.value === 'Ya';
   const v = (Store.db.access[u.dept] || {}).rate || 'Tidak';
   return v === 'M' || (v === 'R*' && isLead(u));
 }
-const canEditDeal = (d) => { const p = perm('deal'); return p === 'M' || (p === 'C' && d.ownerId === me().id); };
+const canEditDeal = (d) => { if (!canSeeDeal(d)) return false; const p = perm('deal'); return p === 'M' || (p === 'C' && (d.ownerId === me().id || isLead(me()))); };
 const canConfigPipeline = () => ['Super Admin', 'Kepala Department'].includes(me().role);
 const canAdmin = () => me().role === 'Super Admin';
-const canReopen = (d) => { const u = me(); if (d.status === 'Won') return ['Super Admin', 'Kepala Department'].includes(u.role); return canEditDeal(d) && (d.ownerId === u.id || isLead(u) || u.role === 'Super Admin'); };
-const canMovePic = (r) => canEditRec(r) && (perm(catEnt(r.cat)) === 'M' || isLead(me()));
+const canReopen = (d) => { if (!canEditDeal(d)) return false; const u = me(); if (d.status === 'Won') return ['Super Admin', 'Kepala Department'].includes(u.role); return canEditDeal(d) && (d.ownerId === u.id || isLead(u) || u.role === 'Super Admin'); };
+const canMovePic = (r) => canEditRec(r);
 const liveRecs = () => Store.db.records.filter(r => !r.archived);
 const liveInts = () => Store.db.interactions.filter(i => !i.cancelled);
 function trackChange(kind, id, field, before, after, note) {

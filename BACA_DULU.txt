@@ -7,7 +7,8 @@ S-01 Login pengembangan: halaman login ditampilkan kembali, menggunakan
 pilihan akun contoh. Ini simulasi SSO lokal, belum autentikasi SSO server.
 S-02 Pengguna/karyawan, department, role, aktivasi dan hak akses,
 termasuk pengecualian akses per orang dan Edit Profil sendiri.
-S-03 Data lead, client, community, KOL/KOC, dan media.
+S-03 Status relasi Lead/Client. KOL, Community, Media, dan Digital Campaign
+adalah layanan terpisah dari status.
 S-04 Pencarian, filter, segmen, PIC, validasi, duplikasi, gabung data,
 arsip dan pemulihan.
 S-05 Riwayat interaksi, hasil komunikasi, langkah berikutnya, dan follow-up.
@@ -41,3 +42,12 @@ Alamat: http://127.0.0.1:5175
 Data contoh tersimpan di browser dengan kunci optima_crm_client_preview_v1.
 Data browser versi lengkap tidak disalin atau diubah.
 Folder lengkap /Users/mac/Downloads/optima-crm tetap mandiri di port 5173.
+
+ALUR TERBARU:
+Setiap orang/divisi dapat menerima Lead langsung. PIC awal dan divisi
+otomatis akun pengisi. CS tetap dapat menangani Lead umum, bukan jalur wajib.
+Serah terima boleh antar-divisi dan ke/dari CS; identitas pengisi tetap disimpan.
+Lead menjadi Client setelah deal Won. Setiap divisi melihat data sendiri;
+Executive melihat lintas divisi. Pemetaan layanan bisa diubah admin.
+Daftar tim asli hanya dimuat di browser localhost, tidak ikut demo publik.
+Pembatasan akses masih pada prototipe lokal; otorisasi operasional perlu backend.

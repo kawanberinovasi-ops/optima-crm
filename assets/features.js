@@ -50,7 +50,8 @@ cpFiltered = function () {
   let list = base;
   if (ui.cat !== 'all') list = list.filter(r => r.cat === ui.cat);
   if (ui.dept !== 'all') list = list.filter(r => r.dept === ui.dept);
-  if (q) list = list.filter(r => (r.name + ' ' + (r.contacts || []).map(c => c.name + ' ' + c.email).join(' ') + ' ' + r.code + ' ' + r.city + ' ' + userName(r.picId)).toLowerCase().includes(q));
+  if (ui.service && ui.service !== 'all') list = list.filter(r => r.serviceId === ui.service);
+  if (q) list = list.filter(r => (r.name + ' ' + (r.contacts || []).map(c => c.name + ' ' + c.email).join(' ') + ' ' + r.code + ' ' + r.city + ' ' + serviceName(r.serviceId) + ' ' + userName(r.picId)).toLowerCase().includes(q));
   const ints = liveInts();
   const last = (r) => ints.filter(i => i.recordId === r.id).sort((a, b) => b.date.localeCompare(a.date))[0];
   list = list.map(r => ({ r, last: last(r), fu: ints.filter(i => i.recordId === r.id && !i.done && i.fuDate).sort((a, b) => a.fuDate.localeCompare(b.fuDate))[0] }));
@@ -83,14 +84,13 @@ function Drawer() {
   const r = recById(App.drawer.id); if (!r || !canSeeRec(r)) { App.drawer = null; return ''; }
   ensureRec(r);
   const ints = Store.db.interactions.filter(i => i.recordId === r.id).sort((a, b) => b.date.localeCompare(a.date));
-  const deals = can('deal', 'R') ? Store.db.deals.filter(d => d.recordId === r.id) : [];
-  const info = [['Kota', r.city], ['Segmen', r.segment], ['Sumber', r.source], ['PIC', userName(r.picId)], ['Department pemilik', r.dept], ['Dibuat', fmtDate(r.createdAt)]];
-  if (r.cat === 'KOL/KOC' && canSeeRate()) info.push(['Rate card', r.rate ? fmtRp(r.rate) : '-']);
+  const deals = can('deal', 'R') ? Store.db.deals.filter(d => d.recordId === r.id && canSeeDeal(d)) : [];
+  const info = [['Kota', r.city], ['Status', r.cat], ['Layanan', serviceName(r.serviceId)], ['Pengisi data', userName(r.createdBy)], ['Segmen', r.segment], ['Sumber', r.source], ['PIC', userName(r.picId)], ['Department pemilik', r.dept], ['Dibuat', fmtDate(r.createdAt)]];
+  if (r.serviceId === 'kol' && canSeeRate()) info.push(['Rate card', r.rate ? fmtRp(r.rate) : '-']);
   const ed = canEditRec(r) && !r.archived;
   const hb = (a, icon, label, extra) => '<button type="button" class="btn btn-sm" style="background:rgba(255,255,255,.14)" data-a="' + a + '" data-v="' + r.id + '"' + (extra || '') + '>' + ic(icon, 'ic-s') + label + '</button>';
   const more = [];
-  if (ed && r.cat === 'Lead' && can('client', 'C')) more.push(['convert', 'check', 'Jadikan Client']);
-  if (canMovePic(r) && !r.archived) more.push(['movepic', 'swap', 'Pindah PIC']);
+  if (canMovePic(r) && !r.archived) more.push(['movepic', 'swap', 'Pindah PIC / divisi']);
   if (canDelRec(r) && !r.archived) more.push(['mergerec', 'users', 'Gabung data ganda']);
   if (canDelRec(r)) more.push(r.archived ? ['restorerec', 'refresh', 'Pulihkan dari arsip'] : ['delrec', 'file', 'Arsipkan']);
   const ch = (Store.db.changes || []).filter(c => c.kind === 'record' && c.refId === r.id);
@@ -124,13 +124,13 @@ Pages.pipeline = function () {
   const ui = App.ui.pl; ui.view = ui.view || 'board'; ui.st = ui.st || 'active';
   const hero = (extra, n) => '<section class="hero enter" style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:24px">' + stripesArt(3) + '<div style="display:flex;flex-direction:column;gap:10px;min-width:0"><span class="lbl">Pipeline · ' + esc(extra) + '</span><h1 class="disp hero-title">Gas, geser<br>deal-nya.</h1><p style="margin:0;font-size:16px">Drag kartu ke stage lain, atau pakai tombol panah di kartu.</p></div>' + (n || '') + '</section>';
   if (!can('deal', 'R')) return hero('Terkunci') + empty('Pipeline terkunci.', 'Akun ini ga punya akses ke deal. Minta Super Admin kalau butuh.', '<a class="btn btn-sm" href="#/mywork">Balik ke My Work</a>');
-  const line = lineById(ui.line) || Store.db.lines[0]; ui.line = line.id;
+  const choices = visibleLines(); const line = choices.find(l => l.id === ui.line) || choices[0]; if (!line) return hero('Divisi') + empty('Belum ada pipeline.', 'Minta admin menyiapkan lini bisnis divisimu.'); ui.line = line.id;
   const range = periodRange(ui.per, ui.val); const q = ui.q.trim().toLowerCase();
-  const deals = Store.db.deals.filter(d => d.lineId === line.id && inRange(d.status === 'Open' || d.status === 'On Hold' ? (d.createdAt || d.target) : (d.closedAt || d.target), range) && (!q || (d.title + ' ' + ((recById(d.recordId) || {}).name || '')).toLowerCase().includes(q)));
+  const deals = Store.db.deals.filter(d => canSeeDeal(d) && d.lineId === line.id && inRange(d.status === 'Open' || d.status === 'On Hold' ? (d.createdAt || d.target) : (d.closedAt || d.target), range) && (!q || (d.title + ' ' + ((recById(d.recordId) || {}).name || '')).toLowerCase().includes(q)));
   const open = deals.filter(d => d.status === 'Open'); const seeV = canSeeValue(null);
   const won = deals.filter(d => d.status === 'Won'); const lost = deals.filter(d => d.status === 'Lost'); const hold = deals.filter(d => d.status === 'On Hold');
   const wonV = won.reduce((a, d) => a + (+d.value || 0), 0);
-  const cfg = canConfigPipeline();
+  const cfg = canManageLine(line);
   const stats = '<div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:28px"><div style="display:flex;flex-direction:column"><span class="lbl">Deal open</span><span class="disp" style="font-size:46px">' + cnt(open.length) + '</span></div><div style="display:flex;flex-direction:column"><span class="lbl">Nilai open</span><span class="disp" style="font-size:46px">' + (seeV ? cnt(open.reduce((a, d) => a + (+d.offer || 0), 0), 'rp') : 'Rp ···') + '</span></div>' + (wonV && seeV ? '<span class="sticker" style="font-size:20px;align-self:center">Won ' + fmtRp(wonV) + '</span>' : '') + (can('deal', 'C') ? '<button type="button" class="btn btn-w" data-a="newdeal">' + ic('plus', 'ic-s') + 'Deal baru</button>' : '') + '</div>';
   const closingId = line.stages[line.stages.length - 1].id;
   const active = deals.filter(d => d.status !== 'Lost');
@@ -159,7 +159,7 @@ Pages.pipeline = function () {
         : empty('Ga ada deal di filter ini.', 'Ganti status atau periode.', '<button type="button" class="btn btn-sm" data-a="plst" data-v="all">Lihat semua</button>')) + '</section>';
   }
   return hero(line.name, stats) +
-    '<div class="enter s1" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px"><div style="display:flex;flex-wrap:wrap;gap:10px">' + seg([['board', 'Papan'], ['list', 'Daftar']], ui.view, 'plview', 'Tampilan') + seg(Store.db.lines.map(l => [l.id, l.name, Store.db.deals.filter(d => d.lineId === l.id && d.status === 'Open').length]), line.id, 'plline', 'Lini bisnis', 'tablist') + '</div>' +
+    '<div class="enter s1" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px"><div style="display:flex;flex-wrap:wrap;gap:10px">' + seg([['board', 'Papan'], ['list', 'Daftar']], ui.view, 'plview', 'Tampilan') + seg(visibleLines().map(l => [l.id, l.name, Store.db.deals.filter(d => canSeeDeal(d) && d.lineId === l.id && d.status === 'Open').length]), line.id, 'plline', 'Lini bisnis', 'tablist') + '</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' + seg([['all', 'Semua'], ['m', 'Bulan'], ['q', 'Quarter'], ['y', 'Tahun']], ui.per, 'plper', 'Jenis periode') + (ui.per !== 'all' ? '<label><span class="sr">Pilih periode</span><select id="pl-val" class="inp" data-ch="plval" style="width:auto;min-height:44px;font-weight:700;color:var(--p)">' + periodOptions(ui.per).map(o => opt(o[0], ui.val || periodOptions(ui.per)[0][0], o[1])).join('') + '</select></label>' : '') + '<label class="search" style="width:220px">' + ic('search', 'ic-s') + '<span class="sr">Cari deal</span><input id="pl-q" data-in="plq" value="' + esc(ui.q) + '" placeholder="Cari deal"></label></div></div>' +
     (ui.per !== 'all' ? '<p class="small muted" style="margin:-8px 0 0">Deal yang masih jalan dihitung dari tanggal dibuat, deal Won dan Lost dari tanggal closing.</p>' : '') + body +
     pageNote('Deal yang masuk Closing berstatus Won. Lost dan On Hold diatur dari detail deal, dan stage terakhirnya tetap tersimpan.');
@@ -384,25 +384,33 @@ const reqErr = (m, o, keys, msg) => { const err = {}; keys.forEach(k => { if (!o
 Object.assign(Forms, {
   record: (o) => {
     const m = App.modal; const err = {};
+    if (!me() || (m.rec ? !canEditRec(m.rec) : !can('lead', 'C'))) { toast('Tidak ada akses', 'Data ini berada di luar kewenanganmu.', 'bad'); return; }
+    if (o.serviceId && !serviceById(o.serviceId)) err.serviceId = 'Pilih layanan yang tersedia.';
     if (!o.name) err.name = 'Nama wajib diisi.'; if (o.cEmail && !emailOk(o.cEmail)) err.cEmail = 'Format email belum benar.';
     if (Object.keys(err).length) { m.err = err; m.val = o; render(); return; }
     const dupes = findDupes({ name: o.name, email: o.cEmail, phone: o.phone }, (m.rec || {}).id);
     if (dupes.length && !m.dupeOk) { m.dupes = dupes.map(x => ({ id: x.r.id, vis: canSeeRec(x.r), why: x.why })); m.dupeOk = true; m.val = o; m.err = {}; m.still = true; render(); return; }
     if ('rate' in o) o.rate = num(o.rate);
     if (m.rec) {
-      const r = ensureRec(m.rec); const L = { name: 'Nama', cat: 'Kategori', segment: 'Segmen', dept: 'Department pemilik', source: 'Sumber', city: 'Kota', note: 'Catatan', rate: 'Rate card' };
+      const r = ensureRec(m.rec); const L = { name: 'Nama', serviceId: 'Layanan', segment: 'Segmen', source: 'Sumber', city: 'Kota', note: 'Catatan', rate: 'Rate card' };
       Object.keys(L).forEach(k => { if (k in o) { trackChange('record', r.id, L[k], k === 'rate' && r[k] ? fmtRp(r[k]) : r[k], k === 'rate' && o[k] ? fmtRp(o[k]) : o[k]); r[k] = o[k]; } });
       const c0 = r.contacts[0] || (r.contacts[0] = { id: uid('c') });
       [['contact', 'name', 'Nama kontak utama'], ['title', 'title', 'Jabatan kontak'], ['cEmail', 'email', 'Email kontak'], ['phone', 'phone', 'Telepon kontak']].forEach(([f, cf, l]) => { if (f in o) { trackChange('record', r.id, l, c0[cf], o[f]); c0[cf] = o[f]; } });
-      syncPrimary(r); r.updatedAt = today(); audit('Ubah', 'Client & Partner', r.name); toast('Tersimpan!', r.name + ' udah diperbarui.');
+      r.service = serviceName(r.serviceId); syncPrimary(r); r.updatedAt = today(); audit('Ubah', 'Client & Partner', r.name); toast('Tersimpan!', r.name + ' udah diperbarui.');
     } else {
-      const r = { id: uid('r'), code: nextCode('r'), createdAt: today(), updatedAt: today(), name: o.name, cat: o.cat, segment: o.segment || '', picId: o.picId, dept: o.dept, source: o.source, city: o.city || '', note: o.note || '', rate: o.rate || '', archived: false, contacts: [{ id: uid('c'), name: o.contact || '', title: o.title || '', email: o.cEmail || '', phone: o.phone || '' }] };
+      const r = { id: uid('r'), code: nextCode('r'), createdAt: today(), updatedAt: today(), name: o.name, cat: 'Lead', serviceId: o.serviceId || '', service: serviceName(o.serviceId), createdBy: me().id, segment: o.segment || '', picId: me().id, dept: me().dept, handoffs: [], source: o.source, city: o.city || '', note: o.note || '', rate: o.rate || '', archived: false, contacts: [{ id: uid('c'), name: o.contact || '', title: o.title || '', email: o.cEmail || '', phone: o.phone || '' }] };
       syncPrimary(r); Store.db.records.push(r); audit('Tambah', 'Client & Partner', r.name + ' (' + r.code + ')'); notify(r.picId, me().name + ' menjadikan kamu PIC ' + r.name, 'rec:' + r.id); toast('Masuk, mantap!', r.name + ' ditambahkan.'); App.drawer = { id: r.id };
     }
     App.modal = null; commit();
   },
   deal: (o) => {
     const m = App.modal; const err = {};
+    const related = recById(o.recordId || (m.deal || {}).recordId);
+    if (!related || !canSeeRec(related) || (m.deal ? !canEditDeal(m.deal) : !can('deal', 'C'))) { toast('Tidak ada akses', 'Pilih data di divisimu.', 'bad'); return; }
+    const owner = userById(o.ownerId || related.picId);
+    if (!owner || !owner.active || owner.role === 'Viewer' || owner.dept !== related.dept) err.ownerId = 'PIC deal harus aktif di divisi pemilik data.';
+    o.lineId = m.deal ? m.deal.lineId : lineForDivision(related.dept).id;
+    o.ownerId = owner ? owner.id : ''; o.service = serviceName(related.serviceId);
     if (!o.title) err.title = 'Judul wajib diisi.'; if (!o.recordId) err.recordId = 'Pilih Client & Partner.';
     if (Object.keys(err).length) { m.err = err; m.val = Object.assign({}, m.val, o); render(); return; }
     if (m.deal) {
@@ -412,22 +420,24 @@ Object.assign(Forms, {
       if (o.offer !== undefined) { const nv = num(o.offer); trackChange('deal', d.id, 'Nilai penawaran', d.offer ? fmtRp(d.offer) : '', nv ? fmtRp(nv) : ''); d.offer = nv; }
       audit('Ubah', 'Deal', d.title); toast('Tersimpan!', d.title + ' diperbarui.');
     } else {
-      const line = lineById(o.lineId); const d = { id: uid('dl'), code: nextCode('d'), title: o.title, recordId: o.recordId, lineId: line.id, stageId: o.stageId || line.stages[0].id, status: 'Open', offer: num(o.offer), value: '', ownerId: o.ownerId, target: o.target, closedAt: '', reason: '', lostReason: '', reviewDate: '', service: o.service, createdAt: today(), history: [] };
+      const line = lineById(o.lineId); const d = { id: uid('dl'), code: nextCode('d'), title: o.title, recordId: o.recordId, lineId: line.id, stageId: o.stageId || line.stages[0].id, status: 'Open', serviceId: related.serviceId || '', offer: num(o.offer), value: '', ownerId: o.ownerId, target: o.target, closedAt: '', reason: '', lostReason: '', reviewDate: '', service: o.service, createdAt: today(), history: [] };
       dealLog(d, '', stageOf(d).name, 'Open', 'Deal dibuat'); Store.db.deals.push(d); audit('Tambah', 'Deal', d.title + ' di ' + line.name); notify(d.ownerId, me().name + ' menjadikan kamu PIC deal ' + d.title, 'deal:' + d.id); App.ui.pl.line = line.id; toast('Deal masuk!', d.title + ' ada di ' + stageOf(d).name + '.');
     }
     App.modal = null; commit();
   },
   closing: (o) => {
     const m = App.modal; const d = findDeal(m.dealId); const err = {};
+    if (!d || d.status !== 'Open' || !canEditDeal(d)) { toast('Tidak ada akses', 'Deal ini berada di luar divisimu.', 'bad'); return; }
     if (!num(o.value)) err.value = 'Nilai deal wajib diisi buat Won.'; if (!o.closedAt) err.closedAt = 'Tanggal closing wajib diisi.';
     if (Object.keys(err).length) { m.err = err; m.value = o.value; m.closedAt = o.closedAt; m.still = true; render(); return; }
     const line = lineById(d.lineId); const from = stageOf(d);
     d.stageId = line.stages[line.stages.length - 1].id; d.status = 'Won'; d.value = num(o.value); d.closedAt = o.closedAt; d.reason = ''; d.lostReason = ''; d.reviewDate = '';
     dealLog(d, from ? from.name : '', stageOf(d).name, 'Won', 'Closing'); audit('Ubah', 'Deal', d.title + ' dari ' + (from ? from.name : '-') + ' ke Closing, Won');
+    promoteWonClient(d);
     App.modal = null; commit(); toast('Deal won. Keren!', d.title + (canSeeValue(d) ? ', ' + fmtRp(d.value) : '') + '.');
   },
   dstatus: (o) => {
-    const m = App.modal; const d = findDeal(m.dealId); const st = m.st; Object.assign(m, o);
+    const m = App.modal; const d = findDeal(m.dealId); const st = m.st; if (!d || !canEditDeal(d) || (st === 'reopen' ? !canReopen(d) : d.status !== 'Open')) return; Object.assign(m, o);
     if (st === 'Lost') { if (reqErr(m, o, ['lostReason'], { lostReason: 'Pilih alasan gagal.' })) return; d.status = 'Lost'; d.lostReason = o.lostReason; d.reason = o.reason || ''; d.closedAt = today(); d.reviewDate = ''; dealLog(d, '', (stageOf(d) || {}).name, 'Lost', o.lostReason + (o.reason ? ', ' + o.reason : '')); audit('Ubah', 'Deal', d.title + ' Lost: ' + o.lostReason); toast('Dicatat Lost', d.title + ' keluar dari papan aktif.', 'info'); }
     else if (st === 'On Hold') { if (reqErr(m, o, ['reason', 'reviewDate'], { reason: 'Isi alasannya.', reviewDate: 'Isi tanggal tinjau ulang.' })) return; if (o.reviewDate < today()) { m.err = { reviewDate: 'Tanggal tinjau ulang ga boleh lewat dari hari ini.' }; m.still = true; render(); return; } d.status = 'On Hold'; d.reason = o.reason; d.reviewDate = o.reviewDate; dealLog(d, '', (stageOf(d) || {}).name, 'On Hold', o.reason + ', tinjau ' + fmtShort(o.reviewDate)); audit('Ubah', 'Deal', d.title + ' On Hold sampai ' + o.reviewDate); toast('Ditunda dulu', 'Diingatkan lagi ' + fmtShort(o.reviewDate) + '.', 'info'); }
     else {
@@ -466,7 +476,7 @@ Object.assign(Forms, {
     audit('Gabung', 'Client & Partner', src.name + ' (' + src.code + ') digabung ke ' + keep.name + ' (' + keep.code + ')');
     App.modal = null; App.drawer = { id: keep.id }; commit(); toast('Digabung!', ni + ' interaksi dan ' + nd + ' deal pindah ke ' + keep.name + '.');
   },
-  view: (o) => { const m = App.modal; if (reqErr(m, o, ['name'], { name: 'Kasih nama tampilannya.' })) return; const ui = App.ui.cp; Store.db.views = Store.db.views || []; Store.db.views.push({ id: uid('v'), userId: me().id, name: o.name, filter: { cat: ui.cat, dept: ui.dept, q: ui.q, sort: ui.sort, arch: !!ui.arch } }); App.modal = null; commit(); toast('Tampilan disimpan', o.name + ' bisa dipakai kapan aja.'); },
+  view: (o) => { const m = App.modal; if (reqErr(m, o, ['name'], { name: 'Kasih nama tampilannya.' })) return; const ui = App.ui.cp; Store.db.views = Store.db.views || []; Store.db.views.push({ id: uid('v'), userId: me().id, name: o.name, filter: { cat: ui.cat, dept: ui.dept, service: ui.service || 'all', q: ui.q, sort: ui.sort, arch: !!ui.arch } }); App.modal = null; commit(); toast('Tampilan disimpan', o.name + ' bisa dipakai kapan aja.'); },
   override: (o) => {
     const m = App.modal; m.val = o; if (reqErr(m, o, ['userId', 'reason'], { userId: 'Pilih pengguna.', reason: 'Isi alasannya.' })) return;
     Store.db.overrides = (Store.db.overrides || []).filter(x => !(x.userId === o.userId && x.key === o.key));
