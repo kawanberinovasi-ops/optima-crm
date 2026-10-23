@@ -2,7 +2,7 @@
   "name": "optima-crm-client-preview",
   "version": "0.1.0",
   "private": true,
-  "description": "OPTIMA CRM: all modules enabled, with Lead lifecycle and division ownership",
+  "description": "OPTIMA CRM client presentation S-01–S-06: development login, roles, relationships, data management, follow-up and sales pipeline",
   "scripts": {
     "start": "npx --yes serve -l 5175 .",
     "test": "node --test tests/*.test.cjs"

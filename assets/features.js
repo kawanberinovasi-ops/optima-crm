@@ -193,7 +193,7 @@ const _mywork = Pages.mywork;
 Pages.mywork = function () {
   let html = _mywork();
   if (!can('deal', 'R')) return html;
-  const due = Store.db.deals.filter(d => canSeeDeal(d) && d.status === 'On Hold' && d.ownerId === me().id && d.reviewDate && dayDiff(d.reviewDate) <= 3).sort((a, b) => a.reviewDate.localeCompare(b.reviewDate));
+  const due = Store.db.deals.filter(d => d.status === 'On Hold' && d.ownerId === me().id && d.reviewDate && dayDiff(d.reviewDate) <= 3).sort((a, b) => a.reviewDate.localeCompare(b.reviewDate));
   if (!due.length) return html;
   const box = '<section class="card pad enter s4" aria-label="Deal On Hold" style="display:flex;flex-direction:column;gap:12px"><div class="sec-h"><div><span class="lbl">Tinjau ulang</span><h2 class="disp h2" style="font-size:30px">Deal On Hold kamu</h2></div><a href="#/pipeline" style="font-size:14px;font-weight:700">Pipeline</a></div>' +
     due.map(d => '<div class="lrow"><button type="button" data-a="opendeal" data-v="' + d.id + '" style="all:unset;cursor:pointer;flex:1 1 260px;min-width:0;display:flex;flex-direction:column"><strong>' + esc(d.title) + '</strong><span class="small" style="color:var(--ink2)">' + esc((recById(d.recordId) || {}).name || '') + ' · ' + esc(d.reason || '') + '</span></button>' + fuChip(d.reviewDate) + (canReopen(d) ? '<button type="button" class="btn btn-sm" data-a="reopen" data-v="' + d.id + '">Buka lagi</button>' : '') + '</div>').join('') + '</section>';
@@ -212,10 +212,10 @@ Pages.dashboard = function () {
   let rest = html.slice(cut);
   if (can('deal', 'R')) {
     const r = periodRange(ui.per, ui.val || periodOptions(ui.per)[0][0]);
-    const lost = Store.db.deals.filter(d => canSeeDeal(d) && d.status === 'Lost' && inRange(d.closedAt, r));
+    const lost = Store.db.deals.filter(d => d.status === 'Lost' && inRange(d.closedAt, r));
     const reasons = {}; lost.forEach(d => { const k = d.lostReason || 'Lainnya'; reasons[k] = (reasons[k] || 0) + 1; });
     const rs = Object.entries(reasons).sort((a, b) => b[1] - a[1]); const rmax = Math.max(1, ...rs.map(x => x[1]));
-    const sc = DEAL_STATUS.map(s => [s, Store.db.deals.filter(d => canSeeDeal(d) && d.status === s && (s === 'Open' || s === 'On Hold' || inRange(d.closedAt, r))).length]);
+    const sc = DEAL_STATUS.map(s => [s, Store.db.deals.filter(d => d.status === s && (s === 'Open' || s === 'On Hold' || inRange(d.closedAt, r))).length]);
     const extra = '<div class="row-f" style="align-items:stretch"><section class="card pad enter s6" style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:12px"><div><span class="lbl">Status deal</span><h2 class="disp h2" style="font-size:30px">Open, Won, Lost, On Hold</h2></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">' + sc.map(([s, n]) => '<div style="padding:14px;border-radius:18px;background:var(--bg);display:flex;justify-content:space-between;align-items:center">' + statusChip(s) + '<span class="disp num" style="font-size:32px;color:var(--p)">' + n + '</span></div>').join('') + '</div><span class="small muted">Won dan Lost dihitung di periode terpilih.</span></section>' +
       '<section class="card pad enter s7" style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:12px"><div><span class="lbl">Alasan gagal · ' + esc(perLabel(ui.per, ui.val)) + '</span><h2 class="disp h2" style="font-size:30px">Kenapa deal lepas</h2></div>' +
       (rs.length ? rs.map(([k, n]) => '<div style="display:grid;grid-template-columns:170px 1fr 30px;gap:10px;align-items:center"><span class="small" style="font-weight:600">' + esc(k) + '</span><div class="bar" style="height:14px"><i class="growx" style="width:' + (n / rmax * 100) + '%;background:linear-gradient(90deg,#C9343A,#E5484D)"></i></div><span class="num" style="font-weight:800;text-align:right">' + n + '</span></div>').join('') : '<p class="small muted" style="margin:0">Ga ada deal Lost di periode ini.</p>') + '</section></div>';
@@ -498,7 +498,7 @@ doImport = function () {
   created.r.forEach(id => { const r = recById(id); r.contacts = [{ id: uid('c'), name: r.contact || '', title: r.title || '', email: r.cEmail || '', phone: r.phone || '' }]; r.archived = false; });
   updated.forEach(u => { const r = recById(u.id); ensureRec(r); Object.assign(r.contacts[0], { name: r.contact, title: r.title, email: r.cEmail, phone: r.phone }); trackChange('record', r.id, 'Import', '', file, 'Data diperbarui dari import'); });
   created.i.forEach(id => { const i = Store.db.interactions.find(x => x.id === id); i.cancelled = false; });
-  created.d.forEach(id => { const d = findDeal(id); d.history = []; if (d.status === 'Won') promoteWonClient(d); if (d.status === 'Lost') { d.lostReason = optList('lostReasons').find(x => x.toLowerCase() === String(d.reason).toLowerCase()) || 'Lainnya'; } if (d.status === 'On Hold' && !d.reviewDate) d.reviewDate = addDays(14); dealLog(d, '', (stageOf(d) || {}).name, d.status, 'Dari import ' + file); });
+  created.d.forEach(id => { const d = findDeal(id); d.history = []; if (d.status === 'Lost') { d.lostReason = optList('lostReasons').find(x => x.toLowerCase() === String(d.reason).toLowerCase()) || 'Lainnya'; } if (d.status === 'On Hold' && !d.reviewDate) d.reviewDate = addDays(14); dealLog(d, '', (stageOf(d) || {}).name, d.status, 'Dari import ' + file); });
   Store.db.imports = Store.db.imports || [];
   Store.db.imports.unshift({ id: uid('im'), file, at: new Date().toISOString(), by: me().id, created, updated, undone: false });
   Store.save(); render();
