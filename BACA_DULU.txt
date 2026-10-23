@@ -1,6 +1,6 @@
-OPTIMA CRM — SEMUA MODUL AKTIF
+OPTIMA CRM — CLIENT PREVIEW S-01 SAMPAI S-06
 ===========================================
-Folder dan penyimpanan tetap terpisah dari salinan di Downloads.
+Mode presentasi di folder dan penyimpanan terpisah dari versi lengkap.
 
 AKTIF:
 S-01 Login pengembangan: halaman login ditampilkan kembali, menggunakan
@@ -22,15 +22,16 @@ Langsung Client & Partner. Logo juga mengarah ke Client & Partner.
 Semua menu masih tampil normal, tanpa gembok atau warna pudar.
 Warna tema bisa diganti lewat menu profil, dan tersimpan di browser ini.
 
-MODUL TAMBAHAN AKTIF:
-- My Work: follow-up dan ringkasan pekerjaan pribadi.
-- Dashboard Pipeline dan Dashboard CRM (S-07).
-- Import/export Excel, unduh template, preview dan batalkan import (S-08).
-- Audit log, ekspor CSV, serta riwayat perubahan data (S-09).
-- Daftar pilihan admin, reset data contoh dan simulasi sesi.
-Tidak ada pembatasan modul presentasi. Hak tindakan dan data tetap mengikuti
-role/divisi. Reset data tetap meminta konfirmasi dan tidak dijalankan otomatis.
-Pengaktifan modul bukan bukti penyelesaian UAT, training, atau integrasi produksi.
+TETAP TERLIHAT, TETAPI KLIK TIDAK MENJALANKAN AKSI:
+- My Work (halaman gabungan yang juga berisi statistik di luar S-06).
+- Dashboard (S-07).
+- Import/export Excel termasuk unduh template dan drag/drop file (S-08).
+  Panel ini tidak ditampilkan di area kerja.
+- Audit log dan catatan aktivitas (S-09). Riwayat perubahan detail tidak ditampilkan.
+- Reset data dan simulasi sesi.
+
+Tampilan UI/UX yang sudah selesai tetap dipertahankan. Pembatasan ini
+bukan bukti penyelesaian S-10, UAT, training, atau serah terima.
 
 JALANKAN:
 Mac/Linux: bash start.sh

@@ -206,3 +206,8 @@ body{font-size:15px;background:radial-gradient(ellipse at 10% 0%,rgba(var(--p-rg
 .scrim:has(>[data-form="profile"]){padding-top:32px}
 [data-form="profile"]{max-height:calc(100svh - 64px);overflow-y:auto}
 @media(max-width:640px){.scrim:has(>[data-form="profile"]){padding-top:24px}}
+
+/* Client preview keeps the original visual styling. Inactive actions are intercepted in JavaScript. */
+
+/* Future-scope content stays in the independent source but is omitted from the S-01–S-05 presentation. */
+.preview-outside-scope{display:none!important}
