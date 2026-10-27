@@ -1,6 +1,6 @@
-# OPTIMA CRM — Client Preview
+# OPTIMA CRM
 
-Prototipe presentasi OPTIMA CRM dengan cakupan S-01 sampai S-06. Folder dan penyimpanan browser terpisah dari aplikasi lengkap.
+Prototipe OPTIMA CRM dengan seluruh modul yang tersedia diaktifkan. Folder dan penyimpanan browser tetap terpisah dari salinan di Downloads.
 
 ## Menjalankan secara lokal
 
@@ -14,7 +14,7 @@ Buka **http://127.0.0.1:5175/** di Safari atau browser lain. Biarkan server berj
 
 Alternatif: `bash start.sh` pada macOS/Linux atau `start.bat` pada Windows. Dengan Node.js, tersedia `npm start`.
 
-## Cakupan presentasi
+## Modul aktif
 
 - **S-01:** halaman login menggunakan akun pengembangan. SSO masih simulasi lokal.
 - **S-02:** pengguna, department, role, aktivasi akun, hak akses, pengecualian per pengguna, dan edit profil sendiri.
@@ -22,9 +22,12 @@ Alternatif: `bash start.sh` pada macOS/Linux atau `start.bat` pada Windows. Deng
 - **S-04:** pencarian, filter, segmen, PIC, validasi, pemeriksaan duplikasi, penggabungan, arsip, dan pemulihan data.
 - **S-05:** interaksi, hasil komunikasi, langkah berikutnya, dan follow-up.
 - **S-06:** Pipeline, deal, stage, PIC, layanan, penawaran, target closing, Won, Lost, dan On Hold.
-- Pilihan warna tema melalui menu profil.
+- **S-07:** My Work, Dashboard pipeline, dan Dashboard CRM.
+- **S-08:** import/export Excel, unduh template, preview import, serta pembatalan batch import.
+- **S-09:** riwayat perubahan data dan audit log.
+- Daftar pilihan admin, edit profil, serta pilihan warna tema melalui menu profil.
 
-Setelah login, aplikasi membuka Client & Partner. My Work dan Dashboard tetap terlihat normal, tetapi tidak menjalankan aksi saat diklik. Import/export dan audit log tidak diaktifkan pada presentasi ini. Sumber modul lengkap dipertahankan.
+Setelah login, aplikasi membuka Client & Partner. Semua menu dapat digunakan sesuai role dan divisi pengguna. Tidak ada pembatasan modul khusus presentasi. Pengaktifan modul bukan bukti penyelesaian UAT, training, atau integrasi produksi.
 
 ## Penyimpanan dan batas prototipe
 

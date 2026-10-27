@@ -1,11 +1,11 @@
-/* S-01–S-06 presentation scope. Independent from the complete application. */
+/* All existing modules enabled. Storage remains independent from the Downloads copy. */
 const CLIENT_PREVIEW = Object.freeze({
-  scope: ['S-01','S-02','S-03','S-04','S-05','S-06'],
+  scope: ['S-01','S-02','S-03','S-04','S-05','S-06','S-07','S-08','S-09'],
   showLogin: true,
-  routes: ['cp','pipeline','akses'],
+  routes: ['mywork','dashboard','cp','pipeline','akses'],
   authRoutes: ['login','expired'],
   defaultRoute: 'cp',
-  adminTabs: ['users','dept','services','access','override']
+  adminTabs: ['users','dept','services','access','override','options','changes','audit']
 });
 function ensurePreviewAccount() {
   if (CLIENT_PREVIEW.showLogin) return;
