@@ -140,7 +140,7 @@ const Store = {
 };
 
 const me = () => Store.db.users.find(u => u.id === Store.db.session) || null;
-const userById = (id) => Store.db.users.find(u => u.id === id);
+const userById = (id) => Store.db.users.find(u => u.id === id) || (() => { const t = (Store.db.trash || []).find(x => x.kind === 'user' && x.data.item.id === id); return t ? { ...t.data.item, active: false, deleted: true } : undefined; })();
 const recById = (id) => Store.db.records.find(r => r.id === id);
 const lineById = (id) => Store.db.lines.find(l => l.id === id);
 const stageOf = (deal) => { const l = lineById(deal.lineId); return l && l.stages.find(s => s.id === deal.stageId); };

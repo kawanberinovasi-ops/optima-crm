@@ -61,8 +61,8 @@ function migrateWorkflow(db) {
     if (u.email === 'ayu@contoh.test' && u.dept === 'Customer Service') u.dept = 'Creative & Media';
     if (u.email === 'dimas@contoh.test' && u.dept === 'Customer Service') u.dept = 'CampusNet';
   });
-  if (!db.users.some(u => u.dept === 'DietPartner' && u.active)) db.users.push({ id: 'demo-dietpartner', name: 'Tim DietPartner', email: 'dietpartner@contoh.test', dept: 'DietPartner', role: 'Kepala Department', active: true });
-  if (!db.users.some(u => u.dept === 'Digital Campaign' && u.role === 'Kepala Department')) db.users.push({ id: 'demo-digital-lead', name: 'Kepala Digital Campaign', email: 'kepala.digital@contoh.test', dept: 'Digital Campaign', role: 'Kepala Department', active: true });
+  if (!db.users.some(u => u.dept === 'DietPartner' && u.active)) db.users.push({ id: 'demo-dietpartner', name: 'Aulia Maharani', email: 'dietpartner@contoh.test', dept: 'DietPartner', role: 'Kepala Department', active: true });
+  if (!db.users.some(u => u.dept === 'Digital Campaign' && u.role === 'Kepala Department')) db.users.push({ id: 'demo-digital-lead', name: 'Naufal Ramadhan', email: 'kepala.digital@contoh.test', dept: 'Digital Campaign', role: 'Kepala Department', active: true });
   db.access = db.access || {};
   db.departments.forEach(d => { db.access[d.name] = defaultDivisionAccess(d.name); });
   db.lines.forEach(l => { if (!l.dept) l.legacy = true; });
@@ -132,5 +132,13 @@ function transferRecord(r, targetUser, reason) {
   audit('Serah terima', 'Lead & Client', r.name + ': ' + from.dept + ' ke ' + r.dept + ', PIC ' + targetUser.name + ': ' + reason);
   notify(targetUser.id, me().name + ' menyerahkan ' + r.name + ' ke kamu', 'rec:' + r.id);
 }
+function normalizeDemoNames(db) {
+  let changed = false;
+  for (const [id, email, oldName, name] of [['demo-digital-lead','kepala.digital@contoh.test','Kepala Digital Campaign','Naufal Ramadhan'],['demo-dietpartner','dietpartner@contoh.test','Tim DietPartner','Aulia Maharani']]) {
+    const user = db.users.find(u => u.id === id && u.email === email && u.name === oldName);
+    if (user) { user.name = name; changed = true; }
+  }
+  return changed;
+}
 const loadBeforeWorkflow = Store.load.bind(Store);
-Store.load = function () { loadBeforeWorkflow(); if (migrateWorkflow(this.db)) this.save(); };
+Store.load = function () { loadBeforeWorkflow(); const changed = migrateWorkflow(this.db); if (normalizeDemoNames(this.db) || changed) this.save(); };
