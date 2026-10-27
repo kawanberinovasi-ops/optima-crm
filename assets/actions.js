@@ -342,23 +342,27 @@ function parseWorkbook(wb) {
   R.slice(0, 2000).forEach(o => {
     if (o['kode sumber'] === 'CP-0001' && o['nama'] === 'PT Contoh Sejahtera') { out.skippedExample = true; return; }
     const row = 'Sheet 7 baris ' + o._row + ': ';
-    const cat = CATS.find(c => c.toLowerCase() === (o['kategori'] || '').toLowerCase());
-    const pic = uByEmail(o['email pic']); const dept = Store.db.departments.find(d => d.name.toLowerCase() === (o['department pemilik'] || '').toLowerCase());
+    const ex = Store.db.records.find(r => r.code === o['kode sumber']);
+    const legacyService = { 'kol/koc':'kol', kol:'kol', community:'community', media:'media', 'digital campaign':'digital-campaign' }[(o['kategori'] || '').toLowerCase()];
+    const requestedCat = o['kategori'] || 'Lead';
+    const cat = CATS.find(c => c.toLowerCase() === requestedCat.toLowerCase()) || (legacyService ? 'Lead' : '');
+    const service = (Store.db.services || []).find(x => [x.name.toLowerCase(), x.id].includes((o['layanan'] || legacyService || '').toLowerCase()));
+    const pic = ex ? userById(ex.picId) : me();
+    const dept = Store.db.departments.find(d => d.name === (ex ? ex.dept : me().dept));
     if (!o['kode sumber'] || !o['nama']) return out.errors.push(row + 'Kode sumber dan Nama wajib diisi.');
     if (codes[o['kode sumber']]) return out.errors.push(row + 'Kode sumber ' + o['kode sumber'] + ' dobel di file.');
     if (!cat) return out.errors.push(row + 'Kategori "' + (o['kategori'] || '') + '" ga dikenal.');
     if (!pic) return out.errors.push(row + 'Email PIC "' + (o['email pic'] || '') + '" belum terdaftar di CRM.');
     if (!dept) return out.errors.push(row + 'Department "' + (o['department pemilik'] || '') + '" belum ada.');
     if (!can(catEnt(cat), 'C')) return out.errors.push(row + 'Akun ini ga boleh menambah kategori ' + cat + '.');
-    const ex = Store.db.records.find(r => r.code === o['kode sumber']);
     if (ex && !canEditRec(ex)) return out.errors.push(row + 'Data ' + ex.name + ' udah ada dan akun ini ga boleh mengubahnya.');
     codes[o['kode sumber']] = true;
-    out.records.push({ isNew: !ex, ex, data: { code: o['kode sumber'], name: o['nama'], cat, segment: o['segmen'] || '', picId: pic.id, dept: dept.name, source: optList('sources').includes(o['sumber']) ? o['sumber'] : (o['sumber'] || 'Lainnya'), contact: o['nama kontak utama'] || '', title: o['jabatan kontak'] || '', cEmail: o['email kontak'] || '', phone: o['telepon kontak'] || '', city: o['kota'] || '', rate: num(o['rate card (kol/koc)']), note: o['catatan'] || '' } });
+    out.records.push({ isNew: !ex, ex, data: { code: o['kode sumber'], name: o['nama'], cat: ex ? ex.cat : 'Lead', serviceId: service ? service.id : (ex ? ex.serviceId : ''), service: service ? service.name : (ex ? ex.service : ''), segment: o['segmen'] || '', picId: pic.id, dept: dept.name, source: optList('sources').includes(o['sumber']) ? o['sumber'] : (o['sumber'] || 'Lainnya'), contact: o['nama kontak utama'] || '', title: o['jabatan kontak'] || '', cEmail: o['email kontak'] || '', phone: o['telepon kontak'] || '', city: o['kota'] || '', rate: num(o['rate card (kol/koc)']), note: o['catatan'] || '' } });
   });
-  const recByCode = (c) => codes[c] ? { code: c } : Store.db.records.find(r => r.code === c);
+  const recByCode = c => (out.records.find(x => x.data.code === c) || {}).data || Store.db.records.find(r => r.code === c && canSeeRec(r));
   (sheetRows(wb, '8', 'kode sumber') || []).forEach(o => {
     if (o['kode sumber'] === 'INT-0001' && o['kode client & partner'] === 'CP-0001') { out.skippedExample = true; return; }
-    const row = 'Sheet 8 baris ' + o._row + ': '; const by = uByEmail(o['email pencatat']);
+    const row = 'Sheet 8 baris ' + o._row + ': '; const by = o['email pencatat'] ? uByEmail(o['email pencatat']) : me();
     if (!o['kode sumber'] || !o['kode client & partner'] || !o['hasil pembicaraan']) return out.errors.push(row + 'Kode, kode Client & Partner, dan hasil wajib diisi.');
     if (!recByCode(o['kode client & partner'])) return out.errors.push(row + 'Kode Client & Partner ' + o['kode client & partner'] + ' ga ketemu.');
     if (!by) return out.errors.push(row + 'Email pencatat belum terdaftar.');
@@ -368,16 +372,18 @@ function parseWorkbook(wb) {
   });
   (sheetRows(wb, '9', 'kode sumber') || []).forEach(o => {
     if (o['kode sumber'] === 'DL-0001' && o['kode client & partner'] === 'CP-0001') { out.skippedExample = true; return; }
-    const row = 'Sheet 9 baris ' + o._row + ': '; const owner = uByEmail(o['email pic']);
-    const line = Store.db.lines.find(l => l.name.toLowerCase() === (o['lini bisnis'] || '').toLowerCase());
+    const row = 'Sheet 9 baris ' + o._row + ': ';
+    const rec = recByCode(o['kode client & partner']);
+    const owner = o['email pic'] ? uByEmail(o['email pic']) : rec && userById(rec.picId);
+    const line = Store.db.lines.find(l => !l.legacy && l.dept === (rec || {}).dept && (!o['lini bisnis'] || l.name.toLowerCase() === o['lini bisnis'].toLowerCase()));
     const status = DEAL_STATUS.find(s => s.toLowerCase() === (o['status'] || '').toLowerCase());
     if (!o['kode sumber'] || !o['kode client & partner']) return out.errors.push(row + 'Kode wajib diisi.');
     if (!recByCode(o['kode client & partner'])) return out.errors.push(row + 'Kode Client & Partner ' + o['kode client & partner'] + ' ga ketemu.');
     if (!line) return out.errors.push(row + 'Lini bisnis "' + (o['lini bisnis'] || '') + '" belum ada.');
     if (!status) return out.errors.push(row + 'Status harus Open, Won, Lost, atau On Hold.');
-    if (!owner) return out.errors.push(row + 'Email PIC belum terdaftar.');
+    if (!owner || !owner.active || owner.dept !== rec.dept) return out.errors.push(row + 'PIC harus aktif dan berasal dari divisi pemilik relasi.');
     if (!can('deal', 'C')) return out.errors.push(row + 'Akun ini ga boleh menambah deal.');
-    let stage = line.stages.find(s => s.name.toLowerCase() === (o['stage'] || '').toLowerCase());
+    let stage = o['stage'] ? line.stages.find(s => s.name.toLowerCase() === o['stage'].toLowerCase()) : line.stages[0];
     if (status === 'Won' || status === 'Lost') stage = line.stages[line.stages.length - 1];
     if (!stage) return out.errors.push(row + 'Stage "' + (o['stage'] || '') + '" ga ada di ' + line.name + '.');
     if (status === 'Won' && (!num(o['nilai deal (rp)']) || !normDate(o['tanggal closing']))) return out.errors.push(row + 'Deal Won wajib ada nilai deal dan tanggal closing.');
@@ -389,7 +395,7 @@ function parseWorkbook(wb) {
 }
 function doImport() {
   const m = App.modal; const p = m.parsed; let n = 0;
-  p.records.forEach(x => { if (x.ex) Object.assign(x.ex, x.data, { updatedAt: today() }); else Store.db.records.push(Object.assign({ id: uid('r'), createdAt: today(), updatedAt: today() }, x.data)); n++; });
+  p.records.forEach(x => { if (x.ex) Object.assign(x.ex, x.data, { updatedAt: today() }); else Store.db.records.push(Object.assign({ id: uid('r'), createdAt: today(), updatedAt: today(), createdBy: me().id, createdByName: me().name }, x.data)); n++; });
   const idOf = (code) => (Store.db.records.find(r => r.code === code) || {}).id;
   p.ints.forEach(x => { Store.db.interactions.push({ id: uid('i'), code: x.code, recordId: idOf(x.recCode), type: x.type, date: x.date, result: x.result, next: x.next, fuDate: x.fuDate, done: false, by: x.by }); n++; });
   p.deals.forEach(x => { Store.db.deals.push({ id: uid('dl'), code: x.code, title: x.title, recordId: idOf(x.recCode), lineId: x.lineId, stageId: x.stageId, status: x.status, offer: x.offer, value: x.status === 'Won' ? x.value : '', ownerId: x.ownerId, target: x.target, closedAt: x.closedAt, reason: x.reason, service: x.service, createdAt: today() }); n++; });
@@ -401,7 +407,7 @@ function exportXlsx() {
   const recs = (App.route === 'cp' ? cpFiltered().list.map(x => x.r) : Store.db.records.filter(canSeeRec));
   const ids = new Set(recs.map(r => r.id)); const seeRate = canSeeRate();
   const wb = XLSX.utils.book_new();
-  const s7 = [['Kode sumber *', 'Nama *', 'Kategori *', 'Segmen', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan']].concat(recs.map(r => [r.code, r.name, r.cat, r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate ? r.rate : '', r.note]));
+  const s7 = [['Kode sumber *', 'Nama *', 'Kategori *', 'Segmen', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan', 'Layanan']].concat(recs.map(r => [r.code, r.name, r.cat, r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate ? r.rate : '', r.note, serviceName(r.serviceId)]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s7), '7 Data Client & Partner');
   if (can('interaksi', 'R')) { const s8 = [['Kode sumber *', 'Kode Client & Partner *', 'Tanggal *', 'Jenis *', 'Hasil pembicaraan *', 'Langkah berikutnya', 'Tanggal follow-up', 'Email pencatat *', 'Catatan']].concat(Store.db.interactions.filter(i => ids.has(i.recordId)).map(i => [i.code, (recById(i.recordId) || {}).code, i.date, i.type, i.result, i.next, i.fuDate, (userById(i.by) || {}).email || '', i.done ? 'Follow-up selesai' : ''])); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s8), '8 Data Interaksi'); }
   if (can('deal', 'R')) { const s9 = [['Kode sumber *', 'Kode Client & Partner *', 'Lini bisnis *', 'Stage *', 'Status *', 'Layanan', 'Nilai penawaran (Rp)', 'Nilai deal (Rp)', 'Target closing', 'Tanggal closing', 'Alasan Lost / On Hold', 'Email PIC *', 'Catatan']].concat(Store.db.deals.filter(d => ids.has(d.recordId)).map(d => [d.code, (recById(d.recordId) || {}).code, (lineById(d.lineId) || {}).name, (stageOf(d) || {}).name, d.status, d.service || d.title, canSeeValue(d) ? d.offer : '', canSeeValue(d) ? d.value : '', d.target, d.closedAt, d.reason, (userById(d.ownerId) || {}).email || '', ''])); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s9), '9 Data Deal'); }
