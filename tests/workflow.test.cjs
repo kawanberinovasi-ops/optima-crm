@@ -12,7 +12,7 @@ function app() {
   const document = { activeElement: null, documentElement: node(), body: node(), addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; }, createElement: node, getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); } };
   const context = vm.createContext({ console, document, location: { hash: '#/login', hostname: '127.0.0.1' }, history: { replaceState() {} }, window: { addEventListener() {}, scrollTo() {} }, localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v) }, setTimeout() { return 0; }, clearTimeout() {}, setInterval() { return 0; }, matchMedia: () => ({ matches: true }), URLSearchParams, Date, Math, Intl, performance: { now: () => 0 }, requestAnimationFrame() {}, FormData: class {} });
   const root = path.join(__dirname, '..', 'assets');
-  for (const file of ['data.js','optima-workflow.js','optima-preview-config.js','ui.js','pages.js','actions.js','features.js','optima-profile.js','optima-workflow-ui.js','optima-preview.js']) vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, { filename: file });
+  for (const file of ['data.js','optima-workflow.js','optima-preview-config.js','ui.js','pages.js','actions.js','features.js','optima-profile.js','optima-workflow-ui.js','optima-management.js','optima-preview.js']) vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, { filename: file });
   vm.runInContext("render = () => {}; toast = () => {};", context);
   return code => vm.runInContext(code, context);
 }
@@ -152,4 +152,93 @@ test('Excel rejects deal or interaction references outside the active division',
   assert.equal(run('p.ints.length'), 0);
   assert.equal(run('p.deals.length'), 0);
   assert.equal(run('p.errors.length'), 2);
+});
+
+test('record deletion is confirmed and restores the record, deals and interactions together', () => {
+  const run = app();
+  run("Store.db.session='u1'; const r=Store.db.records.find(r=>Store.db.deals.some(d=>d.recordId===r.id)&&Store.db.interactions.some(i=>i.recordId===r.id)); const snapshot=JSON.stringify([r,Store.db.deals.filter(d=>d.recordId===r.id),Store.db.interactions.filter(i=>i.recordId===r.id)]); Actions.removerec({dataset:{v:r.id}});");
+  assert.equal(run('!!recById(r.id)'), true);
+  assert.equal(run('App.modal.ok'), 'Hapus');
+  run('Actions.confirmok();');
+  assert.equal(run('!!recById(r.id)'), false);
+  assert.equal(run('Store.db.deals.some(d=>d.recordId===r.id)||Store.db.interactions.some(i=>i.recordId===r.id)'), false);
+  run('Actions.restoretrash({dataset:{v:Store.db.trash[0].id}}); Actions.confirmok();');
+  assert.equal(run('JSON.stringify([recById(r.id),Store.db.deals.filter(d=>d.recordId===r.id),Store.db.interactions.filter(i=>i.recordId===r.id)])===snapshot'), true);
+});
+test('deletion rechecks the actor and division permission when confirmation is submitted', () => {
+  const run = app();
+  run("Store.db.session='u1'; const r=Store.db.records.find(r=>r.dept==='Creative & Media'); Actions.removerec({dataset:{v:r.id}}); const pending=App.modal.fn; Store.db.session='u5'; pending();");
+  assert.equal(run('!!recById(r.id)'), true);
+  run('App.modal=null; Actions.removerec({dataset:{v:r.id}});');
+  assert.equal(run('App.modal'), null);
+  run("Store.db.session='u1'; Actions.removerec({dataset:{v:r.id}}); Actions.confirmok(); const tid=Store.db.trash[0].id; Store.db.session='u5'; App.modal=null; Actions.restoretrash({dataset:{v:tid}});");
+  assert.equal(run('App.modal'), null);
+  assert.equal(run('!!recById(r.id)'), false);
+});
+test('used lines, stages and services are protected; unused configuration can be recovered', () => {
+  const run = app();
+  run("Store.db.session='u1'; const line=Store.db.lines.find(l=>Store.db.deals.some(d=>d.lineId===l.id)); Actions.delline({dataset:{v:line.id}});");
+  assert.equal(run('App.modal.ok'), 'Mengerti');
+  run("Actions.confirmok(); const used=Store.db.deals.find(d=>d.lineId===line.id); Actions.delstage({dataset:{v:used.stageId}});");
+  assert.equal(run('App.modal.ok'), 'Mengerti');
+  run("Actions.confirmok(); Actions.delstage({dataset:{v:line.stages.at(-1).id}});");
+  assert.equal(run('App.modal.ok'), 'Mengerti');
+  run("Actions.confirmok(); const unused={id:'qa-stage',name:'QA kosong'}; line.stages.splice(1,0,unused); Actions.delstage({dataset:{v:unused.id}}); Actions.confirmok();");
+  assert.equal(run("line.stages.some(s=>s.id==='qa-stage')"), false);
+  run('Actions.restoretrash({dataset:{v:Store.db.trash[0].id}}); Actions.confirmok();');
+  assert.equal(run('line.stages[1].id'), 'qa-stage');
+  assert.equal(run('isClosingStage(line,line.stages.at(-1).id)'), true);
+  run("const svc=Store.db.services.find(s=>Store.db.records.some(r=>r.serviceId===s.id)); Actions['workflow-delete-service']({dataset:{v:svc.id}});");
+  assert.equal(run('App.modal.ok'), 'Mengerti');
+  run("Actions.confirmok(); Store.db.services.push({id:'qa-svc',name:'QA layanan',dept:'Executive'}); Actions['workflow-delete-service']({dataset:{v:'qa-svc'}}); const pending=App.modal.fn; Store.db.records[0].serviceId='qa-svc'; pending();");
+  assert.equal(run("!!serviceById('qa-svc')"), true);
+  run("Store.db.records[0].serviceId=svc.id; Actions['workflow-delete-service']({dataset:{v:'qa-svc'}}); Actions.confirmok(); Actions.restoretrash({dataset:{v:Store.db.trash[0].id}}); Actions.confirmok();");
+  assert.equal(run("!!serviceById('qa-svc')"), true);
+  run("Store.db.lines.push({id:'qa-line',name:'QA lini',dept:'Executive',stages:[{id:'qas1',name:'Lead'},{id:'qas2',name:'Closing'}]}); Actions.delline({dataset:{v:'qa-line'}}); Actions.confirmok();");
+  assert.equal(run("!!lineById('qa-line')"), false);
+  run('Actions.restoretrash({dataset:{v:Store.db.trash[0].id}}); Actions.confirmok();');
+  assert.equal(run("lineById('qa-line').stages.length"), 2);
+});
+test('department deletion blocks assignments and recovers empty pipelines and access rules', () => {
+  const run = app();
+  run("Store.db.session='u1'; Actions.deldept({dataset:{v:Store.db.departments.find(d=>d.name==='Digital Campaign').id}});");
+  assert.equal(run('App.modal.ok'), 'Mengerti');
+  run("Actions.confirmok(); Store.db.departments.push({id:'qa-dept',name:'QA Department'}); Store.db.access['QA Department']={lead:'C'}; Store.db.lines.push({id:'qa-line',name:'QA pipeline',dept:'QA Department',stages:[{id:'qas1',name:'Lead'},{id:'qas2',name:'Closing'}]}); Actions.deldept({dataset:{v:'qa-dept'}}); Actions.confirmok();");
+  assert.equal(run("Store.db.departments.some(d=>d.id==='qa-dept')||!!lineById('qa-line')||!!Store.db.access['QA Department']"), false);
+  run('Actions.restoretrash({dataset:{v:Store.db.trash[0].id}}); Actions.confirmok();');
+  assert.equal(run("Store.db.access['QA Department'].lead"), 'C');
+  assert.equal(run("lineById('qa-line').dept"), 'QA Department');
+});
+test('users with active assignments and the current account are protected; recovery keeps accounts inactive', () => {
+  const run = app();
+  run("Store.db.session='u1'; Actions.deluser({dataset:{v:'u1'}});");
+  assert.equal(run('App.modal.ok'), 'Mengerti');
+  run("Actions.confirmok(); Actions.deluser({dataset:{v:'u5'}});");
+  assert.equal(run('App.modal.ok'), 'Mengerti');
+  run("Actions.confirmok(); Store.db.users.push({id:'qa-user',name:'QA User',email:'qa@contoh.test',aliases:[],dept:'Executive',role:'Staf',active:true}); Store.db.overrides.push({id:'qa-ov',userId:'qa-user',key:'lead',value:'R'}); Store.db.audit.push({id:'qa-history',by:'qa-user',action:'Uji'}); Actions.deluser({dataset:{v:'qa-user'}}); Actions.confirmok();");
+  assert.equal(run("Store.db.users.some(u=>u.id==='qa-user')||Store.db.overrides.some(o=>o.userId==='qa-user')"), false);
+  assert.equal(run("userById('qa-user').name"), 'QA User');
+  run("Actions.switch({dataset:{v:'qa-user'}});");
+  assert.equal(run('me().id'), 'u1');
+  run('Actions.restoretrash({dataset:{v:Store.db.trash[0].id}}); Actions.confirmok();');
+  assert.equal(run("userById('qa-user').active"), false);
+  assert.equal(run("Store.db.overrides.some(o=>o.id==='qa-ov')"), true);
+});
+test('exceptions require confirmation and can be restored without duplicate rules', () => {
+  const run = app();
+  run("Store.db.session='u1'; Store.db.overrides.push({id:'qa-ov',userId:'u5',key:'lead',value:'R'}); Actions.ovdel({dataset:{v:'qa-ov'}});");
+  assert.equal(run("Store.db.overrides.some(o=>o.id==='qa-ov')"), true);
+  run('Actions.confirmok();');
+  assert.equal(run("Store.db.overrides.some(o=>o.id==='qa-ov')"), false);
+  run("Store.db.overrides.push({id:'qa-new',userId:'u5',key:'lead',value:'C'}); App.modal=null; Actions.restoretrash({dataset:{v:Store.db.trash[0].id}});");
+  assert.equal(run('App.modal'), null);
+  assert.equal(run('Store.db.trash.length'), 1);
+});
+test('greeting uses the full account name and demo cleanup preserves custom names', () => {
+  const run = app();
+  run("Store.db.session='demo-digital-lead';");
+  assert.equal(run('me().name'), 'Naufal Ramadhan');
+  assert.equal(run('Pages.mywork().includes("Naufal Ramadhan")'), true);
+  run("me().name='Nama Pilihan Pengguna'; normalizeDemoNames(Store.db);");
+  assert.equal(run('me().name'), 'Nama Pilihan Pengguna');
 });
