@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Enums\AccessLevel;
 use App\Enums\DealStatus;
-use App\Enums\Role;
 use App\Models\ClientPartner;
 use App\Models\Deal;
 use App\Models\Interaction;
@@ -72,10 +71,10 @@ class InteractionController extends Controller
 
             if ($dealId === 'new') {
                 abort_unless($this->access->can($me, 'deal', AccessLevel::C), 403, 'Kamu ga punya izin menambah deal.');
-                $pipeline = $this->deals->pipelineFor($record->department_id);
-                $stage = isset($data['toStage']) ? Stage::find($data['toStage']) : null;
-                $owner = $me->department_id === $record->department_id && $me->role !== Role::Viewer ? $me : $record->pic;
+                $owner = $record->pic;
                 $this->deals->assertOwner($owner, $record, 'dealTitle');
+                $pipeline = $this->deals->pipelineFor($owner, isset($data['lineId']) ? (int) $data['lineId'] : null);
+                $stage = isset($data['toStage']) ? Stage::find($data['toStage']) : null;
                 $deal = $this->deals->create($me, $record, $pipeline, $stage, [
                     'title' => trim($data['dealTitle']), 'owner_id' => $owner->id, 'target_closing' => today()->addDays(30),
                 ], 'Deal dibuat dari catat interaksi');

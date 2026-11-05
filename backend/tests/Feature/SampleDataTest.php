@@ -11,6 +11,7 @@ use App\Models\Pipeline;
 use App\Models\Service;
 use App\Models\Stage;
 use App\Models\User;
+use App\Services\Access;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -29,7 +30,8 @@ class SampleDataTest extends TestCase
     public function test_sample_data_matches_prototype(): void
     {
         $this->assertSame(9, User::count());
-        $this->assertSame(19, ClientPartner::count());
+        $this->assertSame(21, ClientPartner::count());
+        $this->assertSame(2, ClientPartner::where('category', 'Partner')->count(), 'contoh Partner');
         $this->assertSame(14, Interaction::count());
         $this->assertSame(25, Deal::count());
     }
@@ -43,12 +45,15 @@ class SampleDataTest extends TestCase
 
     public function test_matches_client_preview_structure(): void
     {
-        // Pratinjau klien (22 Okt 2026): Commercial dilebur ke CS, satu pipeline per divisi, deal ikut divisi relasinya.
+        // Commercial dilebur ke CS (22 Okt). Revisi 5 Nov: pipeline Sales dan Campaign, deal di pipeline yang dipakai PIC-nya.
         $this->assertFalse(Department::where('name', 'Commercial')->exists());
-        $this->assertSame(Department::count(), Pipeline::whereNotNull('department_id')->count());
+        $this->assertSame(['Sales', 'Campaign'], Pipeline::orderBy('position')->pluck('name')->all());
+        $this->assertSame(['Digital Campaign'], Pipeline::where('name', 'Campaign')->first()->departments()->pluck('name')->all());
+        $this->assertSame(Department::count() - 1, Pipeline::where('name', 'Sales')->first()->departments()->count());
         $this->assertSame(['KOL', 'Community', 'Media', 'Digital Campaign', 'CampusNet', 'DietPartner'], Service::orderBy('position')->pluck('name')->all());
+        $access = app(Access::class);
         foreach (Deal::with('pipeline', 'clientPartner', 'owner')->get() as $deal) {
-            $this->assertSame($deal->clientPartner->department_id, $deal->pipeline->department_id, $deal->code);
+            $this->assertContains($deal->pipeline_id, $access->pipelineIds($deal->clientPartner->pic), $deal->code);
             $this->assertSame($deal->clientPartner->department_id, $deal->owner->department_id, $deal->code.' PIC deal dari divisi relasi');
         }
         $this->assertSame(['Client', 'CampusNet', 'CampusNet', 'dimas@contoh.test'], (fn ($r) => [$r->category->value, $r->service->name, $r->department->name, $r->pic->email])(ClientPartner::where('code', 'CP-0001')->first()));

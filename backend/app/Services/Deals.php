@@ -7,12 +7,10 @@ use App\Enums\DealStatus;
 use App\Enums\Role;
 use App\Models\ClientPartner;
 use App\Models\Deal;
-use App\Models\Department;
 use App\Models\Pipeline;
 use App\Models\Stage;
 use App\Models\User;
 use App\Support\Codes;
-use App\Support\DivisionDefaults;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +24,7 @@ class Deals
 {
     public const ENTITY = 'Deal';
 
-    public function __construct(private Audit $audit) {}
+    public function __construct(private Audit $audit, private Access $access) {}
 
     public function create(User $by, ClientPartner $record, Pipeline $pipeline, ?Stage $stage, array $attrs, string $note = 'Deal dibuat'): Deal
     {
@@ -47,38 +45,29 @@ class Deals
         });
     }
 
-    /** Pipeline divisi (satu per divisi). Dibuat dengan stage standar kalau divisi itu belum punya. */
-    public function pipelineFor(int $departmentId): Pipeline
+    /**
+     * Pipeline untuk deal milik pengguna ini: yang diminta kalau pengguna itu memakainya, kalau tidak pipeline pertamanya.
+     * Pengguna tanpa pipeline jatuh ke pipeline pertama (Sales).
+     */
+    public function pipelineFor(User $owner, ?int $wanted = null): Pipeline
     {
-        $pipeline = Pipeline::where('department_id', $departmentId)->whereNull('archived_at')->orderBy('position')->first();
-        if ($pipeline) {
-            return $pipeline;
-        }
-        $dept = Department::findOrFail($departmentId);
+        $ids = $this->access->pipelineIds($owner);
+        $id = $wanted && in_array($wanted, $ids, true) ? $wanted : ($ids[0] ?? null);
 
-        return DB::transaction(function () use ($dept) {
-            $name = Pipeline::where('name', $dept->name)->exists() ? $dept->name.' (divisi)' : $dept->name;
-            $pipeline = Pipeline::create(['name' => $name, 'department_id' => $dept->id, 'position' => (int) Pipeline::max('position') + 1]);
-            foreach (DivisionDefaults::STAGES as $i => $stage) {
-                $pipeline->stages()->create(['name' => $stage, 'position' => $i, 'is_closing' => $stage === 'Closing']);
-            }
-            $this->audit->log('Tambah', 'Pipeline', $pipeline->id, $pipeline->name.' untuk divisi '.$dept->name);
-
-            return $pipeline;
-        });
+        return ($id ? Pipeline::find($id) : null) ?? Pipeline::whereNull('archived_at')->orderBy('position')->firstOrFail();
     }
 
-    /** PIC deal harus pengguna aktif, bukan Viewer, dari divisi pemilik relasi. */
+    /** PIC deal = PIC relasinya, dan harus pengguna aktif yang bukan Viewer. */
     public function assertOwner(?User $owner, ClientPartner $record, string $field = 'ownerId'): void
     {
-        if (! $owner || ! $owner->active || $owner->role === Role::Viewer || $owner->department_id !== $record->department_id) {
-            throw ValidationException::withMessages([$field => 'PIC deal harus pengguna aktif dari divisi '.($record->department?->name ?? 'pemilik data').'.']);
+        if (! $owner || ! $owner->active || $owner->role === Role::Viewer || $owner->id !== $record->pic_id) {
+            throw ValidationException::withMessages([$field => 'PIC deal mengikuti PIC relasi, dan harus pengguna aktif yang bukan Viewer.']);
         }
     }
 
     /**
-     * Deal ikut divisi baru relasinya: pindah ke pipeline divisi itu. Stage dicocokkan lewat nama, kalau tidak ada
-     * lewat urutan; deal Won tetap di Closing. Perpindahan dicatat di riwayat deal.
+     * Deal pindah ke pipeline lain (misalnya PIC baru tidak memakai pipeline lamanya). Stage dicocokkan lewat nama,
+     * kalau tidak ada lewat urutan; deal Won tetap di Closing. Perpindahan dicatat di riwayat deal.
      */
     public function moveToDivision(User $by, Deal $deal, Pipeline $target, string $note): void
     {

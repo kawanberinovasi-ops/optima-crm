@@ -204,33 +204,35 @@ class LeadFlowTest extends TestCase
         $this->assertSame(1, Handover::first()->deals_moved);
         $this->assertStringContainsString('Pindah ke', Deal::find($open['id'])->histories()->latest('id')->value('note'));
 
-        // Semua deal (termasuk yang Won) ikut pipeline divisi baru; Won tetap di Closing.
-        $line = Pipeline::with('stages')->whereRelation('department', 'name', 'Executive')->first();
-        $this->assertSame([$line->id, $line->id], [Deal::find($open['id'])->pipeline_id, Deal::find($won['id'])->pipeline_id]);
-        $this->assertSame('Lead', Deal::find($open['id'])->stage->name, 'stage dicocokkan lewat nama');
+        // Executive dan Customer Service sama-sama memakai Sales, jadi deal tetap di pipeline dan stage-nya.
+        $sales = Pipeline::where('name', 'Sales')->value('id');
+        $this->assertSame([$sales, $sales], [Deal::find($open['id'])->pipeline_id, Deal::find($won['id'])->pipeline_id]);
+        $this->assertSame('Lead', Deal::find($open['id'])->stage->name);
+
+        // Ke Digital Campaign (pipeline Campaign): deal pindah pipeline, Won tetap di Closing.
+        $dc = $this->user('Digital Campaign');
+        $this->handover($this->user('Executive', Role::SuperAdmin), $lead['id'], $dc)->assertOk();
+        $campaign = Pipeline::where('name', 'Campaign')->value('id');
+        $this->assertSame([$campaign, $campaign], [Deal::find($open['id'])->pipeline_id, Deal::find($won['id'])->pipeline_id]);
+        $this->assertSame('Brief', Deal::find($open['id'])->stage->name, 'stage dicocokkan lewat urutan');
         $this->assertTrue(Deal::find($won['id'])->stage->is_closing);
     }
 
-    public function test_7_executive_sees_across_divisions_others_do_not(): void
+    public function test_7_only_super_admin_sees_everything_others_only_their_own(): void
     {
         foreach (['Digital Campaign', 'Customer Service', 'Creative & Media', 'CampusNet'] as $dept) {
             $this->newLead($this->user($dept), ['name' => 'Lead '.$dept]);
         }
 
         $names = fn (User $u) => collect($this->as($u)->getJson('/api/client-partners?all=1')->json('data'))->pluck('name')->sort()->values()->all();
-        $this->assertCount(4, $names($this->user('Executive')));
-        $this->assertCount(4, $names($this->user('Executive', Role::Viewer)), 'Viewer Executive tetap melihat lintas divisi, hanya baca');
-        $this->assertSame(['Lead Customer Service'], $names($this->user('Customer Service')));
+        $this->assertCount(4, $names($this->user('Executive', Role::SuperAdmin)));
+        $this->assertSame([], $names($this->user('Executive')), 'Executive tidak lagi melihat lintas divisi');
+        $this->assertSame([], $names($this->user('Customer Service', Role::KepalaDepartment)), 'Kepala Department tidak melihat data timnya');
 
-        // Kepala department lain tidak otomatis Super Admin dan tidak melihat lintas divisi.
         $head = $this->user('Creative & Media', Role::KepalaDepartment);
         $this->assertFalse($head->isSuperAdmin());
-        $this->assertSame(['Lead Creative & Media'], $names($head));
-
-        // Flag lintas divisi bisa diatur admin.
-        $admin = $this->user('Executive', Role::SuperAdmin);
-        $this->as($admin)->patchJson('/api/departments/'.Department::where('name', 'Business Operation')->value('id'), ['seesAll' => true])->assertOk();
-        $this->assertCount(4, $names($this->user('Business Operation')));
+        $this->newLead($head, ['name' => 'Lead milik kepala']);
+        $this->assertSame(['Lead milik kepala'], $names($head));
     }
 
     public function test_8_legacy_categories_migrate_to_status_and_service_keeping_ids_and_history(): void
@@ -332,13 +334,14 @@ class LeadFlowTest extends TestCase
     {
         $dc = $this->user('Digital Campaign', Role::KepalaDepartment);
         $dc->update(['email' => 'dc@contoh.test']);
-        $rows = fn (string $dept) => ['records' => [['_row' => 6, 'kode sumber' => 'X-'.$dept, 'nama' => 'Data '.$dept, 'kategori' => 'KOL/KOC',
-            'email pic' => 'dc@contoh.test', 'department pemilik' => $dept]]];
+        $this->user('Customer Service')->update(['email' => 'cs@contoh.test']);
+        $rows = fn (string $dept, string $pic = 'dc@contoh.test') => ['records' => [['_row' => 6, 'kode sumber' => 'X-'.$dept, 'nama' => 'Data '.$dept, 'kategori' => 'KOL/KOC',
+            'email pic' => $pic, 'department pemilik' => $dept]]];
 
         $own = $this->as($dc)->postJson('/api/imports/check', ['filename' => 'a.xlsx', 'sheets' => $rows('Digital Campaign')])->json('data');
         $this->assertCount(1, $own['records']);
-        $other = $this->as($dc)->postJson('/api/imports/check', ['filename' => 'b.xlsx', 'sheets' => $rows('Customer Service')])->json('data');
-        $this->assertStringContainsString('Divisi pemilik harus divisi kamu', $other['errors'][0]);
+        $other = $this->as($dc)->postJson('/api/imports/check', ['filename' => 'b.xlsx', 'sheets' => $rows('Customer Service', 'cs@contoh.test')])->json('data');
+        $this->assertStringContainsString('PIC harus kamu sendiri', $other['errors'][0]);
 
         $this->as($dc)->postJson('/api/imports/'.$own['id'].'/commit')->assertOk();
         $record = ClientPartner::with('service')->where('code', 'X-Digital Campaign')->first();

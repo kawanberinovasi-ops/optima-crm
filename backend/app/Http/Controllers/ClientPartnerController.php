@@ -88,8 +88,8 @@ class ClientPartnerController extends Controller
     }
 
     /**
-     * Data baru selalu Lead, dengan PIC dan divisi pemilik otomatis dari pengguna yang mengisi (siapa pun yang punya hak
-     * input, dari divisi mana pun). Kategori, PIC, dan divisi dari form diabaikan. Pembuat dan waktu dibuat disimpan permanen.
+     * Data baru: Lead (calon Client) atau Partner (revisi klien 5 Nov 2026), dengan PIC dan divisi pemilik otomatis dari
+     * pengguna yang mengisi. Status Client, PIC, dan divisi dari form diabaikan. Pembuat dan waktu dibuat disimpan permanen.
      */
     public function store(Request $request): JsonResponse
     {
@@ -97,15 +97,16 @@ class ClientPartnerController extends Controller
         abort_unless($this->access->canCreateRecord($me, Category::Lead), 403, 'Kamu ga punya izin menambah Lead.');
         $data = $request->validate($this->rules(creating: true));
         $service = $this->service($data);
+        $category = ($data['kind'] ?? 'Lead') === 'Partner' ? Category::Partner : Category::Lead;
 
-        $record = DB::transaction(function () use ($data, $me, $service) {
+        $record = DB::transaction(function () use ($data, $me, $service, $category) {
             [$id, $code] = Codes::next('client_partners', 'CP');
             $record = new ClientPartner;
             $record->forceFill([
                 'id' => $id,
                 'code' => $code,
                 'name' => trim($data['name']),
-                'category' => Category::Lead,
+                'category' => $category,
                 'service_id' => $service?->id,
                 'segment' => $data['segment'] ?? null,
                 'pic_id' => $me->id,
@@ -122,7 +123,7 @@ class ClientPartnerController extends Controller
                     'email' => $data['cEmail'] ?? null, 'phone' => $data['phone'] ?? null, 'is_primary' => true,
                 ]);
             }
-            $this->audit->log('Tambah', self::ENTITY, $record->id, $record->name.' ('.$record->code.') sebagai Lead, PIC '.$me->name, null, $record->getAttributes());
+            $this->audit->log('Tambah', self::ENTITY, $record->id, $record->name.' ('.$record->code.') sebagai '.$category->value.', PIC '.$me->name, null, $record->getAttributes());
 
             return $record;
         });
@@ -135,12 +136,15 @@ class ClientPartnerController extends Controller
         $me = $request->user();
         $this->authorizeView($me, $clientPartner);
         abort_unless($this->access->canEditRecord($me, $clientPartner), 403, 'Kamu ga bisa mengubah data ini.');
-        // Status relasi berubah hanya lewat deal Won, divisi dan PIC hanya lewat serah terima.
+        // Client hanya lewat deal Won; Lead dan Partner boleh saling diganti kalau salah isi. Divisi dan PIC hanya lewat serah terima.
         $data = $request->validate($this->rules(creating: false));
 
         DB::transaction(function () use ($me, $clientPartner, $data) {
             $original = $clientPartner->getRawOriginal();
             $fields = isset($data['name']) ? ['name' => trim($data['name'])] : [];
+            if (isset($data['kind']) && $clientPartner->category !== Category::Client) {
+                $fields['category'] = $data['kind'];
+            }
             foreach (['segment', 'source', 'city', 'note'] as $k) {
                 if (array_key_exists($k, $data)) {
                     $fields[$k] = $data[$k];
@@ -229,11 +233,13 @@ class ClientPartnerController extends Controller
             $original = $clientPartner->getRawOriginal();
             $clientPartner->update(['pic_id' => $to->id, 'department_id' => $to->department_id]);
 
-            // Semua deal ikut pipeline divisi baru; yang masih berjalan (Open/On Hold) dipegang PIC baru.
-            $pipeline = $this->deals->pipelineFor($to->department_id);
+            // Deal pindah ke pipeline PIC baru kalau PIC baru tidak memakai pipeline lamanya; yang masih berjalan dipegang PIC baru.
             $note = 'Pindah ke '.$to->name.' ('.$to->department->name.')';
+            $allowed = $this->access->pipelineIds($to);
             foreach ($clientPartner->deals()->with('stage', 'pipeline')->get() as $deal) {
-                $this->deals->moveToDivision($me, $deal, $pipeline, $note);
+                if (! in_array($deal->pipeline_id, $allowed, true)) {
+                    $this->deals->moveToDivision($me, $deal, $this->deals->pipelineFor($to), $note);
+                }
             }
             $running = $clientPartner->deals()->whereIn('status', [DealStatus::Open, DealStatus::OnHold])->where('owner_id', '<>', $to->id)->get();
             foreach ($running as $deal) {
@@ -279,10 +285,13 @@ class ClientPartnerController extends Controller
         $moved = DB::transaction(function () use ($clientPartner, $source, $me) {
             $ints = $source->interactions()->update(['client_partner_id' => $clientPartner->id]);
             $deals = $source->deals()->update(['client_partner_id' => $clientPartner->id]);
-            // Deal pindahan ikut pipeline divisi data yang disimpan.
-            $pipeline = $this->deals->pipelineFor($clientPartner->department_id);
+            // Deal pindahan ikut PIC data yang disimpan, dan pipeline-nya kalau PIC itu tidak memakai pipeline lamanya.
+            $clientPartner->deals()->whereIn('status', [DealStatus::Open, DealStatus::OnHold])->update(['owner_id' => $clientPartner->pic_id]);
+            $pic = $clientPartner->pic;
             foreach ($clientPartner->deals()->with('stage', 'pipeline')->get() as $deal) {
-                $this->deals->moveToDivision($me, $deal, $pipeline, 'Digabung dari '.$source->name);
+                if ($pic && ! in_array($deal->pipeline_id, $this->access->pipelineIds($pic), true)) {
+                    $this->deals->moveToDivision($me, $deal, $this->deals->pipelineFor($pic), 'Digabung dari '.$source->name);
+                }
             }
             $emails = $clientPartner->contacts()->pluck('email')->filter()->map(fn ($e) => strtolower($e))->all();
             $contacts = 0;
@@ -367,6 +376,7 @@ class ClientPartnerController extends Controller
 
         return [
             'name' => [$req, 'string', 'max:200'],
+            'kind' => ['nullable', Rule::in(['Lead', 'Partner'])],
             'service' => ['nullable', 'string', 'max:100'],
             'segment' => ['nullable', 'string', 'max:100'],
             'source' => ['nullable', 'string', 'max:100'],

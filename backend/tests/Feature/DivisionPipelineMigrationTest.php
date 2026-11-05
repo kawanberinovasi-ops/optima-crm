@@ -14,15 +14,20 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
-/** Migrasi struktur divisi untuk database yang sudah berisi data (Commercial, pipeline lama tanpa divisi). */
+/**
+ * Migrasi berurutan untuk database yang sudah berisi data (Commercial, pipeline lama tanpa divisi):
+ * struktur divisi 22 Okt, lalu revisi klien 5 Nov (pipeline Sales dan Campaign, jenis Partner).
+ */
 class DivisionPipelineMigrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_commercial_merges_into_cs_and_deals_move_to_division_pipelines(): void
+    public function test_commercial_merges_into_cs_and_deals_end_in_sales_pipeline(): void
     {
         $this->seed(ReferenceDataSeeder::class);
+        $revision = require database_path('migrations/2026_11_05_000002_client_revision_pipelines_partner.php');
         $migration = require database_path('migrations/2026_10_22_000002_division_pipelines.php');
+        $revision->down();
         $migration->down();
 
         // Keadaan sebelum migrasi: department Commercial dan satu pipeline umum.
@@ -44,6 +49,7 @@ class DivisionPipelineMigrationTest extends TestCase
         $won = $deal('DL-OLD2', 'Closing', 'Won');
 
         $migration->up();
+        $revision->up();
 
         $cs = Department::where('name', 'Customer Service')->first();
         $this->assertFalse(Department::where('name', 'Commercial')->exists());
@@ -51,12 +57,15 @@ class DivisionPipelineMigrationTest extends TestCase
         $this->assertSame($cs->id, $record->fresh()->department_id, 'ID data tetap, divisi pindah ke CS');
         $this->assertNotNull(DB::table('pipelines')->where('id', $umum)->value('archived_at'), 'pipeline lama diarsipkan, tidak dihapus');
 
-        $line = Pipeline::where('department_id', $cs->id)->first();
-        $this->assertSame('Customer Service', $line->name);
+        $active = Pipeline::whereNull('archived_at')->orderBy('position')->get();
+        $this->assertSame(['Sales', 'Campaign'], $active->pluck('name')->all(), 'pipeline divisi lain digabung ke Sales');
+        $sales = $active->first();
         $this->assertSame(['Proposal', 'Open'], [Deal::find($open)->stage->name, Deal::find($open)->status->value]);
-        $this->assertSame($line->id, Deal::find($open)->pipeline_id);
+        $this->assertSame($sales->id, Deal::find($open)->pipeline_id);
         $this->assertTrue(Deal::find($won)->stage->is_closing);
-        $this->assertSame(Department::count(), Pipeline::whereNotNull('department_id')->whereNull('archived_at')->count(), 'satu pipeline per divisi');
+        $this->assertSame(['Brief', 'Konsep', 'Produksi', 'Tayang', 'Report', 'Closing'], $active->last()->stages()->pluck('name')->all());
+        $this->assertSame(['Digital Campaign'], $active->last()->departments()->pluck('name')->all());
+        $this->assertTrue($sales->departments()->whereKey($cs->id)->exists());
         $this->assertSame('M', AccessGrant::where(['department_id' => $cs->id, 'entity' => 'interaksi'])->value('level'));
         $this->assertSame('C', AccessGrant::where(['department_id' => Department::where('name', 'CampusNet')->value('id'), 'entity' => 'deal'])->value('level'));
     }

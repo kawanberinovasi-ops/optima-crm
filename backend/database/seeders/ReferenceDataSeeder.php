@@ -11,7 +11,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Pengaturan awal yang dipakai juga di produksi: department dari blueprint, matriks hak akses usulan tim
- * (SRS bagian 3), daftar pilihan, dan satu pipeline per divisi. Super Admin bisa mengubah semuanya setelah go-live.
+ * (SRS bagian 3), daftar pilihan, dan pipeline per jenis pekerjaan (Sales, Campaign) beserta divisi pemakainya. Super Admin bisa mengubah semuanya setelah go-live.
  * Sumbernya sample.json, hasil ekspor dari prototipe, supaya backend dan prototipe memakai angka yang sama.
  */
 class ReferenceDataSeeder extends Seeder
@@ -53,9 +53,11 @@ class ReferenceDataSeeder extends Seeder
         }
 
         foreach ($data['pipelines'] as $i => $p) {
-            $pipeline = Pipeline::firstOrCreate(['name' => $p['name']], [
-                'position' => $i, 'department_id' => Department::where('name', $p['department'] ?? '')->value('id'),
-            ]);
+            $pipeline = Pipeline::firstOrCreate(['name' => $p['name']], ['position' => $i]);
+            // Divisi yang memakai pipeline ini; hanya diisi kalau belum diatur, supaya ubahan Super Admin tidak tertimpa.
+            if (! $pipeline->departments()->exists()) {
+                $pipeline->departments()->sync(Department::whereIn('name', $p['departments'] ?? [])->pluck('id'));
+            }
             if ($pipeline->stages()->exists()) {
                 continue;
             }

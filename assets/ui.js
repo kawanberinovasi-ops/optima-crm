@@ -40,18 +40,18 @@ const seg = (items, cur, act, label, role) => '<div class="seg" role="' + (role 
 const opt = (v, cur, label) => '<option value="' + esc(v) + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + esc(label == null ? v : label) + '</option>';
 const fuChip = (d) => { if (!d) return ''; const n = dayDiff(d); if (n < 0) return '<span class="chip c-bad ping"><span class="dot"></span>Telat ' + (-n) + ' hari</span>'; if (n === 0) return '<span class="chip c-warn"><span class="dot"></span>Hari ini</span>'; return '<span class="chip c-info"><span class="dot"></span>' + fmtShort(d) + '</span>'; };
 const statusChip = (s) => '<span class="chip ' + ({ Open: 'c-info', Won: 'c-ok', Lost: 'c-bad', 'On Hold': 'c-warn' }[s] || 'c-n') + '"><span class="dot"></span>' + esc(s) + '</span>';
-const catChip = (c) => '<span class="chip ' + (c === 'Client' ? 'c-ok' : 'c-info') + '"><span class="dot"></span>' + esc(c) + '</span>';
+const catChip = (c) => '<span class="chip ' + (c === 'Client' ? 'c-ok' : c === 'Partner' ? 'c-y' : 'c-info') + '"><span class="dot"></span>' + esc(c) + '</span>';
 const valOrLock = (deal, v) => canSeeValue(deal) ? fmtRp(v) : '<span title="Nilai disembunyikan sesuai hak akses" style="display:inline-flex;align-items:center;gap:6px">' + ic('lock', 'ic-s') + 'Rp ···</span>';
 
 /* ---------- state & router ---------- */
 const App = {
-  route: 'cp', anim: true, pop: null, modal: null, drawer: null, pal: null,
+  route: 'mywork', anim: true, pop: null, modal: null, drawer: null, pal: null,
   ui: { cp: { cat: 'all', q: '', dept: 'all', service: 'all', page: 0, sort: 'name' }, pl: { line: 'um', per: 'all', val: '', q: '' }, mw: { f: 'all' }, db: { per: 'm', val: '' }, ak: { tab: 'users', q: '', act: 'all', by: 'all' } }
 };
 const ROUTES = ['login', 'mywork', 'dashboard', 'cp', 'pipeline', 'akses', 'expired'];
 function parseHash() {
   const h = location.hash.replace(/^#\/?/, ''); const [r, qs] = h.split('?');
-  App.route = ROUTES.includes(r) ? r : (r ? 'notfound' : 'cp');
+  App.route = ROUTES.includes(r) ? r : (r ? 'notfound' : 'mywork');
   const q = new URLSearchParams(qs || '');
   if (App.route === 'pipeline' && q.get('line')) App.ui.pl.line = q.get('line');
   if (App.route === 'akses' && q.get('tab')) App.ui.ak.tab = q.get('tab');
@@ -68,7 +68,7 @@ function render() {
   const root = document.getElementById('app');
   if (!me()) { if (App.expired) { App.route = 'expired'; root.innerHTML = Pages.expired(); } else { App.route = 'login'; root.innerHTML = Pages.login(); } }
   else {
-    if (App.route === 'login') App.route = 'cp';
+    if (App.route === 'login') App.route = 'mywork';
     root.innerHTML = navbar() + '<main class="wrap ' + (App.anim ? '' : 'noanim') + '" id="main">' + (App.loading ? skeleton() : (Pages[App.route] || Pages.notfound)()) + '</main>';
   }
   document.getElementById('ov').innerHTML = overlays();
@@ -109,8 +109,8 @@ function navbar() {
     : '<a class="ml" href="#/' + href + '" aria-current="' + (r === href ? 'page' : 'false') + '">' + label + '</a>') + '</div>';
   const pi = (act, v, icon, t, d, y) => '<button type="button" role="menuitem" class="pi" data-a="' + act + '" data-v="' + esc(v || '') + '"><span class="tile ' + (y ? 'y' : '') + '">' + ic(icon) + '</span><span><span class="t">' + t + '</span><span class="d">' + d + '</span></span></button>';
   const cpDrop = '<div class="pop l" role="menu">' + pi('nav', 'cp', 'list', 'Semua data', 'Cari, filter, dan buka profil') + (canCreateAny() ? pi('import', '', 'up', 'Import data', 'Pakai template Excel') : '') + pi('export', '', 'down', 'Export data', 'Unduh data sesuai hak akses') + '</div>';
-  const plDrop = '<div class="pop l" role="menu">' + visibleLines().map((l, i) => pi('navline', l.id, ['code', 'flag', 'pen'][i % 3] || 'deal', esc(l.name), l.stages.length + ' stage', i === 1)).join('') + (canConfigPipeline() ? pi('newline', '', 'plus', 'Lini bisnis baru', 'Tambah pipeline sendiri') : '') + '</div>';
-  const plusDrop = '<div class="pop r" role="menu" style="min-width:280px">' + (canCreateAny() ? pi('newrec', '', 'user', 'Data baru', 'Lead baru, PIC otomatis akunmu') : '') + (can('deal', 'C') ? pi('newdeal', '', 'deal', 'Deal baru', 'Masuk ke pipeline') : '') + (can('interaksi', 'C') ? pi('newint', '', 'chat', 'Catat interaksi', 'Call, meeting, atau chat', true) : '') + (!canCreateAny() && !can('deal', 'C') && !can('interaksi', 'C') ? '<div class="pi"><span class="d">Akun ini cuma bisa melihat.</span></div>' : '') + '</div>';
+  const plDrop = '<div class="pop l" role="menu">' + visibleLines().map((l, i) => pi('navline', l.id, ['code', 'flag', 'pen'][i % 3] || 'deal', esc(l.name), l.stages.length + ' stage', i === 1)).join('') + (canConfigPipeline() ? pi('newline', '', 'plus', 'Pipeline baru', 'Khusus Super Admin') : '') + '</div>';
+  const plusDrop = '<div class="pop r" role="menu" style="min-width:280px">' + (canCreateAny() ? pi('newrec', '', 'user', 'Data baru', 'Lead atau Partner, PIC otomatis akunmu') : '') + (can('deal', 'C') && visibleLines().length ? pi('newdeal', '', 'deal', 'Deal baru', 'Masuk ke pipeline') : '') + (can('interaksi', 'C') ? pi('newint', '', 'chat', 'Catat interaksi', 'Call, meeting, atau chat', true) : '') + (!canCreateAny() && !can('deal', 'C') && !can('interaksi', 'C') ? '<div class="pi"><span class="d">Akun ini cuma bisa melihat.</span></div>' : '') + '</div>';
   const myN = (Store.db.notifs || []).filter(n => n.userId === u.id && workflowNotificationVisible(n)); const unread = myN.filter(n => !n.read).length;
   const late = fu.filter(i => dayDiff(i.fuDate) < 0).length;
   const notifDrop = '<div class="pop r" role="menu" style="min-width:360px;max-height:520px;overflow-y:auto">' +
@@ -119,17 +119,14 @@ function navbar() {
     '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px"><span class="lbl">Pemberitahuan</span>' + (unread ? '<button type="button" class="btn-ghost small" data-a="notifall" style="min-height:32px">Tandai semua dibaca</button>' : '') + '</div>' +
     (myN.length ? myN.slice(0, 8).map(n => '<button type="button" class="pi" data-a="notifopen" data-v="' + n.id + '"' + (n.read ? '' : ' style="background:var(--card2)"') + '><span class="tile ' + (n.read ? '' : 'y') + '">' + ic('bell') + '</span><span style="flex:1"><span class="t" style="font-weight:' + (n.read ? 600 : 800) + '">' + esc(n.text) + '</span><span class="d">' + fmtTime(n.at) + '</span></span>' + (n.read ? '' : '<span class="dot" style="background:var(--bad)"></span>') + '</button>').join('') : '<div style="padding:4px 10px 8px" class="small muted">Belum ada pemberitahuan.</div>') +
     '<div class="lbl" style="padding:8px 10px">Follow-up mepet</div>' + (fu.length ? fu.slice(0, 6).map(i => { const rec = recById(i.recordId); return '<button type="button" class="pi" data-a="nav" data-v="mywork">' + av(rec.name, rec.id, 'sm') + '<span style="flex:1"><span class="t">' + esc(rec.name) + '</span><span class="d">' + esc(i.next || i.result) + '</span></span>' + fuChip(i.fuDate) + '</button>'; }).join('') : '<div style="padding:10px" class="small muted">Aman, ga ada yang telat.</div>') + '</div>';
-  const ctxDrop = '<div class="pop l" role="menu" style="min-width:320px"><div class="lbl" style="padding:8px 10px">Ganti akun uji</div>' + Store.db.users.filter(x => x.active).map(x => '<button type="button" class="pi" data-a="switch" data-v="' + x.id + '"' + (x.id === u.id ? ' aria-current="true" style="background:var(--tint)"' : '') + '>' + av(x.name, x.id, 'round sm') + '<span><span class="t">' + esc(x.name) + '</span><span class="d">' + esc(x.role) + ' · ' + esc(x.dept) + '</span></span></button>').join('') + '</div>';
   const meDrop = '<div class="pop r" role="menu" style="min-width:290px"><div style="display:flex;gap:12px;align-items:center;padding:10px">' + av(u.name, u.id, 'round') + '<div><strong>' + esc(u.name) + '</strong><div class="small muted">' + esc(u.role) + ' · ' + esc(u.dept) + '</div></div></div>' +
     pi('editprofile', '', 'user', 'Edit Profil', 'Foto dan informasi pribadi kamu') +
     pi('opentrash', '', 'trash', 'Data terhapus', 'Pulihkan data sesuai hak akses') +
-    (canViewAdmin() ? pi('nav', 'akses', 'shield', 'Akses & Audit', canAdmin() ? 'Pengguna, hak akses, log' : 'Lihat pengguna dan log') : '') +
     (canAdmin() ? pi('resetdata', '', 'refresh', 'Reset data contoh', 'Balik ke kondisi awal', true) : '') + pi('simexpire', '', 'lock', 'Coba sesi berakhir', 'Simulasi batas waktu sesi (uji)') + pi('themepick', '', 'pen', 'Warna tema', 'Ganti palet warna aplikasi') + pi('logout', '', 'logout', 'Keluar', 'Akhiri sesi di browser ini') + '</div>';
   const roleTag = { 'Super Admin': 'ADMIN', 'Kepala Department': 'HEAD', Koordinator: 'KOOR', Staf: 'STAF', Viewer: 'VIEW' }[u.role] || '';
   return '<header class="nav glass"><div class="nav-in">' +
-    '<a class="nav-logo" href="#/cp" aria-label="OPTIMA Media, ke Client & Partner"><img src="assets/logo.png" alt="OPTIMA Media"></a>' +
-    '<div style="position:relative"><button type="button" class="ctx" data-a="pop" data-v="ctx" data-pop aria-expanded="' + (pop === 'ctx') + '" aria-label="Konteks kerja dan ganti akun uji"><span class="dot" style="background:var(--ok)"></span><span class="cl">' + esc(u.dept) + '</span>' + ic('chev', 'ic-s') + '</button>' + (pop === 'ctx' ? ctxDrop : '') + '</div>' +
-    '<nav class="menu" aria-label="Menu utama">' + item('', 'My Work', 'mywork') + item('', 'Dashboard', 'dashboard') + item('pl', 'Pipeline', 'pipeline', plDrop) + item('cp', 'Client & Partner', 'cp', cpDrop) + '</nav>' +
+    '<a class="nav-logo" href="#/mywork" aria-label="OPTIMA Media, ke My Work"><img src="assets/logo.png" alt="OPTIMA Media"></a>' +
+    '<nav class="menu" aria-label="Menu utama">' + item('', 'My Work', 'mywork') + item('', 'Dashboard', 'dashboard') + (can('deal', 'R') && visibleLines().length ? item('pl', 'Pipeline', 'pipeline', plDrop) : '') + item('cp', 'Client & Partner', 'cp', cpDrop) + (canViewAdmin() ? item('', 'Akses & Audit', 'akses') : '') + '</nav>' +
     '<button type="button" class="sbtn" data-a="pal" aria-label="Cari, shortcut Command K">' + ic('search') + '<span class="sl" style="flex:1;text-align:left">Cari…</span><span class="kbd">⌘K</span></button>' +
     '<div style="position:relative"><button type="button" class="icb plus" data-a="pop" data-v="plus" data-pop aria-expanded="' + (pop === 'plus') + '" aria-label="Buat baru">' + ic('plus') + '</button>' + (pop === 'plus' ? plusDrop : '') + '</div>' +
     '<div style="position:relative"><button type="button" class="icb" data-a="pop" data-v="notif" data-pop aria-expanded="' + (pop === 'notif') + '" aria-label="Notifikasi, ' + unread + ' belum dibaca, ' + fu.length + ' follow-up mepet">' + ic('bell') + (unread ? '<span class="badge-dot" style="min-width:18px;height:18px;top:4px;right:4px;font-size:10px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 4px">' + unread + '</span>' : fu.length ? '<span class="badge-dot"></span>' : '') + '</button>' + (pop === 'notif' ? notifDrop : '') + '</div>' +
@@ -153,7 +150,7 @@ function modalShell(title, sub, body, foot, wide, formName) {
 }
 function Palette() {
   const q = (App.pal.q || '').trim().toLowerCase();
-  const pages = [['mywork', 'My Work', 'Antrian follow-up'], ['dashboard', 'Dashboard', 'Angka dan grafik'], ['pipeline', 'Pipeline', 'Board deal'], ['cp', 'Client & Partner', 'Database relasi']].concat(canViewAdmin() ? [['akses', 'Akses & Audit', 'Pengguna dan log']] : []);
+  const pages = [['mywork', 'My Work', 'Antrian follow-up'], ['dashboard', 'Dashboard', 'Angka dan grafik']].concat(can('deal', 'R') && visibleLines().length ? [['pipeline', 'Pipeline', 'Board deal']] : []).concat([['cp', 'Client & Partner', 'Database relasi']]).concat(canViewAdmin() ? [['akses', 'Akses & Audit', 'Pengguna dan log']] : []);
   let res = pages.filter(p => !q || p[1].toLowerCase().includes(q)).map(p => ({ a: 'nav', v: p[0], t: p[1], d: 'Menu · ' + p[2], icon: 'home' }));
   if (q) {
     res = res.concat(Store.db.records.filter(r => !r.archived && canSeeRec(r) && (r.name + ' ' + r.contact + ' ' + r.code).toLowerCase().includes(q)).slice(0, 6).map(r => ({ a: 'openrec', v: r.id, t: r.name, d: r.cat + ' · ' + r.city, av: r })));

@@ -51,10 +51,10 @@ class DealController extends Controller
 
         $record = ClientPartner::findOrFail($data['recordId']);
         abort_unless($this->access->canViewRecord($me, $record), 403, 'Kamu ga punya akses ke data ini.');
-        // Pipeline selalu pipeline divisi pemilik relasi; PIC deal bawaan = PIC relasi.
-        $pipeline = $this->deals->pipelineFor($record->department_id);
-        $owner = User::find($data['ownerId'] ?? $record->pic_id);
+        // PIC deal = PIC relasi. Pipeline: yang dipilih kalau PIC itu memakainya, kalau tidak pipeline pertamanya.
+        $owner = $record->pic;
         $this->deals->assertOwner($owner, $record);
+        $pipeline = $this->deals->pipelineFor($owner, isset($data['lineId']) ? (int) $data['lineId'] : null);
         $stage = isset($data['stageId']) ? Stage::find($data['stageId']) : null;
 
         $deal = $this->deals->create($me, $record, $pipeline, $stage, [
@@ -84,20 +84,17 @@ class DealController extends Controller
         ], ['title.required' => 'Judul wajib diisi.']);
 
         $fields = [];
-        foreach (['title' => 'title', 'service' => 'service', 'target' => 'target_closing', 'recordId' => 'client_partner_id', 'ownerId' => 'owner_id'] as $in => $col) {
+        foreach (['title' => 'title', 'service' => 'service', 'target' => 'target_closing', 'recordId' => 'client_partner_id'] as $in => $col) {
             if (array_key_exists($in, $data)) {
                 $fields[$col] = $data[$in];
             }
         }
         $record = isset($fields['client_partner_id']) ? ClientPartner::findOrFail($fields['client_partner_id']) : $deal->clientPartner;
         abort_unless($this->access->canViewRecord($me, $record), 403, 'Kamu ga punya akses ke data ini.');
-        if (isset($fields['owner_id']) || $record->department_id !== $deal->clientPartner->department_id) {
-            $owner = User::find($fields['owner_id'] ?? $deal->owner_id);
-            if (! isset($fields['owner_id']) && $owner?->department_id !== $record->department_id) {
-                $owner = $record->pic;
-                $fields['owner_id'] = $owner?->id;
-            }
-            $this->deals->assertOwner($owner, $record);
+        // PIC deal selalu mengikuti PIC relasinya.
+        if ($record->id !== $deal->client_partner_id) {
+            $this->deals->assertOwner($record->pic, $record);
+            $fields['owner_id'] = $record->pic_id;
         }
         // Nilai penawaran hanya bisa diubah oleh yang boleh melihatnya.
         if (array_key_exists('offer', $data) && $this->access->canSeeDealValue($me, $deal)) {
@@ -106,7 +103,9 @@ class DealController extends Controller
 
         $original = $deal->getRawOriginal();
         $deal->update($fields);
-        $this->deals->moveToDivision($me, $deal->fresh(), $this->deals->pipelineFor($record->department_id), 'Relasi deal diganti');
+        if (! in_array($deal->pipeline_id, $this->access->pipelineIds($deal->owner), true)) {
+            $this->deals->moveToDivision($me, $deal->fresh(), $this->deals->pipelineFor($deal->owner), 'Relasi deal diganti');
+        }
         $this->audit->changed(Deals::ENTITY, $deal, $original, $deal->title);
         if ($deal->wasChanged('owner_id') && $deal->owner_id !== $me->id) {
             Notify::send($deal->owner, 'Deal '.$deal->title.' sekarang kamu yang pegang', 'deal:'.$deal->id);

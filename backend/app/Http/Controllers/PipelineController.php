@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Pengaturan pipeline (SRS 4.3): satu pipeline per divisi; stage bisa ditambah, diganti nama, dan dihapus tanpa developer.
+ * Pengaturan pipeline (SRS 4.3), khusus Super Admin: pipeline per jenis pekerjaan; stage bisa ditambah, diganti nama, dan dihapus tanpa developer.
  * Setiap pipeline punya tepat satu stage Closing di urutan terakhir.
  */
 class PipelineController extends Controller
@@ -23,10 +23,10 @@ class PipelineController extends Controller
     public function store(Request $request): JsonResponse
     {
         $this->authorizeConfig($request);
-        $me = $request->user();
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', 'unique:pipelines,name'],
             'stages' => ['nullable', 'string', 'max:2000'],
+            'deptIds' => ['nullable', 'array'], 'deptIds.*' => ['integer', 'exists:departments,id'],
         ], ['name.required' => 'Nama wajib diisi.', 'name.unique' => 'Nama pipeline ini sudah dipakai.']);
 
         $names = collect(preg_split('/\r?\n/', (string) ($data['stages'] ?? '')))
@@ -35,9 +35,10 @@ class PipelineController extends Controller
             $names = collect(['Lead']);
         }
 
-        // Pipeline baru milik divisi pembuatnya.
-        $pipeline = DB::transaction(function () use ($data, $names, $me) {
-            $pipeline = Pipeline::create(['name' => trim($data['name']), 'department_id' => $me->department_id, 'position' => (int) Pipeline::max('position') + 1]);
+        // Divisi yang memakai pipeline baru bisa dipilih sekarang atau nanti di Akses & Audit → Pipeline.
+        $pipeline = DB::transaction(function () use ($data, $names) {
+            $pipeline = Pipeline::create(['name' => trim($data['name']), 'position' => (int) Pipeline::max('position') + 1]);
+            $pipeline->departments()->sync($data['deptIds'] ?? []);
             foreach ($names->push('Closing') as $i => $name) {
                 $pipeline->stages()->create(['name' => $name, 'position' => $i, 'is_closing' => $name === 'Closing']);
             }
@@ -116,12 +117,11 @@ class PipelineController extends Controller
 
     private function authorizeConfig(Request $request, ?Pipeline $pipeline = null): void
     {
-        abort_unless($this->access->canConfigurePipeline($request->user()), 403, 'Cuma Super Admin dan Kepala Department yang bisa mengatur pipeline.');
-        abort_unless($this->access->canConfigurePipeline($request->user(), $pipeline), 403, 'Pipeline ini milik divisi lain.');
+        abort_unless($this->access->canConfigurePipeline($request->user(), $pipeline), 403, 'Cuma Super Admin yang bisa mengatur pipeline.');
     }
 
     private function respond(Pipeline $pipeline, int $status = 200): JsonResponse
     {
-        return response()->json(['data' => FrontShape::line($pipeline->fresh(['stages', 'department']))], $status);
+        return response()->json(['data' => FrontShape::line($pipeline->fresh(['stages', 'departments']))], $status);
     }
 }

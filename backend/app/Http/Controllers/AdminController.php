@@ -15,7 +15,6 @@ use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
 use App\Services\ChangeHistory;
-use App\Services\Deals;
 use App\Support\DivisionDefaults;
 use App\Support\FrontShape;
 use App\Support\Notify;
@@ -37,7 +36,7 @@ class AdminController extends Controller
 
     private const OPTION_LABEL = ['segments' => 'Segmen', 'sources' => 'Sumber data', 'interaction_types' => 'Jenis interaksi', 'lost_reasons' => 'Alasan deal Lost'];
 
-    public function __construct(private Access $access, private Audit $audit, private Deals $deals) {}
+    public function __construct(private Access $access, private Audit $audit) {}
 
     /* ---------- pengguna ---------- */
 
@@ -109,11 +108,13 @@ class AdminController extends Controller
 
         $dept = DB::transaction(function () use ($data) {
             $dept = Department::create(['name' => trim($data['name'])]);
-            // Department baru mengelola datanya sendiri (C), lengkap dengan pipeline divisinya.
+            // Department baru mengelola datanya sendiri (C) dan memakai pipeline pertama (Sales) sampai diatur Super Admin.
             foreach (DivisionDefaults::access($dept->name) as $entity => $level) {
                 AccessGrant::create(['department_id' => $dept->id, 'entity' => $entity, 'level' => $level]);
             }
-            $this->deals->pipelineFor($dept->id);
+            if ($first = Pipeline::whereNull('archived_at')->orderBy('position')->value('id')) {
+                $dept->pipelines()->attach($first);
+            }
 
             return $dept;
         });
@@ -132,10 +133,6 @@ class AdminController extends Controller
 
         $before = ['name' => $department->name, 'sees_all' => $department->sees_all];
         $department->update(array_filter(['name' => isset($data['name']) ? trim($data['name']) : null, 'sees_all' => $data['seesAll'] ?? null], fn ($v) => $v !== null));
-        if ($before['name'] !== $department->name && ! Pipeline::where('name', $department->name)->exists()) {
-            // Pipeline divisi ikut berganti nama.
-            $department->pipelines()->where('name', $before['name'])->update(['name' => $department->name]);
-        }
         $after = ['name' => $department->name, 'sees_all' => $department->sees_all];
         $summary = $before['name'] !== $after['name'] ? $before['name'].' jadi '.$after['name'] : $department->name;
         if ($before['sees_all'] !== $after['sees_all']) {
@@ -154,14 +151,56 @@ class AdminController extends Controller
             'Department ini masih punya pengguna atau data. Pindahkan dulu.');
 
         $name = $department->name;
-        // Pipeline kosong ikut dihapus; yang masih punya deal diarsipkan supaya riwayatnya tetap ada.
-        foreach ($department->pipelines as $pipeline) {
-            $pipeline->deals()->exists() ? $pipeline->update(['archived_at' => now(), 'department_id' => null]) : $pipeline->delete();
-        }
         $department->delete();
         $this->audit->log('Hapus', 'Department', null, $name);
 
         return response()->json(['ok' => true]);
+    }
+
+    /* ---------- pipeline per divisi dan per pengguna (revisi klien 5 Nov 2026) ---------- */
+
+    /** Divisi yang memakai pipeline ini. */
+    public function updatePipelineDepartments(Request $request, Pipeline $pipeline): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $data = $request->validate(['deptIds' => ['present', 'array'], 'deptIds.*' => ['integer', Rule::exists('departments', 'id')]]);
+        $before = $pipeline->departments()->pluck('name')->sort()->values()->all();
+        $pipeline->departments()->sync($data['deptIds']);
+        $after = $pipeline->departments()->pluck('name')->sort()->values()->all();
+        $this->audit->log('Ubah', 'Pipeline', $pipeline->id, $pipeline->name.' dipakai: '.(implode(', ', $after) ?: 'tidak ada divisi'), ['divisi' => $before], ['divisi' => $after]);
+
+        return response()->json(['data' => self::pipelineAccessShape()]);
+    }
+
+    /** Tambah (allowed=true), cabut (false), atau kembalikan ke aturan divisi (null) pipeline untuk satu pengguna. */
+    public function updatePipelineUser(Request $request, Pipeline $pipeline): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $data = $request->validate(['userId' => ['required', 'integer', Rule::exists('users', 'id')], 'allowed' => ['present', 'nullable', 'boolean']]);
+        $user = User::findOrFail($data['userId']);
+        if ($data['allowed'] === null) {
+            $pipeline->userOverrides()->detach($user->id);
+        } else {
+            $pipeline->userOverrides()->syncWithoutDetaching([$user->id => ['allowed' => $data['allowed']]]);
+        }
+        $what = $data['allowed'] === null ? 'kembali mengikuti divisinya' : ($data['allowed'] ? 'ditambahkan' : 'dicabut');
+        $this->audit->log('Ubah', 'Pipeline', $pipeline->id, $pipeline->name.' untuk '.$user->name.': '.$what);
+        if ($user->id !== $request->user()->id) {
+            Notify::send($user, 'Akses pipeline '.$pipeline->name.' '.$what);
+        }
+
+        return response()->json(['data' => self::pipelineAccessShape()]);
+    }
+
+    /** @return array{departments: list<array{lineId: string, deptId: string}>, users: list<array{lineId: string, userId: string, allowed: bool}>} */
+    public static function pipelineAccessShape(): array
+    {
+        return [
+            'departments' => DB::table('department_pipeline')->orderBy('pipeline_id')->get()
+                ->map(fn ($r) => ['lineId' => (string) $r->pipeline_id, 'deptId' => (string) $r->department_id])->all(),
+            'users' => DB::table('pipeline_user')->orderBy('pipeline_id')->get()
+                ->map(fn ($r) => ['lineId' => (string) $r->pipeline_id, 'userId' => (string) $r->user_id, 'allowed' => (bool) $r->allowed])->all(),
+        ];
     }
 
     /* ---------- hak akses ---------- */

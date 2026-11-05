@@ -66,24 +66,25 @@ class TrashTest extends TestCase
         $this->assertSame(0, TrashEntry::count());
     }
 
-    public function test_record_delete_needs_level_m_and_own_division(): void
+    public function test_record_delete_needs_level_m_and_being_pic(): void
     {
         $staff = $this->user('CampusNet');
         $own = $this->record($staff);
 
         $this->as($staff)->deleteJson('/api/trash/record/'.$own->id)->assertForbidden();
         $this->as($this->user('Customer Service', Role::KepalaDepartment))->deleteJson('/api/trash/record/'.$own->id)->assertForbidden();
-        $this->as($this->user('Executive'))->deleteJson('/api/trash/record/'.$own->id)->assertCreated();
+        $this->as($this->user('Executive'))->deleteJson('/api/trash/record/'.$own->id)->assertForbidden();
+        $this->as($this->user('Executive', Role::SuperAdmin))->deleteJson('/api/trash/record/'.$own->id)->assertCreated();
         $this->assertSame([], $this->as($staff)->getJson('/api/bootstrap')->json('trash'), 'yang tidak berhak tidak melihat entrinya');
     }
 
     public function test_line_and_stage_follow_pipeline_rights_and_blocks(): void
     {
-        $head = $this->user('CampusNet', Role::KepalaDepartment);
-        $line = Pipeline::with('stages')->whereRelation('department', 'name', 'CampusNet')->first();
-        $other = Pipeline::whereRelation('department', 'name', 'Digital Campaign')->first();
-
-        $this->as($head)->deleteJson('/api/trash/line/'.$other->id)->assertForbidden();
+        $line = Pipeline::with('stages')->where('name', 'Sales')->first();
+        $other = Pipeline::where('name', 'Campaign')->first();
+        $this->as($this->user('CampusNet', Role::KepalaDepartment))->deleteJson('/api/trash/line/'.$other->id)->assertForbidden();
+        $this->as($this->user('CampusNet', Role::KepalaDepartment))->deleteJson('/api/trash/stage/'.$line->stages->first()->id)->assertForbidden();
+        $head = $this->user('Executive', Role::SuperAdmin);
         $this->as($head)->deleteJson('/api/trash/stage/'.$line->stages->last()->id)->assertStatus(422)
             ->assertJsonPath('message', fn ($m) => str_contains($m, 'Closing'));
 
@@ -93,11 +94,14 @@ class TrashTest extends TestCase
         $this->as($head)->postJson('/api/trash/'.$this->entry()->id.'/restore')->assertOk();
         $this->assertSame(['Lead', 'Qualified', 'Meeting', 'Proposal', 'Negotiation', 'Closing'], $line->stages()->pluck('name')->all());
 
-        $this->record($head);
+        $this->record($this->user('CampusNet'));
         $this->as($head)->postJson('/api/deals', ['title' => 'Portal', 'recordId' => ClientPartner::first()->id])->assertCreated();
         $this->as($head)->deleteJson('/api/trash/line/'.$line->id)->assertStatus(422)
             ->assertJsonPath('message', fn ($m) => str_contains($m, 'Masih ada deal'));
-        $this->as($head)->deleteJson('/api/trash/line/'.Pipeline::whereRelation('department', 'name', 'DietPartner')->value('id'))->assertForbidden();
+        $this->as($head)->deleteJson('/api/trash/line/'.$other->id)->assertCreated();
+        $this->assertSame([], $this->as($this->user('Digital Campaign'))->getJson('/api/bootstrap')->json('lines'), 'pipeline terhapus tidak dipakai lagi');
+        $this->as($head)->postJson('/api/trash/'.$this->entry()->id.'/restore')->assertOk();
+        $this->assertSame(['Campaign'], array_column($this->as($this->user('Digital Campaign'))->getJson('/api/bootstrap')->json('lines'), 'name'));
     }
 
     public function test_admin_only_kinds_and_their_blocks(): void
@@ -115,14 +119,14 @@ class TrashTest extends TestCase
         $this->as($admin)->postJson('/api/trash/'.$this->entry()->id.'/restore')->assertOk();
         $this->assertSame('Creative & Media', Service::find($media->id)->department->name);
 
-        // Department dengan pengguna tidak bisa; department kosong ikut membawa pipeline kosongnya.
+        // Department dengan pengguna tidak bisa; department kosong dipulihkan beserta pipeline yang dipakainya.
         $this->as($admin)->deleteJson('/api/trash/dept/'.$head->department_id)->assertStatus(422);
         $diet = Department::where('name', 'DietPartner')->first();
         Service::where('department_id', $diet->id)->update(['department_id' => null]);
         $this->as($admin)->deleteJson('/api/trash/dept/'.$diet->id)->assertCreated();
-        $this->assertFalse(Pipeline::where('name', 'DietPartner')->exists());
+        $this->assertFalse(Pipeline::where('name', 'Sales')->first()->departments()->whereKey($diet->id)->exists());
         $this->as($admin)->postJson('/api/trash/'.$this->entry()->id.'/restore')->assertOk();
-        $this->assertSame($diet->id, Pipeline::where('name', 'DietPartner')->value('department_id'));
+        $this->assertSame(['Sales'], $diet->pipelines()->pluck('name')->all());
         $this->assertSame('C', $diet->accessGrants()->where('entity', 'deal')->value('level'));
 
         $override = AccessOverride::create(['user_id' => $head->id, 'entity' => 'deal', 'level' => 'R']);

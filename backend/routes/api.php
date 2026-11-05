@@ -51,6 +51,8 @@ Route::middleware('crm')->group(function () {
     Route::post('pipelines/{pipeline}/stages', [PipelineController::class, 'storeStage']);
     Route::patch('stages/{stage}', [PipelineController::class, 'updateStage']);
     Route::delete('stages/{stage}', [PipelineController::class, 'destroyStage']);
+    Route::put('pipelines/{pipeline}/departments', [AdminController::class, 'updatePipelineDepartments']);
+    Route::put('pipelines/{pipeline}/users', [AdminController::class, 'updatePipelineUser']);
     Route::get('deals', [DealController::class, 'index']);
     Route::post('deals', [DealController::class, 'store']);
     Route::patch('deals/{deal}', [DealController::class, 'update']);

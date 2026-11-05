@@ -50,9 +50,11 @@ class InteractionApiTest extends TestCase
 
     public function test_log_interaction_with_followup_and_notify_pic(): void
     {
+        // Hanya PIC dan Super Admin yang melihat data; Super Admin yang mencatat memberi tahu PIC-nya.
         $pic = $this->user();
-        $me = $this->user();
+        $me = $this->user('Executive', Role::SuperAdmin);
         $record = $this->record($pic);
+        $this->as($this->user())->postJson('/api/interactions', ['recordId' => $record->id, 'type' => 'Telepon', 'date' => today()->toDateString(), 'result' => 'x'])->assertForbidden();
 
         $res = $this->log($me, $record);
 
@@ -84,9 +86,9 @@ class InteractionApiTest extends TestCase
     {
         $me = $this->user();
         $record = $this->record($me);
-        $first = $this->log($me, $record, ['dealId' => 'new', 'dealTitle' => 'Website', 'lineId' => Pipeline::first()->id]);
+        $first = $this->log($me, $record, ['dealId' => 'new', 'dealTitle' => 'Website', 'lineId' => Pipeline::where('name', 'Campaign')->value('id')]);
         $stages = Pipeline::find($first['deal']['lineId'])->stages;
-        $this->assertSame('Customer Service', Pipeline::find($first['deal']['lineId'])->department->name, 'deal baru masuk pipeline divisi relasi');
+        $this->assertSame('Sales', Pipeline::find($first['deal']['lineId'])->name, 'deal baru masuk pipeline yang dipakai PIC relasi');
 
         $moved = $this->log($me, $record, ['dealId' => $first['deal']['id'], 'toStage' => $stages->firstWhere('name', 'Meeting')->id]);
         $this->assertSame((string) $stages->firstWhere('name', 'Meeting')->id, $moved['deal']['stageId']);
@@ -127,7 +129,7 @@ class InteractionApiTest extends TestCase
     {
         $owner = $this->user('Customer Service');
         $this->log($owner, $this->record($owner, Category::Lead));
-        $viewer = $this->user('Digital Campaign'); // divisi lain
+        $viewer = $this->user('Customer Service', Role::KepalaDepartment); // bukan PIC-nya
 
         $this->as($viewer)->getJson('/api/interactions')->assertOk()->assertJsonCount(0, 'data');
         $this->as($this->user('Business Operation', Role::Viewer))->postJson('/api/interactions', ['recordId' => 1])->assertForbidden();

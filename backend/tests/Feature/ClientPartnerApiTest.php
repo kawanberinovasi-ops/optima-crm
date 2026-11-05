@@ -47,15 +47,34 @@ class ClientPartnerApiTest extends TestCase
         return $r;
     }
 
-    public function test_list_only_contains_records_of_own_division(): void
+    public function test_list_only_contains_records_where_user_is_pic(): void
     {
+        $me = $this->user('Digital Campaign', Role::KepalaDepartment);
         $this->record($this->user('Customer Service'), Category::Lead, ['name' => 'Lead CS']);
-        $this->record($this->user('Digital Campaign'), Category::Lead, ['name' => 'Lead DC']);
+        $this->record($this->user('Digital Campaign'), Category::Lead, ['name' => 'Lead rekan']);
+        $this->record($me, Category::Lead, ['name' => 'Lead saya']);
 
-        $names = collect($this->as($this->user('Digital Campaign'))->getJson('/api/client-partners?all=1')->assertOk()->json('data'))->pluck('name');
+        $names = collect($this->as($me)->getJson('/api/client-partners?all=1')->assertOk()->json('data'))->pluck('name')->all();
+        $this->assertSame(['Lead saya'], $names, 'Kepala Department pun hanya melihat data yang PIC-nya dia');
 
-        $this->assertContains('Lead DC', $names);
-        $this->assertNotContains('Lead CS', $names);
+        $all = collect($this->as($this->user('Executive', Role::SuperAdmin))->getJson('/api/client-partners?all=1')->json('data'))->pluck('name');
+        $this->assertCount(3, $all, 'Super Admin melihat semua');
+    }
+
+    public function test_partner_is_created_without_lead_status_and_can_be_switched_from_lead(): void
+    {
+        $me = $this->user();
+        $partner = $this->as($me)->postJson('/api/client-partners', ['name' => 'Sound System Jaya', 'kind' => 'Partner'])->assertCreated()->assertJsonPath('data.cat', 'Partner');
+        $lead = $this->as($me)->postJson('/api/client-partners', ['name' => 'Media Kampus'])->assertCreated()->assertJsonPath('data.cat', 'Lead');
+
+        $this->as($me)->patchJson('/api/client-partners/'.$lead->json('data.id'), ['kind' => 'Partner'])->assertOk()->assertJsonPath('data.cat', 'Partner');
+        $this->as($me)->postJson('/api/client-partners', ['name' => 'X', 'kind' => 'Client'])->assertUnprocessable();
+
+        // Client tidak bisa diganti jadi Partner lewat form.
+        $client = $this->record($me, Category::Client);
+        $this->as($me)->patchJson('/api/client-partners/'.$client->id, ['kind' => 'Partner'])->assertOk()->assertJsonPath('data.cat', 'Client');
+        $this->assertSame(['Partner'], collect($this->as($me)->getJson('/api/client-partners?all=1&cat=Partner')->json('data'))->pluck('cat')->unique()->values()->all());
+        $this->assertNotNull($partner->json('data.id'));
     }
 
     public function test_opening_a_record_of_another_division_by_url_is_refused(): void
@@ -143,8 +162,8 @@ class ClientPartnerApiTest extends TestCase
 
         $this->as($dc)->getJson('/api/client-partners/'.$kol->id)->assertJsonPath('data.rate', 6000000)->assertJsonPath('data.service', 'KOL');
 
-        // Executive staf melihat lintas divisi; rate card Executive "Ya".
-        $this->as($this->user('Executive'))->getJson('/api/client-partners/'.$kol->id)->assertJsonPath('data.rate', 6000000);
+        // Super Admin melihat semua data beserta rate card-nya.
+        $this->as($this->user('Executive', Role::SuperAdmin))->getJson('/api/client-partners/'.$kol->id)->assertJsonPath('data.rate', 6000000);
         // Rate card dari form diabaikan untuk layanan selain KOL.
         $res = $this->as($dc)->postJson('/api/client-partners', ['name' => 'Komunitas X', 'service' => 'Community', 'rate' => 5000000])->assertCreated();
         $this->assertNull(ClientPartner::find($res->json('data.id'))->rate_card);
@@ -152,11 +171,12 @@ class ClientPartnerApiTest extends TestCase
 
     public function test_archive_needs_level_m_and_reason_and_can_be_restored(): void
     {
-        $record = $this->record($this->user('Customer Service'));
+        $manager = $this->user('Customer Service');
+        $record = $this->record($manager);
 
         $this->as($this->user('CampusNet'))->postJson('/api/client-partners/'.$record->id.'/archive', ['reason' => 'Tutup'])->assertForbidden();
+        $this->as($this->user('Customer Service'))->postJson('/api/client-partners/'.$record->id.'/archive', ['reason' => 'Tutup'])->assertForbidden();
 
-        $manager = $this->user('Customer Service');
         $this->as($manager)->postJson('/api/client-partners/'.$record->id.'/archive', [])->assertUnprocessable();
         $this->as($manager)->postJson('/api/client-partners/'.$record->id.'/archive', ['reason' => 'Perusahaan tutup'])
             ->assertOk()->assertJsonPath('data.archived', true)->assertJsonPath('data.archiveReason', 'Perusahaan tutup');
@@ -174,11 +194,11 @@ class ClientPartnerApiTest extends TestCase
         $this->assertSame(Category::Lead, $lead->fresh()->category);
     }
 
-    public function test_duplicate_check_covers_all_divisions_but_hides_details(): void
+    public function test_duplicate_check_covers_everyone_but_hides_details_of_others(): void
     {
-        $visible = $this->record($this->user('Digital Campaign'), Category::Lead, ['name' => 'PT Sinar Kreasi Nusantara']);
-        $hidden = $this->record($this->user('Customer Service'), Category::Lead, ['name' => 'Sinar Kreasi Nusantara Media']);
         $viewer = $this->user('Digital Campaign');
+        $visible = $this->record($viewer, Category::Lead, ['name' => 'PT Sinar Kreasi Nusantara']);
+        $hidden = $this->record($this->user('Customer Service'), Category::Lead, ['name' => 'Sinar Kreasi Nusantara Media']);
 
         $res = $this->as($viewer)->postJson('/api/client-partners/duplicates', ['name' => 'Sinar Kreasi Nusantara'])->assertOk();
 

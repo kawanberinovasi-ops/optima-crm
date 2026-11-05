@@ -29,8 +29,7 @@ const TrashOps = (() => {
     }
     if (kind === 'service' && svcUsed(item.name)) p.block = 'Layanan masih dipakai oleh relasi atau deal. Ganti layanan pada data terkait dahulu.';
     if (kind === 'dept') {
-      const lines = Store.db.lines.filter(l => l.dept === item.name);
-      if (Store.db.users.some(u => u.dept === item.name) || Store.db.records.some(r => r.dept === item.name) || (Store.db.services || []).some(s => s.dept === item.name) || Store.db.deals.some(d => lines.some(l => l.id === d.lineId))) p.block = 'Department masih dipakai oleh pengguna, relasi, layanan, atau deal. Pindahkan penugasannya dahulu. Pipeline kosong akan ikut masuk Data terhapus.';
+      if (Store.db.users.some(u => u.dept === item.name) || Store.db.records.some(r => r.dept === item.name) || (Store.db.services || []).some(s => s.dept === item.name)) p.block = 'Department masih dipakai oleh pengguna, relasi, atau layanan. Pindahkan penugasannya dahulu.';
     }
     if (kind === 'user') {
       if (id === me().id) p.block = 'Akun yang sedang dipakai tidak dapat dihapus.';
@@ -56,8 +55,9 @@ const TrashOps = (() => {
     } else {
       if (kind === 'dept') {
         data.access = clone(Store.db.access[p.item.name] || {});
-        data.lines = clone(Store.db.lines.filter(l => l.dept === p.item.name));
-        Store.db.lines = Store.db.lines.filter(l => l.dept !== p.item.name);
+        // Pipeline dipakai bersama divisi lain: yang disimpan hanya pipeline mana yang dipakai divisi ini.
+        data.lineIds = Store.db.lines.filter(l => (l.depts || []).includes(p.item.name)).map(l => l.id);
+        Store.db.lines.forEach(l => { l.depts = (l.depts || []).filter(x => x !== p.item.name); });
         delete Store.db.access[p.item.name];
       }
       if (kind === 'user') {
@@ -102,7 +102,6 @@ const TrashOps = (() => {
       if (data.deals.some(d => !lineById(d.lineId) || !lineById(d.lineId).stages.some(s => s.id === d.stageId) || !actualUser(d.ownerId))) return 'Pulihkan lini bisnis, stage, atau pengguna deal terkait dahulu.';
       if (data.deals.some(d => Store.db.deals.some(x => x.id === d.id || (d.code && x.code === d.code))) || data.interactions.some(i => Store.db.interactions.some(x => x.id === i.id || (i.code && x.code === i.code)))) return 'Kode deal atau interaksi terkait sudah dipakai data lain.';
     }
-    if (kind === 'dept' && data.lines.some(l => Store.db.lines.some(x => x.id === l.id))) return 'Ada lini bisnis dengan ID yang sama.';
     if (kind === 'user') {
       const emails = [item.email, ...(item.aliases || [])].map(e => e.toLowerCase());
       if (Store.db.users.some(u => [u.email, ...(u.aliases || [])].some(e => emails.includes(e.toLowerCase())))) return 'Email pengguna sudah dipakai akun lain.';
@@ -124,7 +123,7 @@ const TrashOps = (() => {
       Store.db[tables[kind]] = Store.db[tables[kind]] || [];
       Store.db[tables[kind]].push(item);
       if (kind === 'record') { Store.db.interactions.push(...clone(data.interactions)); Store.db.deals.push(...clone(data.deals)); }
-      if (kind === 'dept') { Store.db.access[item.name] = clone(data.access); Store.db.lines.push(...clone(data.lines)); }
+      if (kind === 'dept') { Store.db.access[item.name] = clone(data.access); Store.db.lines.forEach(l => { if ((data.lineIds || []).includes(l.id) && !(l.depts || []).includes(item.name)) l.depts = (l.depts || []).concat([item.name]); }); }
       if (kind === 'user') Store.db.overrides = (Store.db.overrides || []).concat(clone(data.overrides));
     }
     Store.db.trash = trash().filter(t => t.id !== id);
@@ -152,7 +151,7 @@ const TrashOps = (() => {
     if (!p || !p.allowed) return denied();
     if (p.block) { App.modal = { kind: 'confirm', title: 'Belum bisa dihapus', text: esc(p.block), ok: 'Mengerti', fn: () => {} }; render(); return; }
     const actor = me().id;
-    const related = kind === 'record' ? ' Beserta ' + Store.db.interactions.filter(i => i.recordId === id).length + ' interaksi dan ' + Store.db.deals.filter(d => d.recordId === id).length + ' deal terkait.' : kind === 'dept' ? ' Pipeline kosong department ini ikut dipindahkan.' : kind === 'user' ? ' Akun tidak bisa dipakai masuk. Nama di riwayat lama tetap tersimpan.' : '';
+    const related = kind === 'record' ? ' Beserta ' + Store.db.interactions.filter(i => i.recordId === id).length + ' interaksi dan ' + Store.db.deals.filter(d => d.recordId === id).length + ' deal terkait.' : kind === 'dept' ? ' Pemakaian pipeline oleh department ini ikut tersimpan.' : kind === 'user' ? ' Akun tidak bisa dipakai masuk. Nama di riwayat lama tetap tersimpan.' : '';
     App.modal = { kind: 'confirm', title: 'Hapus ' + esc(p.label) + '?', sub: labels[kind], text: 'Data akan dipindahkan ke Data terhapus dan bisa dipulihkan.' + related, ok: 'Hapus', danger: true,
       fn: () => {
         // Hak dan syarat diperiksa ulang saat konfirmasi.

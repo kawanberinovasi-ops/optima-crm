@@ -2,14 +2,14 @@
 'use strict';
 // Dengan backend (window.OPTIMA_API), cache browser dipisah dari data contoh mode lokal.
 // v4: status relasi (Lead/Client) dipisah dari layanan, akses per divisi. Data contoh lama di browser direset sekali.
-const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v3' : 'optima_crm_local_v5';
+const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v4' : 'optima_crm_local_v6';
 // Commercial dilebur ke Customer Service (keputusan 22 Okt 2026, mengikuti pratinjau klien).
 const DEPTS = ['Executive', 'Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'];
 const SEED_DEPTS = ['Executive', 'Commercial'].concat(DEPTS.slice(1));
 const ROLES = ['Super Admin', 'Kepala Department', 'Koordinator', 'Staf', 'Viewer'];
 // Status relasi. Data baru selalu Lead; jadi Client hanya lewat deal Won.
-const CATS = ['Lead', 'Client'];
-const CAT_KEY = { 'Lead': 'lead', 'Client': 'client' };
+const CATS = ['Lead', 'Client', 'Partner'];
+const CAT_KEY = { 'Lead': 'lead', 'Client': 'client', 'Partner': 'client' };
 // Layanan bukan status. Pemetaan ke divisi bisa diubah admin (KOL dan Community: Digital Campaign, sementara).
 const DEFAULT_SERVICES = [['KOL', 'Digital Campaign'], ['Community', 'Digital Campaign'], ['Media', 'Creative & Media'], ['Digital Campaign', 'Digital Campaign'], ['CampusNet', 'CampusNet'], ['DietPartner', 'DietPartner']];
 const serviceList = () => ((Store.db && Store.db.services) || DEFAULT_SERVICES.map(([name, dept], i) => ({ id: 's' + (i + 1), name, dept, active: true }))).filter(x => x.active !== false);
@@ -39,7 +39,7 @@ function defaultDivisionAccess(dept) {
   return { lead: lvl, client: lvl, interaksi: lvl, deal: lvl, nilai: dept === 'Executive' ? 'Ya' : 'Ya*', rate: dept === 'Digital Campaign' || dept === 'Executive' ? 'M' : 'Tidak' };
 }
 const PIPELINE_STAGES = ['Lead', 'Qualified', 'Meeting', 'Proposal', 'Negotiation', 'Closing'];
-const divisionLineId = (dept) => 'division-' + dept.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const CAMPAIGN_STAGES = ['Brief', 'Konsep', 'Produksi', 'Tayang', 'Report', 'Closing'];
 /**
  * Struktur divisi untuk data contoh (sama dengan pratinjau klien di GitHub Pages):
  * Commercial jadi Customer Service, satu pipeline per divisi, layanan diturunkan dari data, relasi berlayanan
@@ -58,9 +58,12 @@ function divisionWorkflow(db) {
   db.users.push({ id: 'u8', name: 'Tim DietPartner', email: 'dietpartner@contoh.test', dept: 'DietPartner', role: 'Kepala Department', active: true });
   db.users.push({ id: 'u9', name: 'Kepala Digital Campaign', email: 'kepala.digital@contoh.test', dept: 'Digital Campaign', role: 'Kepala Department', active: true });
   db.access = {}; DEPTS.forEach(d => { db.access[d] = defaultDivisionAccess(d); });
+  // Revisi klien 5 Nov 2026: pipeline per jenis pekerjaan. Sales dipakai semua divisi kecuali Digital Campaign (Campaign).
   const old = db.lines[0];
-  db.lines = DEPTS.map(dept => { const id = divisionLineId(dept); return { id, name: dept, dept, stages: PIPELINE_STAGES.map((name, i) => ({ id: id + '-s' + i, name })) }; });
-  const lineOf = (dept) => db.lines.find(l => l.dept === dept);
+  const mkLine = (id, name, depts, stages) => ({ id, name, depts, stages: stages.map((n, i) => ({ id: id + '-s' + i, name: n })) });
+  db.lines = [mkLine('sales', 'Sales', DEPTS.filter(d => d !== 'Digital Campaign'), PIPELINE_STAGES), mkLine('campaign', 'Campaign', ['Digital Campaign'], CAMPAIGN_STAGES)];
+  db.lineUsers = [];
+  const lineOf = (dept) => db.lines.find(l => l.depts.includes(dept));
   const firstOf = (dept) => db.users.find(u => u.active && u.role !== 'Viewer' && u.dept === dept);
   const infer = (r) => {
     if (r.service) return r.service;
@@ -89,6 +92,13 @@ function divisionWorkflow(db) {
     if (d.status === 'Won' && r.cat === 'Lead') { r.cat = 'Client'; r.convertedAt = d.closedAt; }
   });
   db.records.forEach(r => { const w = db.deals.filter(d => d.recordId === r.id && d.status === 'Won').map(d => d.closedAt).sort()[0]; if (w) r.convertedAt = w; });
+  // Contoh Partner (revisi klien): vendor dan media partner, tanpa tahap Lead.
+  [['Sound System Harmoni', 'Vendor', 'u6', 'Customer Service', 'Hendro S.', 'Pemilik', 'Bandung'], ['Majalah Kampus Kita', 'Media partner', 'u5', 'Digital Campaign', 'Tia Lestari', 'Pemimpin Redaksi', 'Bandung']]
+    .forEach(([name, segment, picId, dept, contact, title, city], i) => {
+      const n = db.records.length + 1; const id = 'r' + n; const cEmail = contact.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '') + '@contoh.test';
+      db.records.push({ id, code: 'CP-' + String(n).padStart(4, '0'), name, cat: 'Partner', service: '', createdBy: picId, segment, picId, dept, source: 'Referensi', contact, title, cEmail, phone: '0812-0000-' + String(3100 + i * 7), city, rate: '', note: '', createdAt: addDays(-40 + i * 9), updatedAt: addDays(-5 - i), archived: false, handovers: [], contacts: [{ id: 'cp' + n, name: contact, title, email: cEmail, phone: '0812-0000-' + String(3100 + i * 7) }] });
+    });
+  db.seq.r = db.records.length;
   return db;
 }
 
@@ -222,8 +232,8 @@ const overrideOf = (u, k) => (Store.db.overrides || []).find(o => o.userId === u
 function perm(ent, u) {
   u = u || me(); if (!u) return 'N';
   if (u.role === 'Super Admin') return 'M';
-  // Department yang melihat lintas divisi (Executive) mengelola semua data; Viewer-nya tetap hanya melihat.
-  if (seesAll(u)) return u.role === 'Viewer' ? 'R' : 'M';
+  // Department ber-level kelola (Executive) mengelola data yang dipegangnya; Viewer-nya tetap hanya melihat.
+  if ((Store.db.departments.find(d => d.name === u.dept) || {}).seesAll) return u.role === 'Viewer' ? 'R' : 'M';
   const ov = overrideOf(u, ent); if (ov) return u.role === 'Viewer' && ov.value !== 'N' ? 'R' : ov.value;
   const a = Store.db.access[u.dept]; let p = (a && a[ent]) || 'N';
   if (u.role === 'Viewer' && p !== 'N') p = 'R';
@@ -231,12 +241,12 @@ function perm(ent, u) {
 }
 const can = (ent, lvl) => LV[perm(ent)] >= LV[lvl];
 const catEnt = (cat) => CAT_KEY[cat] || 'lead';
-/** Super Admin dan department dengan seesAll (Executive) melihat Lead dan Client semua divisi. */
-const seesAll = (u) => !!u && (u.role === 'Super Admin' || !!(Store.db.departments.find(d => d.name === u.dept) || {}).seesAll);
-/** Data milik divisi sendiri, sesuai level dari role. Di mode backend server sudah menyaring; ini untuk tampilan dan mode lokal. */
-const canSeeRec = (r) => !r.hidden && can(catEnt(r.cat), 'R') && (seesAll(me()) || r.dept === me().dept);
-/** M mengubah semua data yang terlihat; C mengubah data yang dia pegang, dan Kepala Department/Koordinator semua data divisinya. */
-const canEditRec = (r) => { if (!canSeeRec(r)) return false; const p = perm(catEnt(r.cat)); return p === 'M' || (p === 'C' && (r.picId === me().id || isLead(me()))); };
+/** Revisi klien 5 Nov 2026: hanya Super Admin yang melihat seluruh data Client & Partner. */
+const seesAll = (u) => !!u && u.role === 'Super Admin';
+/** Data yang PIC-nya pengguna ini (Super Admin: semua). Di mode backend server sudah menyaring; ini untuk tampilan dan mode lokal. */
+const canSeeRec = (r) => !r.hidden && can(catEnt(r.cat), 'R') && (seesAll(me()) || r.picId === me().id);
+/** Mengubah data yang boleh dilihat, dengan level C atau M. */
+const canEditRec = (r) => canSeeRec(r) && LV[perm(catEnt(r.cat))] >= LV.C;
 const canDelRec = (r) => canSeeRec(r) && perm(catEnt(r.cat)) === 'M';
 /** Data baru selalu Lead, jadi yang menentukan adalah hak input Lead. */
 const canCreateAny = () => can('lead', 'C');
@@ -258,8 +268,9 @@ function canSeeRate() {
 }
 /** Deal terlihat kalau boleh melihat deal dan relasinya ada di cakupan divisi. */
 const canSeeDeal = (d) => !!d && can('deal', 'R') && (() => { const r = recById(d.recordId); return !r || canSeeRec(r); })();
-const canEditDeal = (d) => { if (!canSeeDeal(d)) return false; const p = perm('deal'); return p === 'M' || (p === 'C' && (d.ownerId === me().id || isLead(me()))); };
-const canConfigPipeline = () => ['Super Admin', 'Kepala Department'].includes(me().role);
+const canEditDeal = (d) => canSeeDeal(d) && can('deal', 'C');
+/** Membuat dan mengatur pipeline serta stage: hanya Super Admin. */
+const canConfigPipeline = () => !!me() && me().role === 'Super Admin';
 const canAdmin = () => me().role === 'Super Admin';
 const canReopen = (d) => { if (!canEditDeal(d)) return false; const u = me(); if (d.status === 'Won') return ['Super Admin', 'Kepala Department'].includes(u.role); return canEditDeal(d) && (d.ownerId === u.id || isLead(u) || u.role === 'Super Admin'); };
 /** Pindah PIC / divisi ke arah mana pun: siapa pun yang boleh mengubah data itu. */
@@ -267,10 +278,21 @@ const canHandover = (r) => canEditRec(r);
 const canMovePic = canHandover;
 /** Deal mengikuti divisi pemilik relasinya. */
 const scopedDeals = () => Store.db.deals.filter(d => !me() || canSeeDeal(d));
-/** Satu pipeline per divisi: pengguna melihat pipeline divisinya, yang melihat lintas divisi melihat semua. */
-const visibleLines = () => (Store.db.lines || []).filter(l => !l.archived && (!me() || seesAll(me()) || l.dept === me().dept));
-const canManageLine = (line) => !!line && canConfigPipeline() && (seesAll(me()) || line.dept === me().dept);
-const lineForDivision = (dept) => (Store.db.lines || []).find(l => !l.archived && l.dept === dept);
+/**
+ * Pipeline yang dipakai pengguna: pipeline divisinya, ditambah atau dikurangi pengecualian per pengguna dari Super Admin.
+ * Super Admin memakai semua pipeline.
+ */
+function linesFor(u) {
+  if (!u) return [];
+  const all = (Store.db.lines || []).filter(l => !l.archived);
+  if (u.role === 'Super Admin') return all;
+  const ov = (Store.db.lineUsers || []).filter(x => x.userId === u.id);
+  return all.filter(l => { const o = ov.find(x => x.lineId === l.id); return o ? o.allowed : (l.depts || []).includes(u.dept); });
+}
+const visibleLines = () => linesFor(me());
+const canManageLine = (line) => !!line && canConfigPipeline();
+/** Pipeline bawaan untuk deal milik PIC ini. */
+const lineForUser = (u, wanted) => { const ls = linesFor(u); return ls.find(l => l.id === wanted) || ls[0] || (Store.db.lines || []).find(l => !l.archived); };
 const divisionUsers = (dept) => Store.db.users.filter(u => u.active && u.role !== 'Viewer' && u.dept === dept);
 const liveRecs = () => Store.db.records.filter(r => !r.archived);
 const liveInts = () => Store.db.interactions.filter(i => { if (i.cancelled) return false; const r = recById(i.recordId); return !r || !me() || canSeeRec(r); });

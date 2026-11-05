@@ -7,7 +7,6 @@ use App\Enums\Role;
 use App\Models\AccessGrant;
 use App\Models\Department;
 use App\Models\OptionList;
-use App\Models\Pipeline;
 use App\Models\User;
 use App\Services\Access;
 use Database\Seeders\ReferenceDataSeeder;
@@ -120,10 +119,9 @@ class AdminApiTest extends TestCase
         $this->assertSame('C', $res->json('access.lead'));
         $this->assertSame('Ya*', $res->json('access.nilai'));
         $id = $res->json('data.id');
-        $this->assertSame('Training', Pipeline::where('department_id', $id)->value('name'), 'department baru langsung punya pipeline');
+        $this->assertSame(['Sales'], Department::find($id)->pipelines()->pluck('name')->all(), 'department baru memakai pipeline Sales');
 
         $this->as($admin)->patchJson('/api/departments/'.$id, ['name' => 'Training & Development'])->assertOk();
-        $this->assertSame('Training & Development', Pipeline::where('department_id', $id)->value('name'), 'pipeline ikut berganti nama');
         $this->user('Customer Service'); // department yang masih punya pengguna
         $this->as($admin)->deleteJson('/api/departments/'.Department::where('name', 'Customer Service')->value('id'))->assertStatus(422);
         $this->as($admin)->deleteJson('/api/departments/'.$id)->assertOk();

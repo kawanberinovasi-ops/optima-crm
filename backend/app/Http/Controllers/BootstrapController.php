@@ -75,10 +75,12 @@ class BootstrapController extends Controller
         return response()->json([
             'me' => FrontShape::user($me),
             // Pipeline divisinya sendiri; Executive melihat semua.
-            'lines' => $access->scopePipelines(Pipeline::with('stages', 'department'), $me)->whereNull('archived_at')->orderBy('position')->get()->map(fn (Pipeline $p) => FrontShape::line($p))->values(),
+            'lines' => $access->scopePipelines(Pipeline::with('stages', 'departments'), $me)->whereNull('archived_at')->orderBy('position')->get()->map(fn (Pipeline $p) => FrontShape::line($p))->values(),
             'deals' => $deals,
             'interactions' => $interactions,
             'trash' => app(Trash::class)->listFor($me),
+            // Pengaturan pipeline per divisi dan per pengguna, untuk halaman Akses & Audit.
+            'pipelineAccess' => $access->canViewAdmin($me) ? AdminController::pipelineAccessShape() : ['departments' => [], 'users' => []],
             'users' => User::with('department')->orderBy('id')->get()->map(fn (User $u) => FrontShape::user($u))->values(),
             'departments' => Department::orderBy('id')->get()->map(fn (Department $d) => ['id' => (string) $d->id, 'name' => $d->name, 'seesAll' => $d->sees_all])->values(),
             'services' => AdminController::servicesShape(),

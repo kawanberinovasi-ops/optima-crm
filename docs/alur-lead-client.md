@@ -108,6 +108,31 @@ Service**: pengguna, data, serah terima, dan layanannya pindah ke CS. Kolom Comm
 - Layanan deal otomatis mengikuti layanan relasinya. Dashboard, My Work, pencarian, dan pemberitahuan hanya menampilkan
   data, deal, pipeline, dan tim yang boleh dilihat.
 
+## 5b. Revisi klien 5 Nov 2026
+
+Perubahan di atas pratinjau klien, sesuai catatan revisi klien:
+
+1. **Setelah login masuk ke My Work** (juga logo di header).
+2. **Tidak ada tombol ganti akun** ("Executive ▾") di header; akun ditentukan saat login. Divisi dan role terlihat di menu profil.
+3. **Akses & Audit jadi menu header** (Super Admin dan Kepala Department), tidak lagi di menu profil.
+4. **Pipeline per jenis pekerjaan, diatur Super Admin.**
+   - Pipeline **Sales** (Lead → Qualified → Meeting → Proposal → Negotiation → Closing) dipakai semua divisi kecuali
+     Digital Campaign; pipeline **Campaign** (Brief → Konsep → Produksi → Tayang → Report → Closing) dipakai Digital Campaign.
+   - Pengguna memakai pipeline divisinya. Di Akses & Audit → Pipeline, Super Admin mengatur divisi pemakai setiap pipeline
+     dan pengecualian per pengguna (tambahkan atau cabut). Pengguna tanpa pipeline tidak melihat menu Pipeline.
+   - Membuat pipeline, mengubah atau menghapus stage, dan menghapus pipeline hanya Super Admin (Kepala Department tidak lagi).
+   - Deal dibuat di pipeline yang dipakai PIC relasinya. Pindah PIC memindahkan deal ke pipeline PIC baru kalau PIC baru
+     tidak memakai pipeline lamanya (stage dicocokkan lewat nama, kalau tidak ada lewat urutan; Won tetap di Closing).
+   - **Migrasi** (`2026_11_05_000002`): pipeline Customer Service jadi Sales, pipeline Digital Campaign jadi Campaign (stage
+     diganti nama sesuai urutan, deal tetap di posisinya), deal pipeline divisi lain pindah ke Sales lalu pipeline kosong dihapus.
+5. **Client dan Partner dibedakan.** Status relasi: Lead, Client, atau **Partner**. Partner (vendor, media partner, KOL,
+   komunitas) langsung tercatat tanpa tahap Lead; Lead jadi Client tetap hanya lewat deal Won. Saat edit, Lead dan Partner
+   boleh saling diganti kalau salah isi; Client tidak. Daftar punya tab Lead, Client, Partner. Data lama tidak diubah otomatis.
+6. **Hak lihat data: Super Admin melihat semua; pengguna lain hanya data yang PIC-nya dia** (beserta interaksi dan deal-nya).
+   Ini menggantikan akses per divisi dan akses lintas divisi Executive. Kepala Department dan Executive tidak lagi otomatis
+   melihat data timnya. Pindah PIC tetap jalan: penerima melihat datanya, PIC lama tidak lagi. Import oleh selain Super Admin
+   hanya untuk data dengan PIC dirinya sendiri. PIC deal selalu mengikuti PIC relasinya.
+
 ## 6. Akun internal
 
 - Daftar kepala department ada di `backend/storage/app/private/internal-users.json`. Folder itu **diabaikan git**, jadi

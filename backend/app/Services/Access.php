@@ -13,6 +13,7 @@ use App\Models\Interaction;
 use App\Models\Pipeline;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Satu pintu pemeriksaan hak akses (SRS bagian 3 dan 6.2, kelas "Izin").
@@ -62,14 +63,14 @@ class Access
         return array_values(array_filter(Category::cases(), fn (Category $c) => $this->can($user, $c->entity(), AccessLevel::R)));
     }
 
-    /** Super Admin dan department dengan sees_all (Executive) melihat Lead dan Client semua divisi. */
+    /** Revisi klien 5 Nov 2026: hanya Super Admin yang melihat seluruh data Client & Partner. */
     public function seesAllDivisions(User $user): bool
     {
-        return $user->active && ($user->isSuperAdmin() || (bool) $user->department?->sees_all);
+        return $user->active && $user->isSuperAdmin();
     }
 
     /**
-     * Batasi query Client & Partner ke status yang boleh dilihat dan ke divisi pemilik pengguna.
+     * Batasi query Client & Partner ke status yang boleh dilihat dan ke data yang PIC-nya pengguna itu (Super Admin: semua).
      * Dipakai daftar, pencarian, interaksi, deal, dashboard, export, dan email ringkasan.
      */
     public function scopeClientPartners(Builder $query, User $user): Builder
@@ -80,14 +81,14 @@ class Access
         }
         $query->whereIn('category', $categories);
 
-        return $this->seesAllDivisions($user) ? $query : $query->where('department_id', $user->department_id);
+        return $this->seesAllDivisions($user) ? $query : $query->where('pic_id', $user->id);
     }
 
-    /** Boleh membuka data: level R untuk statusnya, dan data milik divisinya (kecuali yang melihat lintas divisi). */
+    /** Boleh membuka data: level R untuk statusnya, dan PIC-nya pengguna itu (Super Admin: semua). */
     public function canViewRecord(User $user, ClientPartner $record): bool
     {
         return $this->can($user, $record->category->entity(), AccessLevel::R)
-            && ($this->seesAllDivisions($user) || $record->department_id === $user->department_id);
+            && ($this->seesAllDivisions($user) || $record->pic_id === $user->id);
     }
 
     public function canCreateRecord(User $user, Category $category): bool
@@ -106,15 +107,10 @@ class Access
         return false;
     }
 
-    /** M bisa mengubah semua data yang boleh dilihatnya; C data yang PIC-nya dia sendiri, atau semua data divisinya untuk Kepala Department/Koordinator. */
+    /** Mengubah data yang boleh dilihatnya (PIC-nya dia, atau semua untuk Super Admin) dengan level C atau M. */
     public function canEditRecord(User $user, ClientPartner $record): bool
     {
-        if (! $this->canViewRecord($user, $record)) {
-            return false;
-        }
-        $level = $this->level($user, $record->category->entity());
-
-        return $level === AccessLevel::M || ($level === AccessLevel::C && ($record->pic_id === $user->id || $user->role->isLead()));
+        return $this->canViewRecord($user, $record) && $this->level($user, $record->category->entity())->atLeast(AccessLevel::C);
     }
 
     /** Arsip, pulihkan, dan gabung data ganda hanya untuk level M, pada data yang boleh dilihat. */
@@ -142,9 +138,8 @@ class Access
         if (! $this->canViewDeal($user, $deal)) {
             return false;
         }
-        $level = $this->level($user, 'deal');
 
-        return $level === AccessLevel::M || ($level === AccessLevel::C && ($deal->owner_id === $user->id || $user->role->isLead()));
+        return $this->level($user, 'deal')->atLeast(AccessLevel::C);
     }
 
     /**
@@ -189,7 +184,7 @@ class Access
 
     public function canManageRateCard(User $user): bool
     {
-        return $user->active && ($user->isSuperAdmin() || ($this->seesAllDivisions($user) && $user->role !== Role::Viewer) || $this->raw($user, 'rate') === 'M');
+        return $user->active && ($user->isSuperAdmin() || $this->raw($user, 'rate') === 'M');
     }
 
     /**
@@ -224,22 +219,42 @@ class Access
             && $this->can($user, 'interaksi', AccessLevel::C);
     }
 
-    /** Pipeline yang terlihat: pipeline divisinya sendiri, atau semua untuk yang melihat lintas divisi. */
+    /**
+     * Pipeline yang dipakai pengguna (revisi klien 5 Nov 2026): pipeline divisinya, ditambah atau dikurangi pengecualian
+     * per pengguna yang diatur Super Admin. Super Admin memakai semua pipeline.
+     *
+     * @return list<int>
+     */
+    public function pipelineIds(User $user): array
+    {
+        if (! $user->active) {
+            return [];
+        }
+        $active = Pipeline::whereNull('archived_at');
+        if ($user->isSuperAdmin()) {
+            return $active->orderBy('position')->pluck('id')->all();
+        }
+        $fromDept = DB::table('department_pipeline')->where('department_id', $user->department_id)->pluck('pipeline_id');
+        $overrides = DB::table('pipeline_user')->where('user_id', $user->id)->pluck('allowed', 'pipeline_id');
+        $ids = $fromDept->merge($overrides->filter()->keys())->unique()->reject(fn ($id) => $overrides->has($id) && ! $overrides[$id]);
+
+        return $active->whereIn('id', $ids)->orderBy('position')->pluck('id')->all();
+    }
+
     public function scopePipelines(Builder $query, User $user): Builder
     {
-        return $this->seesAllDivisions($user) ? $query : $query->where('department_id', $user->department_id);
+        return $query->whereIn('id', $this->pipelineIds($user));
     }
 
     public function canViewPipeline(User $user, Pipeline $pipeline): bool
     {
-        return $user->active && ($this->seesAllDivisions($user) || $pipeline->department_id === $user->department_id);
+        return in_array($pipeline->id, $this->pipelineIds($user), true);
     }
 
-    /** Mengatur pipeline dan stage tanpa developer (SRS 4.3): Super Admin atau Kepala Department, untuk pipeline divisinya. */
+    /** Membuat dan mengatur pipeline serta stage: hanya Super Admin (revisi klien 5 Nov 2026). */
     public function canConfigurePipeline(User $user, ?Pipeline $pipeline = null): bool
     {
-        return $user->active && in_array($user->role, [Role::SuperAdmin, Role::KepalaDepartment], true)
-            && ($pipeline === null || $this->canViewPipeline($user, $pipeline));
+        return $user->active && $user->isSuperAdmin();
     }
 
     /** Hanya Super Admin yang mengelola pengguna, department, role, dan hak akses. */

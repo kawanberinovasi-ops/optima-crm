@@ -62,7 +62,7 @@ class ImportMergeTest extends TestCase
         $this->assertCount(1, $res['deals']);
         $this->assertTrue($res['skippedExample']);
         $this->assertSame([
-            'Sheet 7 baris 8: Kategori "Planet" ga dikenal. Pakai Lead atau Client; KOL/Community/Media isi di kolom Layanan.',
+            'Sheet 7 baris 8: Kategori "Planet" ga dikenal. Pakai Lead, Client, atau Partner; KOL/Community/Media isi di kolom Layanan.',
             'Sheet 9 baris 7: Deal Won wajib ada nilai deal dan tanggal closing.',
         ], $res['errors']);
         // Pencocokan SRS 8.3: baris di file = baris lolos + baris ditolak.

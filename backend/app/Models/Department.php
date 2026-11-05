@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['name', 'sees_all'])]
@@ -11,7 +12,7 @@ class Department extends Model
 {
     protected function casts(): array
     {
-        // sees_all: department ini melihat Lead dan Client semua divisi (Executive).
+        // sees_all: tidak dipakai lagi sejak revisi klien 5 Nov 2026 (hanya Super Admin yang melihat semua data).
         return ['sees_all' => 'boolean'];
     }
 
@@ -20,9 +21,9 @@ class Department extends Model
         return $this->hasMany(User::class);
     }
 
-    public function pipelines(): HasMany
+    public function pipelines(): BelongsToMany
     {
-        return $this->hasMany(Pipeline::class);
+        return $this->belongsToMany(Pipeline::class);
     }
 
     public function accessGrants(): HasMany

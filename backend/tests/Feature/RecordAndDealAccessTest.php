@@ -49,7 +49,7 @@ class RecordAndDealAccessTest extends TestCase
     private function deal(User $owner, DealStatus $status = DealStatus::Open, array $attrs = []): Deal
     {
         static $n = 0;
-        $pipeline = Pipeline::with('stages')->where('department_id', $owner->department_id)->firstOrFail();
+        $pipeline = Pipeline::with('stages')->where('name', 'Sales')->firstOrFail();
         $closing = in_array($status, [DealStatus::Won], true);
 
         return Deal::create($attrs + [
@@ -75,16 +75,17 @@ class RecordAndDealAccessTest extends TestCase
         $this->assertFalse($this->access()->canArchiveRecord($a, $own), 'arsip butuh level M');
     }
 
-    public function test_level_m_edits_and_archives_any_record_in_own_division_only(): void
+    public function test_only_pic_and_super_admin_see_a_record(): void
     {
-        $commercial = $this->user('Customer Service');
-        $sameDivision = $this->record($this->user('Customer Service'), Category::Client);
-        $otherDivision = $this->record($this->user('CampusNet'), Category::Client);
+        $manager = $this->user('Customer Service', Role::KepalaDepartment);
+        $own = $this->record($manager, Category::Client);
+        $colleague = $this->record($this->user('Customer Service'), Category::Client);
 
-        $this->assertTrue($this->access()->canEditRecord($commercial, $sameDivision));
-        $this->assertTrue($this->access()->canArchiveRecord($commercial, $sameDivision));
-        $this->assertFalse($this->access()->canEditRecord($commercial, $otherDivision));
-        $this->assertFalse($this->access()->canViewRecord($commercial, $otherDivision));
+        $this->assertTrue($this->access()->canEditRecord($manager, $own));
+        $this->assertTrue($this->access()->canArchiveRecord($manager, $own), 'level M atas data miliknya');
+        $this->assertFalse($this->access()->canViewRecord($manager, $colleague), 'Kepala Department tidak otomatis melihat data timnya');
+        $this->assertFalse($this->access()->canViewRecord($this->user('Executive', Role::KepalaDepartment), $colleague), 'Executive juga tidak');
+        $this->assertTrue($this->access()->canEditRecord($this->user('Executive', Role::SuperAdmin), $colleague), 'Super Admin melihat semua');
     }
 
     public function test_handover_follows_edit_right(): void
@@ -92,16 +93,14 @@ class RecordAndDealAccessTest extends TestCase
         $staff = $this->user('CampusNet');
         $coord = $this->user('CampusNet', Role::Koordinator);
         $staffRecord = $this->record($staff);
-        $coordRecord = $this->record($coord);
 
-        $this->assertTrue($this->access()->canHandover($staff, $staffRecord), 'staf C atas data yang PIC-nya dia');
-        $this->assertFalse($this->access()->canHandover($staff, $coordRecord), 'staf C atas data rekan');
-        $this->assertTrue($this->access()->canHandover($coord, $staffRecord), 'Koordinator atas data divisinya');
-        $this->assertTrue($this->access()->canHandover($this->user('Customer Service'), $this->record($this->user('Customer Service'))), 'level M di divisinya');
-        $this->assertFalse($this->access()->canHandover($this->user('Customer Service'), $staffRecord), 'data divisi lain');
+        $this->assertTrue($this->access()->canHandover($staff, $staffRecord), 'PIC dengan level C');
+        $this->assertFalse($this->access()->canHandover($coord, $staffRecord), 'Koordinator bukan PIC-nya');
+        $this->assertTrue($this->access()->canHandover($this->user('Executive', Role::SuperAdmin), $staffRecord));
+        $this->assertFalse($this->access()->canHandover($this->user('CampusNet', Role::Viewer), $this->record($this->user('CampusNet'))));
     }
 
-    public function test_commercial_staff_sees_value_only_of_own_deals(): void
+    public function test_deal_values_follow_deal_visibility(): void
     {
         $staff = $this->user('Customer Service');
         $own = $this->deal($staff);
@@ -109,6 +108,7 @@ class RecordAndDealAccessTest extends TestCase
 
         $this->assertTrue($this->access()->canSeeDealValue($staff, $own));
         $this->assertFalse($this->access()->canSeeDealValue($staff, $other));
+        $this->assertTrue($this->access()->canSeeDealValue($this->user('Executive', Role::SuperAdmin), $other));
     }
 
     public function test_hidden_deal_values_are_not_sent(): void
@@ -133,7 +133,7 @@ class RecordAndDealAccessTest extends TestCase
 
         $this->assertArrayHasKey('rate_card', $this->access()->filterClientPartner($this->user('Digital Campaign'), $payload));
         $this->assertArrayNotHasKey('rate_card', $this->access()->filterClientPartner($this->user('Customer Service', Role::Koordinator), $payload));
-        $this->assertArrayHasKey('rate_card', $this->access()->filterClientPartner($this->user('Executive'), $payload), 'Executive selalu melihat rate card');
+        $this->assertArrayHasKey('rate_card', $this->access()->filterClientPartner($this->user('Executive', Role::SuperAdmin), $payload));
     }
 
     public function test_won_deal_reopens_only_by_super_admin_or_department_head_who_can_edit_it(): void
@@ -142,23 +142,22 @@ class RecordAndDealAccessTest extends TestCase
         $deal = $this->deal($owner, DealStatus::Won);
 
         $this->assertTrue($this->access()->canReopenDeal($this->user('Executive', Role::SuperAdmin), $deal));
-        $this->assertTrue($this->access()->canReopenDeal($this->user('Customer Service', Role::KepalaDepartment), $deal));
-        $this->assertTrue($this->access()->canReopenDeal($this->user('Executive', Role::KepalaDepartment), $deal), 'Kepala Department Executive (lintas divisi)');
-        $this->assertFalse($this->access()->canReopenDeal($this->user('CampusNet', Role::KepalaDepartment), $deal), 'Kepala Department divisi lain');
-        $this->assertFalse($this->access()->canReopenDeal($this->user('Customer Service', Role::Koordinator), $deal));
-        $this->assertFalse($this->access()->canReopenDeal($owner, $deal), 'PIC tidak bisa buka deal Won');
+        $this->assertFalse($this->access()->canReopenDeal($this->user('Customer Service', Role::KepalaDepartment), $deal), 'bukan PIC-nya');
+        $this->assertFalse($this->access()->canReopenDeal($owner, $deal), 'PIC staf tidak bisa buka deal Won');
+
+        $head = $this->user('Customer Service', Role::KepalaDepartment);
+        $this->assertTrue($this->access()->canReopenDeal($head, $this->deal($head, DealStatus::Won)), 'Kepala Department atas deal yang dia pegang');
     }
 
-    public function test_lost_and_on_hold_deals_reopen_by_pic_or_their_lead(): void
+    public function test_lost_and_on_hold_deals_reopen_by_pic_or_super_admin(): void
     {
         foreach ([DealStatus::Lost, DealStatus::OnHold] as $status) {
             $owner = $this->user('Customer Service');
             $deal = $this->deal($owner, $status);
 
             $this->assertTrue($this->access()->canReopenDeal($owner, $deal), $status->value.' PIC');
-            $this->assertTrue($this->access()->canReopenDeal($this->user('Customer Service', Role::Koordinator), $deal), $status->value.' atasan');
-            $this->assertFalse($this->access()->canReopenDeal($this->user('Customer Service'), $deal), $status->value.' staf lain');
-            $this->assertFalse($this->access()->canReopenDeal($this->user('Business Operation', Role::KepalaDepartment), $deal), $status->value.' lain department');
+            $this->assertTrue($this->access()->canReopenDeal($this->user('Executive', Role::SuperAdmin), $deal), $status->value.' Super Admin');
+            $this->assertFalse($this->access()->canReopenDeal($this->user('Customer Service', Role::Koordinator), $deal), $status->value.' atasan bukan PIC');
         }
     }
 
@@ -187,18 +186,16 @@ class RecordAndDealAccessTest extends TestCase
         $this->assertContains($wonInOct->id, $ids);
     }
 
-    public function test_only_super_admin_and_department_head_configure_pipeline(): void
+    public function test_only_super_admin_configures_pipelines(): void
     {
-        $this->assertTrue($this->access()->canConfigurePipeline($this->user('Customer Service', Role::KepalaDepartment)));
-        $this->assertFalse($this->access()->canConfigurePipeline($this->user('Customer Service', Role::Koordinator)));
+        $sales = Pipeline::where('name', 'Sales')->first();
+        $campaign = Pipeline::where('name', 'Campaign')->first();
 
-        // Pipeline per divisi: Kepala Department hanya mengatur pipeline divisinya, Executive semua.
-        $cs = Pipeline::whereRelation('department', 'name', 'Customer Service')->first();
-        $dc = Pipeline::whereRelation('department', 'name', 'Digital Campaign')->first();
-        $head = $this->user('Customer Service', Role::KepalaDepartment);
-        $this->assertTrue($this->access()->canConfigurePipeline($head, $cs));
-        $this->assertFalse($this->access()->canConfigurePipeline($head, $dc));
-        $this->assertTrue($this->access()->canConfigurePipeline($this->user('Executive', Role::KepalaDepartment), $dc));
-        $this->assertFalse($this->access()->canViewPipeline($this->user('Customer Service'), $dc));
+        $this->assertTrue($this->access()->canConfigurePipeline($this->user('Executive', Role::SuperAdmin), $campaign));
+        $this->assertFalse($this->access()->canConfigurePipeline($this->user('Customer Service', Role::KepalaDepartment), $sales));
+        $this->assertFalse($this->access()->canConfigurePipeline($this->user('Executive', Role::KepalaDepartment), $sales));
+        $this->assertTrue($this->access()->canViewPipeline($this->user('Customer Service'), $sales));
+        $this->assertFalse($this->access()->canViewPipeline($this->user('Customer Service'), $campaign));
+        $this->assertTrue($this->access()->canViewPipeline($this->user('Digital Campaign'), $campaign));
     }
 }

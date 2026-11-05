@@ -148,8 +148,7 @@ class Trash
             'dept' => User::where('department_id', $item->id)->whereNull('deleted_at')->exists()
                 || ClientPartner::withTrashed()->where('department_id', $item->id)->exists()
                 || Service::where('department_id', $item->id)->exists()
-                || Deal::whereIn('pipeline_id', $item->pipelines()->select('id'))->exists()
-                ? 'Department masih dipakai oleh pengguna, relasi, layanan, atau deal. Pindahkan penugasannya dahulu. Pipeline kosong akan ikut masuk Data terhapus.' : null,
+                ? 'Department masih dipakai oleh pengguna, relasi, atau layanan. Pindahkan penugasannya dahulu.' : null,
             'user' => $item->id === $by->id ? 'Akun yang sedang dipakai tidak dapat dihapus.'
                 : ($item->active && $item->role === Role::SuperAdmin && User::where(['active' => true, 'role' => Role::SuperAdmin])->whereNull('deleted_at')->count() <= 1
                     ? 'Setidaknya satu Super Admin aktif harus tetap tersedia.'
@@ -170,9 +169,8 @@ class Trash
                 : ($r->service_id && ! Service::whereKey($r->service_id)->exists() ? 'Pulihkan layanan relasi ini dahulu.' : null))),
             'user' => ! Department::whereKey($s['department_id'] ?? 0)->exists() ? 'Pulihkan department data ini dahulu.' : null,
             'line' => ($p = Pipeline::find($s['id'])) === null ? 'Data tidak ditemukan.'
-                : (Pipeline::whereNull('archived_at')->where('department_id', $p->department_id)->whereRaw('lower(name) = ?', [strtolower($p->name)])->exists()
-                    ? 'Nama yang sama sudah dipakai. Ubah data yang sudah tersedia dahulu.'
-                    : (! Department::whereKey($p->department_id)->exists() ? 'Pulihkan department data ini dahulu.' : null)),
+                : (Pipeline::whereNull('archived_at')->whereRaw('lower(name) = ?', [strtolower($p->name)])->exists()
+                    ? 'Nama yang sama sudah dipakai. Ubah data yang sudah tersedia dahulu.' : null),
             'stage' => ($p = Pipeline::whereNull('archived_at')->find($s['row']['pipeline_id'])) === null ? 'Pulihkan lini bisnis stage ini dahulu.'
                 : ($p->stages()->where('id', $s['row']['id'])->orWhere(fn ($q) => $q->where('pipeline_id', $p->id)->whereRaw('lower(name) = ?', [strtolower($s['row']['name'])]))->exists()
                     ? 'Stage dengan ID atau nama yang sama sudah tersedia.' : null),
@@ -184,8 +182,7 @@ class Trash
                 ? 'Pengguna belum tersedia atau pengecualian untuk bagian yang sama sudah ada.' : null,
             'dept' => Department::whereKey($s['row']['id'])->orWhereRaw('lower(name) = ?', [strtolower($s['row']['name'])])->exists()
                 ? 'Nama yang sama sudah dipakai. Ubah data yang sudah tersedia dahulu.'
-                : (collect($s['pipelines'])->contains(fn ($p) => Pipeline::whereKey($p['row']['id'])->orWhere('name', $p['row']['name'])->exists())
-                    ? 'Ada lini bisnis dengan ID atau nama yang sama.' : null),
+                : null,
             default => null,
         };
     }
@@ -202,7 +199,7 @@ class Trash
     {
         $p->update(['archived_at' => now()]);
 
-        return [$p->name, $p->department_id, ['id' => $p->id]];
+        return [$p->name, null, ['id' => $p->id]];
     }
 
     private function deleteStage(Stage $stage): array
@@ -214,7 +211,7 @@ class Trash
         $stage->delete();
         $pipeline->stages()->where('position', '>', $row['position'])->decrement('position');
 
-        return [$row['name'].' · '.$pipeline->name, $pipeline->department_id, ['id' => $row['id'], 'row' => $row]];
+        return [$row['name'].' · '.$pipeline->name, null, ['id' => $row['id'], 'row' => $row]];
     }
 
     private function deleteRow($model, string $label, ?int $deptId): array
@@ -229,15 +226,12 @@ class Trash
     {
         $row = (array) DB::table('departments')->where('id', $dept->id)->first();
         $grants = DB::table('access_grants')->where('department_id', $dept->id)->get()->map(fn ($g) => (array) $g)->all();
-        $pipelines = $dept->pipelines()->get()->map(fn (Pipeline $p) => [
-            'row' => (array) DB::table('pipelines')->where('id', $p->id)->first(),
-            'stages' => DB::table('stages')->where('pipeline_id', $p->id)->get()->map(fn ($s) => (array) $s)->all(),
-        ])->all();
-        DB::table('pipelines')->where('department_id', $dept->id)->delete();
+        // Pipeline dipakai bersama divisi lain, jadi yang disimpan hanya divisi ini memakai pipeline mana.
+        $pipelines = DB::table('department_pipeline')->where('department_id', $dept->id)->pluck('pipeline_id')->all();
         AccessGrant::where('department_id', $dept->id)->delete();
         $dept->delete();
 
-        return [$row['name'], null, ['id' => $row['id'], 'row' => $row, 'grants' => $grants, 'pipelines' => $pipelines]];
+        return [$row['name'], null, ['id' => $row['id'], 'row' => $row, 'grants' => $grants, 'pipelineIds' => $pipelines]];
     }
 
     private function deleteUser(User $user): array
@@ -265,11 +259,8 @@ class Trash
         foreach ($s['grants'] as $g) {
             DB::table('access_grants')->insert($g);
         }
-        foreach ($s['pipelines'] as $p) {
-            DB::table('pipelines')->insert($p['row']);
-            foreach ($p['stages'] as $stage) {
-                DB::table('stages')->insert($stage);
-            }
+        foreach (Pipeline::whereIn('id', $s['pipelineIds'] ?? [])->pluck('id') as $pipelineId) {
+            DB::table('department_pipeline')->insert(['department_id' => $s['row']['id'], 'pipeline_id' => $pipelineId]);
         }
     }
 }

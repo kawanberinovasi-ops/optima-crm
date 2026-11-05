@@ -82,6 +82,7 @@
     // Pengguna di Data terhapus hanya dipakai untuk menampilkan nama di riwayat lama.
     db.users = users.filter(u => !u.deleted); db.deletedUsers = users.filter(u => u.deleted);
     db.trash = b.trash || [];
+    db.lineUsers = (b.pipelineAccess || {}).users || [];
     db.departments = b.departments; db.services = b.services; db.access = b.access; db.overrides = b.overrides; db.options = b.options;
     db.records = b.records.map(ensureRec);
     // Sejak G2 pipeline, deal, dan interaksi juga datang dari server.
@@ -136,7 +137,7 @@
       await Api.post('auth/dev-login', { email });
       await loadBootstrap();
       App.login = { step: 'idle', email: '', err: '' }; App.pop = null; App.drawer = null; App.anim = true;
-      location.hash = '#/cp'; render();
+      location.hash = '#/mywork'; render();
     } catch (e) {
       App.login.step = 'idle'; App.login.err = e.message; render();
     }
@@ -172,7 +173,7 @@
 
   /* ---------- Client & Partner lewat API ---------- */
   // Status (selalu Lead saat dibuat), PIC, dan divisi ditentukan server dari akun yang login, jadi tidak dikirim.
-  const PAYLOAD = ['name', 'service', 'segment', 'source', 'city', 'note', 'rate', 'contact', 'title', 'cEmail', 'phone'];
+  const PAYLOAD = ['name', 'kind', 'service', 'segment', 'source', 'city', 'note', 'rate', 'contact', 'title', 'cEmail', 'phone'];
   Forms.record = async (o) => {
     const m = App.modal; if (m.busy) return;
     const err = {};
@@ -299,6 +300,23 @@
     const m = App.modal; if (!o.name) { m.err = { name: 'Nama wajib diisi.' }; m.still = true; render(); return; }
     try { const l = putLine((await Api.post('pipelines', { name: o.name, stages: o.stages || '' })).data); App.ui.pl.line = l.id; App.modal = null; go('pipeline'); toast('Pipeline baru!', l.name + ' udah ada.'); } catch (e) { fail(e, m); }
   };
+  /* ---------- Pipeline per pengguna: daftar dari server sudah disaring ---------- */
+  // Pengguna biasa hanya menerima pipeline yang dia pakai, jadi semuanya miliknya. Super Admin menerima semua pipeline
+  // beserta pengaturan divisi dan pengecualian, jadi pipeline orang lain dihitung seperti di mode lokal.
+  const localLinesFor = linesFor;
+  linesFor = function (u) {
+    if (u && me() && u.id === me().id && me().role !== 'Super Admin') return (Store.db.lines || []).filter(l => !l.archived);
+    return localLinesFor(u);
+  };
+  Changes.linedept = (el) => {
+    const l = lineById(el.dataset.v); if (!l) return;
+    const names = el.checked ? (l.depts || []).concat([el.dataset.d]) : (l.depts || []).filter(x => x !== el.dataset.d);
+    const deptIds = Store.db.departments.filter(d => names.includes(d.name)).map(d => Number(d.id));
+    adminCall(() => req('PUT', 'pipelines/' + l.id + '/departments', { deptIds }), 'Tersimpan', l.name + ' dipakai: ' + (names.join(', ') || 'tidak ada divisi'));
+  };
+  Forms.lineuser = (o) => { if (!o.userId) return; adminCall(() => req('PUT', 'pipelines/' + o.lineId + '/users', { userId: Number(o.userId), allowed: o.allowed === '1' }), 'Tersimpan', userName(o.userId) + (o.allowed === '1' ? ' ditambahkan' : ' dicabut')); };
+  Actions.lineuserdel = (el) => adminCall(() => req('PUT', 'pipelines/' + el.dataset.v + '/users', { userId: Number(el.dataset.u), allowed: null }), 'Tersimpan', userName(el.dataset.u) + ' kembali mengikuti divisinya');
+
   /* ---------- Data terhapus lewat API: server memeriksa ulang hak dan syaratnya ---------- */
   const trashDone = async (title, text) => {
     await loadBootstrap();
@@ -422,7 +440,7 @@
     if (err) { App.login.err = LOGIN_ERR[err] || 'Login gagal. Coba lagi.'; history.replaceState(null, '', '#/login'); }
     parseHash();
     if (me() && App.route === 'akses' && !canViewAdmin()) App.route = 'mywork';
-    if (me() && App.route === 'login') location.hash = '#/cp';
+    if (me() && App.route === 'login') location.hash = '#/mywork';
     App.anim = true; render();
   }
   boot();
