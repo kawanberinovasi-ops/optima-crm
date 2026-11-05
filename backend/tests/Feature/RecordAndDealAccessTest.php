@@ -49,7 +49,7 @@ class RecordAndDealAccessTest extends TestCase
     private function deal(User $owner, DealStatus $status = DealStatus::Open, array $attrs = []): Deal
     {
         static $n = 0;
-        $pipeline = Pipeline::with('stages')->where('name', 'Sales')->firstOrFail();
+        $pipeline = Pipeline::with('stages')->where('name', 'Customer Service')->firstOrFail();
         $closing = in_array($status, [DealStatus::Won], true);
 
         return Deal::create($attrs + [
@@ -188,7 +188,7 @@ class RecordAndDealAccessTest extends TestCase
 
     public function test_only_super_admin_configures_pipelines(): void
     {
-        $sales = Pipeline::where('name', 'Sales')->first();
+        $sales = Pipeline::where('name', 'Customer Service')->first();
         $campaign = Pipeline::where('name', 'Campaign')->first();
 
         $this->assertTrue($this->access()->canConfigurePipeline($this->user('Executive', Role::SuperAdmin), $campaign));

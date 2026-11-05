@@ -48,14 +48,14 @@ const App = {
   route: 'mywork', anim: true, pop: null, modal: null, drawer: null, pal: null,
   ui: { cp: { cat: 'all', q: '', dept: 'all', service: 'all', page: 0, sort: 'name' }, pl: { line: 'um', per: 'all', val: '', q: '' }, mw: { f: 'all' }, db: { per: 'm', val: '' }, ak: { tab: 'users', q: '', act: 'all', by: 'all' } }
 };
-const ROUTES = ['login', 'mywork', 'dashboard', 'cp', 'pipeline', 'akses', 'expired'];
+const ROUTES = ['login', 'mywork', 'dashboard', 'cp', 'partner', 'pipeline', 'akses', 'expired'];
 function parseHash() {
   const h = location.hash.replace(/^#\/?/, ''); const [r, qs] = h.split('?');
   App.route = ROUTES.includes(r) ? r : (r ? 'notfound' : 'mywork');
   const q = new URLSearchParams(qs || '');
   if (App.route === 'pipeline' && q.get('line')) App.ui.pl.line = q.get('line');
   if (App.route === 'akses' && q.get('tab')) App.ui.ak.tab = q.get('tab');
-  if (App.route === 'cp' && q.get('open')) App.drawer = { id: q.get('open') };
+  if ((App.route === 'cp' || App.route === 'partner') && q.get('open')) App.drawer = { id: q.get('open') };
 }
 function go(route, extra) { App.pop = null; App.pal = null; const h = '#/' + route + (extra ? '?' + extra : ''); if (location.hash === h) { App.anim = true; render(); } else location.hash = h; }
 window.addEventListener('hashchange', () => { parseHash(); App.pop = null; window.scrollTo(0, 0); if (!me() || App.noSkeleton) { App.anim = true; render(); return; } App.loading = true; render(); clearTimeout(App._lt); App._lt = setTimeout(() => { App.loading = false; App.anim = true; render(); }, 260); });
@@ -74,7 +74,7 @@ function render() {
   document.getElementById('ov').innerHTML = overlays();
   restoreFocus(f);
   if (App.anim) { countUp(); App.anim = false; }
-  const t = { mywork: 'My Work', dashboard: 'Dashboard', cp: 'Client & Partner', pipeline: 'Pipeline', akses: 'Akses & Audit', login: 'Masuk', notfound: 'Ga ketemu', expired: 'Sesi berakhir' }[App.route] || 'OPTIMA';
+  const t = { mywork: 'My Work', dashboard: 'Dashboard', cp: 'Client', partner: 'Partner', pipeline: 'Pipeline', akses: 'Akses & Audit', login: 'Masuk', notfound: 'Ga ketemu', expired: 'Sesi berakhir' }[App.route] || 'OPTIMA';
   document.title = t + ' · OPTIMA CRM';
 }
 function countUp() {
@@ -126,7 +126,7 @@ function navbar() {
   const roleTag = { 'Super Admin': 'ADMIN', 'Kepala Department': 'HEAD', Koordinator: 'KOOR', Staf: 'STAF', Viewer: 'VIEW' }[u.role] || '';
   return '<header class="nav glass"><div class="nav-in">' +
     '<a class="nav-logo" href="#/mywork" aria-label="OPTIMA Media, ke My Work"><img src="assets/logo.png" alt="OPTIMA Media"></a>' +
-    '<nav class="menu" aria-label="Menu utama">' + item('', 'My Work', 'mywork') + item('', 'Dashboard', 'dashboard') + (can('deal', 'R') && visibleLines().length ? item('pl', 'Pipeline', 'pipeline', plDrop) : '') + item('cp', 'Client & Partner', 'cp', cpDrop) + (canViewAdmin() ? item('', 'Akses & Audit', 'akses') : '') + '</nav>' +
+    '<nav class="menu" aria-label="Menu utama">' + item('', 'My Work', 'mywork') + item('', 'Dashboard', 'dashboard') + (can('deal', 'R') && visibleLines().length ? item('pl', 'Pipeline', 'pipeline', plDrop) : '') + item('cp', 'Client', 'cp', cpDrop) + item('', 'Partner', 'partner') + (canViewAdmin() ? item('', 'Akses & Audit', 'akses') : '') + '</nav>' +
     '<button type="button" class="sbtn" data-a="pal" aria-label="Cari, shortcut Command K">' + ic('search') + '<span class="sl" style="flex:1;text-align:left">Cari…</span><span class="kbd">⌘K</span></button>' +
     '<div style="position:relative"><button type="button" class="icb plus" data-a="pop" data-v="plus" data-pop aria-expanded="' + (pop === 'plus') + '" aria-label="Buat baru">' + ic('plus') + '</button>' + (pop === 'plus' ? plusDrop : '') + '</div>' +
     '<div style="position:relative"><button type="button" class="icb" data-a="pop" data-v="notif" data-pop aria-expanded="' + (pop === 'notif') + '" aria-label="Notifikasi, ' + unread + ' belum dibaca, ' + fu.length + ' follow-up mepet">' + ic('bell') + (unread ? '<span class="badge-dot" style="min-width:18px;height:18px;top:4px;right:4px;font-size:10px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 4px">' + unread + '</span>' : fu.length ? '<span class="badge-dot"></span>' : '') + '</button>' + (pop === 'notif' ? notifDrop : '') + '</div>' +
@@ -150,7 +150,7 @@ function modalShell(title, sub, body, foot, wide, formName) {
 }
 function Palette() {
   const q = (App.pal.q || '').trim().toLowerCase();
-  const pages = [['mywork', 'My Work', 'Antrian follow-up'], ['dashboard', 'Dashboard', 'Angka dan grafik']].concat(can('deal', 'R') && visibleLines().length ? [['pipeline', 'Pipeline', 'Board deal']] : []).concat([['cp', 'Client & Partner', 'Database relasi']]).concat(canViewAdmin() ? [['akses', 'Akses & Audit', 'Pengguna dan log']] : []);
+  const pages = [['mywork', 'My Work', 'Antrian follow-up'], ['dashboard', 'Dashboard', 'Angka dan grafik']].concat(can('deal', 'R') && visibleLines().length ? [['pipeline', 'Pipeline', 'Board deal']] : []).concat([['cp', 'Client', 'Lead dan client'], ['partner', 'Partner', 'Vendor, media, KOL, komunitas']]).concat(canViewAdmin() ? [['akses', 'Akses & Audit', 'Pengguna dan log']] : []);
   let res = pages.filter(p => !q || p[1].toLowerCase().includes(q)).map(p => ({ a: 'nav', v: p[0], t: p[1], d: 'Menu · ' + p[2], icon: 'home' }));
   if (q) {
     res = res.concat(Store.db.records.filter(r => !r.archived && canSeeRec(r) && (r.name + ' ' + r.contact + ' ' + r.code).toLowerCase().includes(q)).slice(0, 6).map(r => ({ a: 'openrec', v: r.id, t: r.name, d: r.cat + ' · ' + r.city, av: r })));

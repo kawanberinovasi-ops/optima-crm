@@ -115,19 +115,19 @@ Perubahan di atas pratinjau klien, sesuai catatan revisi klien:
 1. **Setelah login masuk ke My Work** (juga logo di header).
 2. **Tidak ada tombol ganti akun** ("Executive ▾") di header; akun ditentukan saat login. Divisi dan role terlihat di menu profil.
 3. **Akses & Audit jadi menu header** (Super Admin dan Kepala Department), tidak lagi di menu profil.
-4. **Pipeline per jenis pekerjaan, diatur Super Admin.**
-   - Pipeline **Sales** (Lead → Qualified → Meeting → Proposal → Negotiation → Closing) dipakai semua divisi kecuali
-     Digital Campaign; pipeline **Campaign** (Brief → Konsep → Produksi → Tayang → Report → Closing) dipakai Digital Campaign.
+4. **Setiap divisi punya pipeline sendiri, diatur Super Admin.**
+   - Pipeline bernama sesuai divisi (Lead → Qualified → Meeting → Proposal → Negotiation → Closing); Digital Campaign memakai
+     pipeline **Campaign** (Brief → Konsep → Produksi → Tayang → Report → Closing). Department baru langsung punya pipeline.
    - Pengguna memakai pipeline divisinya. Di Akses & Audit → Pipeline, Super Admin mengatur divisi pemakai setiap pipeline
      dan pengecualian per pengguna (tambahkan atau cabut). Pengguna tanpa pipeline tidak melihat menu Pipeline.
    - Membuat pipeline, mengubah atau menghapus stage, dan menghapus pipeline hanya Super Admin (Kepala Department tidak lagi).
    - Deal dibuat di pipeline yang dipakai PIC relasinya. Pindah PIC memindahkan deal ke pipeline PIC baru kalau PIC baru
      tidak memakai pipeline lamanya (stage dicocokkan lewat nama, kalau tidak ada lewat urutan; Won tetap di Closing).
-   - **Migrasi** (`2026_11_05_000002`): pipeline Customer Service jadi Sales, pipeline Digital Campaign jadi Campaign (stage
-     diganti nama sesuai urutan, deal tetap di posisinya), deal pipeline divisi lain pindah ke Sales lalu pipeline kosong dihapus.
-5. **Client dan Partner dibedakan.** Status relasi: Lead, Client, atau **Partner**. Partner (vendor, media partner, KOL,
+   - **Migrasi** `2026_11_05_000002` sempat menggabungkan pipeline jadi Sales dan Campaign (stage pipeline Digital Campaign
+     diganti nama sesuai urutan); `2026_11_05_000003` memecah Sales lagi jadi pipeline per divisi, dan deal ikut divisi PIC relasinya.
+5. **Client dan Partner dipisah jadi dua menu header**: Client (Lead dan Client) dan Partner. Status relasi: Lead, Client, atau **Partner**. Partner (vendor, media partner, KOL,
    komunitas) langsung tercatat tanpa tahap Lead; Lead jadi Client tetap hanya lewat deal Won. Saat edit, Lead dan Partner
-   boleh saling diganti kalau salah isi; Client tidak. Daftar punya tab Lead, Client, Partner. Data lama tidak diubah otomatis.
+   boleh saling diganti kalau salah isi; Client tidak. Data lama tidak diubah otomatis.
 6. **Hak lihat data: Super Admin melihat semua; pengguna lain hanya data yang PIC-nya dia** (beserta interaksi dan deal-nya).
    Ini menggantikan akses per divisi dan akses lintas divisi Executive. Kepala Department dan Executive tidak lagi otomatis
    melihat data timnya. Pindah PIC tetap jalan: penerima melihat datanya, PIC lama tidak lagi. Import oleh selain Super Admin
@@ -148,6 +148,20 @@ Perubahan di atas pratinjau klien, sesuai catatan revisi klien:
   masuk ke identitas yang sama. Semua didaftarkan sebagai Kepala Department di divisinya, tidak ada yang otomatis
   Super Admin. Super Admin dibuat terpisah dengan `php artisan optima:create-admin`.
 - Di server, salin file itu lewat jalur aman (bukan lewat git), jalankan perintahnya, lalu hapus filenya.
+
+## Menyambungkan SSO Google (Gmail)
+
+Akun kepala department memakai Gmail pribadi dan email optima.web.id, jadi login tidak dibatasi satu domain Workspace.
+1. Google Cloud Console → APIs & Services → OAuth consent screen: tipe **External**. Selama status *Testing*, tambahkan
+   email para pengguna sebagai *Test users* (atau *Publish app* supaya semua akun Google bisa mencoba; yang bisa masuk
+   tetap hanya email yang terdaftar di CRM).
+2. Credentials → Create OAuth client ID → *Web application*. Authorized redirect URI:
+   `http://127.0.0.1:8000/api/auth/google/callback` (lokal) dan `https://<domain produksi>/api/auth/google/callback`.
+3. Isi `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET` di `backend/.env` (jangan dibagikan di chat atau repo),
+   biarkan `GOOGLE_HOSTED_DOMAIN` kosong, lalu `php artisan config:clear`.
+4. Email utama maupun email alternatif di daftar akun internal sama-sama bisa dipakai login.
+
+Saat proyek dialihkan ke klien: OAuth client sebaiknya dibuat ulang di akun Google milik klien, lalu ganti isi `.env` server.
 
 ## Status autentikasi yang benar-benar tersedia
 

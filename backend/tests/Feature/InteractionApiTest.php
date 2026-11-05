@@ -88,7 +88,7 @@ class InteractionApiTest extends TestCase
         $record = $this->record($me);
         $first = $this->log($me, $record, ['dealId' => 'new', 'dealTitle' => 'Website', 'lineId' => Pipeline::where('name', 'Campaign')->value('id')]);
         $stages = Pipeline::find($first['deal']['lineId'])->stages;
-        $this->assertSame('Sales', Pipeline::find($first['deal']['lineId'])->name, 'deal baru masuk pipeline yang dipakai PIC relasi');
+        $this->assertSame('Customer Service', Pipeline::find($first['deal']['lineId'])->name, 'deal baru masuk pipeline yang dipakai PIC relasi');
 
         $moved = $this->log($me, $record, ['dealId' => $first['deal']['id'], 'toStage' => $stages->firstWhere('name', 'Meeting')->id]);
         $this->assertSame((string) $stages->firstWhere('name', 'Meeting')->id, $moved['deal']['stageId']);

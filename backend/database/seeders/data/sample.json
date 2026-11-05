@@ -204,14 +204,23 @@
   ],
   "pipelines": [
     {
-      "name": "Sales",
+      "name": "Executive",
       "departments": [
-        "Executive",
-        "Customer Service",
-        "Creative & Media",
-        "CampusNet",
-        "DietPartner",
-        "Business Operation"
+        "Executive"
+      ],
+      "stages": [
+        "Lead",
+        "Qualified",
+        "Meeting",
+        "Proposal",
+        "Negotiation",
+        "Closing"
+      ]
+    },
+    {
+      "name": "Customer Service",
+      "departments": [
+        "Customer Service"
       ],
       "stages": [
         "Lead",
@@ -233,6 +242,62 @@
         "Produksi",
         "Tayang",
         "Report",
+        "Closing"
+      ]
+    },
+    {
+      "name": "Creative & Media",
+      "departments": [
+        "Creative & Media"
+      ],
+      "stages": [
+        "Lead",
+        "Qualified",
+        "Meeting",
+        "Proposal",
+        "Negotiation",
+        "Closing"
+      ]
+    },
+    {
+      "name": "CampusNet",
+      "departments": [
+        "CampusNet"
+      ],
+      "stages": [
+        "Lead",
+        "Qualified",
+        "Meeting",
+        "Proposal",
+        "Negotiation",
+        "Closing"
+      ]
+    },
+    {
+      "name": "DietPartner",
+      "departments": [
+        "DietPartner"
+      ],
+      "stages": [
+        "Lead",
+        "Qualified",
+        "Meeting",
+        "Proposal",
+        "Negotiation",
+        "Closing"
+      ]
+    },
+    {
+      "name": "Business Operation",
+      "departments": [
+        "Business Operation"
+      ],
+      "stages": [
+        "Lead",
+        "Qualified",
+        "Meeting",
+        "Proposal",
+        "Negotiation",
         "Closing"
       ]
     }
@@ -946,7 +1011,7 @@
       "title": "Website & CRM",
       "service": "Website & CRM",
       "client_partner": "CP-0001",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Negotiation",
       "status": "Open",
       "owner": "dimas@contoh.test",
@@ -964,7 +1029,7 @@
       "title": "ERP gudang",
       "service": "ERP gudang",
       "client_partner": "CP-0005",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Meeting",
       "status": "Open",
       "owner": "dimas@contoh.test",
@@ -982,7 +1047,7 @@
       "title": "Portal siswa",
       "service": "Portal siswa",
       "client_partner": "CP-0016",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Qualified",
       "status": "Open",
       "owner": "dimas@contoh.test",
@@ -1000,7 +1065,7 @@
       "title": "Digitalisasi kampus",
       "service": "Digitalisasi kampus",
       "client_partner": "CP-0010",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Lead",
       "status": "Open",
       "owner": "dimas@contoh.test",
@@ -1018,7 +1083,7 @@
       "title": "Landing page kopi",
       "service": "Landing page kopi",
       "client_partner": "CP-0009",
-      "pipeline": "Sales",
+      "pipeline": "Customer Service",
       "stage": "Lead",
       "status": "Open",
       "owner": "rina@contoh.test",
@@ -1036,7 +1101,7 @@
       "title": "Aplikasi booking",
       "service": "Aplikasi booking",
       "client_partner": "CP-0006",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Closing",
       "status": "Won",
       "owner": "dimas@contoh.test",
@@ -1126,7 +1191,7 @@
       "title": "Video promosi semester",
       "service": "Video promosi semester",
       "client_partner": "CP-0016",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Proposal",
       "status": "Open",
       "owner": "dimas@contoh.test",
@@ -1144,7 +1209,7 @@
       "title": "Paket konten Q4",
       "service": "Paket konten Q4",
       "client_partner": "CP-0003",
-      "pipeline": "Sales",
+      "pipeline": "Creative & Media",
       "stage": "Meeting",
       "status": "Open",
       "owner": "ayu@contoh.test",
@@ -1162,7 +1227,7 @@
       "title": "Jingle radio",
       "service": "Jingle radio",
       "client_partner": "CP-0012",
-      "pipeline": "Sales",
+      "pipeline": "Creative & Media",
       "stage": "Proposal",
       "status": "On Hold",
       "owner": "ayu@contoh.test",
@@ -1216,7 +1281,7 @@
       "title": "Konten promosi",
       "service": null,
       "client_partner": "CP-0003",
-      "pipeline": "Sales",
+      "pipeline": "Creative & Media",
       "stage": "Closing",
       "status": "Won",
       "owner": "ayu@contoh.test",
@@ -1234,7 +1299,7 @@
       "title": "Sistem absensi",
       "service": null,
       "client_partner": "CP-0001",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Closing",
       "status": "Won",
       "owner": "dimas@contoh.test",
@@ -1270,7 +1335,7 @@
       "title": "Iklan radio",
       "service": null,
       "client_partner": "CP-0012",
-      "pipeline": "Sales",
+      "pipeline": "Creative & Media",
       "stage": "Closing",
       "status": "Won",
       "owner": "ayu@contoh.test",
@@ -1288,7 +1353,7 @@
       "title": "Website sekolah",
       "service": null,
       "client_partner": "CP-0016",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Closing",
       "status": "Won",
       "owner": "dimas@contoh.test",
@@ -1324,7 +1389,7 @@
       "title": "Dashboard klinik",
       "service": null,
       "client_partner": "CP-0006",
-      "pipeline": "Sales",
+      "pipeline": "CampusNet",
       "stage": "Closing",
       "status": "Won",
       "owner": "dimas@contoh.test",
@@ -1360,7 +1425,7 @@
       "title": "Proposal lama",
       "service": null,
       "client_partner": "CP-0015",
-      "pipeline": "Sales",
+      "pipeline": "Customer Service",
       "stage": "Proposal",
       "status": "Lost",
       "owner": "rina@contoh.test",

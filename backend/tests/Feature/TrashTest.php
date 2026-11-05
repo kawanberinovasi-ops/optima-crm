@@ -80,7 +80,7 @@ class TrashTest extends TestCase
 
     public function test_line_and_stage_follow_pipeline_rights_and_blocks(): void
     {
-        $line = Pipeline::with('stages')->where('name', 'Sales')->first();
+        $line = Pipeline::with('stages')->where('name', 'Customer Service')->first();
         $other = Pipeline::where('name', 'Campaign')->first();
         $this->as($this->user('CampusNet', Role::KepalaDepartment))->deleteJson('/api/trash/line/'.$other->id)->assertForbidden();
         $this->as($this->user('CampusNet', Role::KepalaDepartment))->deleteJson('/api/trash/stage/'.$line->stages->first()->id)->assertForbidden();
@@ -94,7 +94,7 @@ class TrashTest extends TestCase
         $this->as($head)->postJson('/api/trash/'.$this->entry()->id.'/restore')->assertOk();
         $this->assertSame(['Lead', 'Qualified', 'Meeting', 'Proposal', 'Negotiation', 'Closing'], $line->stages()->pluck('name')->all());
 
-        $this->record($this->user('CampusNet'));
+        $this->record($this->user('Customer Service'));
         $this->as($head)->postJson('/api/deals', ['title' => 'Portal', 'recordId' => ClientPartner::first()->id])->assertCreated();
         $this->as($head)->deleteJson('/api/trash/line/'.$line->id)->assertStatus(422)
             ->assertJsonPath('message', fn ($m) => str_contains($m, 'Masih ada deal'));
@@ -124,9 +124,9 @@ class TrashTest extends TestCase
         $diet = Department::where('name', 'DietPartner')->first();
         Service::where('department_id', $diet->id)->update(['department_id' => null]);
         $this->as($admin)->deleteJson('/api/trash/dept/'.$diet->id)->assertCreated();
-        $this->assertFalse(Pipeline::where('name', 'Sales')->first()->departments()->whereKey($diet->id)->exists());
+        $this->assertFalse(Pipeline::where('name', 'DietPartner')->first()->departments()->whereKey($diet->id)->exists());
         $this->as($admin)->postJson('/api/trash/'.$this->entry()->id.'/restore')->assertOk();
-        $this->assertSame(['Sales'], $diet->pipelines()->pluck('name')->all());
+        $this->assertSame(['DietPartner'], $diet->pipelines()->pluck('name')->all());
         $this->assertSame('C', $diet->accessGrants()->where('entity', 'deal')->value('level'));
 
         $override = AccessOverride::create(['user_id' => $head->id, 'entity' => 'deal', 'level' => 'R']);

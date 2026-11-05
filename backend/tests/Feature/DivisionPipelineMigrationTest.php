@@ -26,6 +26,7 @@ class DivisionPipelineMigrationTest extends TestCase
     {
         $this->seed(ReferenceDataSeeder::class);
         $revision = require database_path('migrations/2026_11_05_000002_client_revision_pipelines_partner.php');
+        $perDivision = require database_path('migrations/2026_11_05_000003_pipeline_per_division.php');
         $migration = require database_path('migrations/2026_10_22_000002_division_pipelines.php');
         $revision->down();
         $migration->down();
@@ -68,5 +69,16 @@ class DivisionPipelineMigrationTest extends TestCase
         $this->assertTrue($sales->departments()->whereKey($cs->id)->exists());
         $this->assertSame('M', AccessGrant::where(['department_id' => $cs->id, 'entity' => 'interaksi'])->value('level'));
         $this->assertSame('C', AccessGrant::where(['department_id' => Department::where('name', 'CampusNet')->value('id'), 'entity' => 'deal'])->value('level'));
+
+        // Lanjutan revisi: Sales dipecah jadi pipeline per divisi; deal ikut divisi PIC relasinya.
+        $perDivision->up();
+        $active = Pipeline::with('departments')->whereNull('archived_at')->orderBy('position')->get();
+        $this->assertSame('Customer Service', Pipeline::find($sales->id)->name, 'pipeline Sales lama dipakai Customer Service');
+        $this->assertSame($sales->id, Deal::find($open)->pipeline_id, 'PIC deal di Customer Service');
+        $this->assertSame('Proposal', Deal::find($open)->stage->name);
+        foreach (Department::all() as $dept) {
+            $this->assertCount(1, $active->filter(fn ($p) => $p->departments->contains('id', $dept->id)), $dept->name);
+        }
+        $this->assertSame(['Lead', 'Qualified', 'Meeting', 'Proposal', 'Negotiation', 'Closing'], $active->firstWhere('name', 'CampusNet')->stages()->pluck('name')->all());
     }
 }

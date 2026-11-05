@@ -45,10 +45,10 @@ function errorPage(e) {
 /* ---------- Client & Partner ---------- */
 cpFiltered = function () {
   const ui = App.ui.cp; const q = ui.q.trim().toLowerCase();
-  const visible = Store.db.records.filter(canSeeRec);
+  const visible = Store.db.records.filter(r => canSeeRec(r) && cpScopeCats().includes(r.cat));
   const base = visible.filter(r => ui.arch ? r.archived : !r.archived);
   let list = base;
-  if (ui.cat !== 'all') list = list.filter(r => r.cat === ui.cat);
+  if (ui.cat !== 'all' && cpScopeCats().includes(ui.cat)) list = list.filter(r => r.cat === ui.cat);
   if (ui.dept !== 'all') list = list.filter(r => r.dept === ui.dept);
   if (ui.service && ui.service !== 'all') list = list.filter(r => ui.service === '-' ? !r.service : r.service === ui.service);
   if (q) list = list.filter(r => (r.name + ' ' + (r.contacts || []).map(c => c.name + ' ' + c.email).join(' ') + ' ' + r.code + ' ' + r.city + ' ' + userName(r.picId)).toLowerCase().includes(q));

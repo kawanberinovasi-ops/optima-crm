@@ -45,11 +45,13 @@ class SampleDataTest extends TestCase
 
     public function test_matches_client_preview_structure(): void
     {
-        // Commercial dilebur ke CS (22 Okt). Revisi 5 Nov: pipeline Sales dan Campaign, deal di pipeline yang dipakai PIC-nya.
+        // Commercial dilebur ke CS (22 Okt). Revisi 5 Nov: tiap divisi pipeline sendiri (Digital Campaign: Campaign).
         $this->assertFalse(Department::where('name', 'Commercial')->exists());
-        $this->assertSame(['Sales', 'Campaign'], Pipeline::orderBy('position')->pluck('name')->all());
+        $this->assertSame(['Executive', 'Customer Service', 'Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'], Pipeline::orderBy('position')->pluck('name')->all());
         $this->assertSame(['Digital Campaign'], Pipeline::where('name', 'Campaign')->first()->departments()->pluck('name')->all());
-        $this->assertSame(Department::count() - 1, Pipeline::where('name', 'Sales')->first()->departments()->count());
+        foreach (Department::with('pipelines')->get() as $dept) {
+            $this->assertCount(1, $dept->pipelines, $dept->name.' punya satu pipeline sendiri');
+        }
         $this->assertSame(['KOL', 'Community', 'Media', 'Digital Campaign', 'CampusNet', 'DietPartner'], Service::orderBy('position')->pluck('name')->all());
         $access = app(Access::class);
         foreach (Deal::with('pipeline', 'clientPartner', 'owner')->get() as $deal) {

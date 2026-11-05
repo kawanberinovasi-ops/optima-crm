@@ -151,7 +151,7 @@ const Actions = {
   closedrawer: () => { App.drawer = null; render(); },
   openrec: (el) => { App.pal = null; App.pop = null; App.drawer = { id: el.dataset.v }; if (App.route !== 'cp' && App.route !== 'mywork') { render(); } else render(); },
   opendeal: (el) => { App.pal = null; App.pop = null; const d = findDeal(el.dataset.v); if (!d) return; App.modal = { kind: 'deal', deal: d }; render(); },
-  newrec: () => { App.pop = null; App.modal = { kind: 'record' }; render(); },
+  newrec: (el) => { App.pop = null; App.modal = { kind: 'record', val: el && el.dataset && el.dataset.v ? { kind: el.dataset.v } : undefined }; render(); },
   editrec: (el, e) => { e.stopPropagation(); App.modal = { kind: 'record', rec: recById(el.dataset.v) }; render(); },
   delrec: (el) => { const r = recById(el.dataset.v); const n = Store.db.deals.filter(d => d.recordId === r.id).length; App.modal = { kind: 'confirm', title: 'Hapus ' + esc(r.name) + '?', text: 'Data ini, ' + Store.db.interactions.filter(i => i.recordId === r.id).length + ' interaksi, dan ' + n + ' deal terkait ikut terhapus dari browser ini.', ok: 'Hapus', danger: true, fn: () => { Store.db.records = Store.db.records.filter(x => x.id !== r.id); Store.db.interactions = Store.db.interactions.filter(i => i.recordId !== r.id); Store.db.deals = Store.db.deals.filter(d => d.recordId !== r.id); audit('Hapus', 'Client & Partner', r.name + ' (' + r.code + ')'); App.drawer = null; toast('Dihapus', r.name + ' udah ga ada di daftar.', 'info'); } }; render(); },
   intpick: (el) => { const v = keepModal(); v.recordId = el.dataset.v; v.q = ''; v.dealId = undefined; v.toStage = ''; App.modal.err = {}; render(); const n = document.querySelector('[data-form=int] [name=type]'); if (n) n.focus(); },
@@ -190,7 +190,7 @@ const Actions = {
   logout: () => { audit('Logout', 'Sesi', me().name + ' keluar'); Store.db.session = null; App.pop = null; App.drawer = null; App.modal = null; Store.save(); location.hash = '#/login'; render(); },
   resetdata: () => { App.pop = null; App.modal = { kind: 'confirm', title: 'Reset data contoh?', text: 'Semua perubahan di browser ini hilang dan data balik ke kondisi awal.', ok: 'Reset', danger: true, fn: () => { Store.reset(); toast('Data direset', 'Balik ke data contoh awal.', 'info'); } }; render(); },
   export: () => { App.pop = null; exportXlsx(); },
-  import: () => { App.pop = null; if (App.route !== 'cp') { location.hash = '#/cp'; } setTimeout(() => Actions.pickfile(), 80); },
+  import: () => { App.pop = null; if (App.route !== 'cp' && App.route !== 'partner') { location.hash = '#/cp'; } setTimeout(() => Actions.pickfile(), 80); },
   pickfile: () => { const i = document.querySelector('[data-ch=importfile]'); if (i) i.click(); },
   doimport: () => doImport()
 };
@@ -406,7 +406,7 @@ function doImport() {
 }
 function exportXlsx() {
   if (typeof XLSX === 'undefined') { toast('Library Excel ga kebaca', 'Cek file assets/xlsx.full.min.js.', 'bad'); return; }
-  const recs = (App.route === 'cp' ? cpFiltered().list.map(x => x.r) : Store.db.records.filter(canSeeRec));
+  const recs = (App.route === 'cp' || App.route === 'partner' ? cpFiltered().list.map(x => x.r) : Store.db.records.filter(canSeeRec));
   const ids = new Set(recs.map(r => r.id)); const seeRate = canSeeRate();
   const wb = XLSX.utils.book_new();
   const s7 = [['Kode sumber *', 'Nama *', 'Kategori *', 'Segmen', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan', 'Layanan']].concat(recs.map(r => [r.code, r.name, r.cat, r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate ? r.rate : '', r.note, r.service || '']));

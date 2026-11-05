@@ -27,7 +27,7 @@ class DealApiTest extends TestCase
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
         // Pengguna bawaan tes ada di Customer Service, yang memakai pipeline Sales.
-        $this->pipeline = Pipeline::with('stages')->where('name', 'Sales')->firstOrFail();
+        $this->pipeline = Pipeline::with('stages')->where('name', 'Customer Service')->firstOrFail();
     }
 
     private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User
@@ -77,8 +77,8 @@ class DealApiTest extends TestCase
         $boot = $this->as($dc)->getJson('/api/bootstrap')->assertOk();
         $this->assertSame([], $boot->json('deals'));
         $this->assertSame(['Campaign'], array_column($boot->json('lines'), 'name'), 'Digital Campaign memakai pipeline Campaign');
-        $this->assertSame(['Sales'], array_column($this->as($colleague)->getJson('/api/bootstrap')->json('lines'), 'name'));
-        $this->assertCount(2, $this->as($this->user('Executive', Role::SuperAdmin))->getJson('/api/bootstrap')->json('lines'), 'Super Admin memakai semua pipeline');
+        $this->assertSame(['Customer Service'], array_column($this->as($colleague)->getJson('/api/bootstrap')->json('lines'), 'name'));
+        $this->assertCount(7, $this->as($this->user('Executive', Role::SuperAdmin))->getJson('/api/bootstrap')->json('lines'), 'Super Admin memakai semua pipeline');
 
         $noDeal = $this->user('Business Operation');
         AccessOverride::create(['user_id' => $noDeal->id, 'entity' => 'deal', 'level' => 'N']);
@@ -96,13 +96,13 @@ class DealApiTest extends TestCase
         $this->as($this->user('Customer Service', Role::KepalaDepartment))->putJson('/api/pipelines/'.$campaign->id.'/users', ['userId' => $staff->id, 'allowed' => true])->assertForbidden();
         $this->as($admin)->putJson('/api/pipelines/'.$campaign->id.'/users', ['userId' => $staff->id, 'allowed' => true])->assertOk();
         $this->as($admin)->putJson('/api/pipelines/'.$campaign->id.'/users', ['userId' => $dcStaff->id, 'allowed' => false])->assertOk();
-        $this->assertSame(['Sales', 'Campaign'], array_column($this->as($staff)->getJson('/api/bootstrap')->json('lines'), 'name'));
+        $this->assertSame(['Customer Service', 'Campaign'], array_column($this->as($staff)->getJson('/api/bootstrap')->json('lines'), 'name'));
         $this->assertSame([], $this->as($dcStaff)->getJson('/api/bootstrap')->json('lines'), 'pipeline dicabut: menu Pipeline hilang');
 
         // Divisi yang memakai pipeline diatur Super Admin.
         $this->as($admin)->putJson('/api/pipelines/'.$campaign->id.'/departments', ['deptIds' => [$staff->department_id]])->assertOk();
         $this->as($admin)->putJson('/api/pipelines/'.$campaign->id.'/users', ['userId' => $staff->id, 'allowed' => null])->assertOk();
-        $this->assertSame(['Sales', 'Campaign'], array_column($this->as($staff)->getJson('/api/bootstrap')->json('lines'), 'name'), 'lewat divisinya');
+        $this->assertSame(['Customer Service', 'Campaign'], array_column($this->as($staff)->getJson('/api/bootstrap')->json('lines'), 'name'), 'lewat divisinya');
     }
 
     public function test_new_deal_owner_is_record_pic_and_pipeline_is_one_the_pic_uses(): void

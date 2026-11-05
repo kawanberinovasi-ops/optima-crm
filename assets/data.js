@@ -2,7 +2,7 @@
 'use strict';
 // Dengan backend (window.OPTIMA_API), cache browser dipisah dari data contoh mode lokal.
 // v4: status relasi (Lead/Client) dipisah dari layanan, akses per divisi. Data contoh lama di browser direset sekali.
-const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v4' : 'optima_crm_local_v6';
+const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v5' : 'optima_crm_local_v7';
 // Commercial dilebur ke Customer Service (keputusan 22 Okt 2026, mengikuti pratinjau klien).
 const DEPTS = ['Executive', 'Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'];
 const SEED_DEPTS = ['Executive', 'Commercial'].concat(DEPTS.slice(1));
@@ -10,6 +10,8 @@ const ROLES = ['Super Admin', 'Kepala Department', 'Koordinator', 'Staf', 'Viewe
 // Status relasi. Data baru selalu Lead; jadi Client hanya lewat deal Won.
 const CATS = ['Lead', 'Client', 'Partner'];
 const CAT_KEY = { 'Lead': 'lead', 'Client': 'client', 'Partner': 'client' };
+/** Menu Client (Lead dan Client) dan menu Partner dipisah (revisi klien 5 Nov 2026). */
+const cpScopeCats = () => (typeof App !== 'undefined' && App.route === 'partner') ? ['Partner'] : ['Lead', 'Client'];
 // Layanan bukan status. Pemetaan ke divisi bisa diubah admin (KOL dan Community: Digital Campaign, sementara).
 const DEFAULT_SERVICES = [['KOL', 'Digital Campaign'], ['Community', 'Digital Campaign'], ['Media', 'Creative & Media'], ['Digital Campaign', 'Digital Campaign'], ['CampusNet', 'CampusNet'], ['DietPartner', 'DietPartner']];
 const serviceList = () => ((Store.db && Store.db.services) || DEFAULT_SERVICES.map(([name, dept], i) => ({ id: 's' + (i + 1), name, dept, active: true }))).filter(x => x.active !== false);
@@ -58,10 +60,12 @@ function divisionWorkflow(db) {
   db.users.push({ id: 'u8', name: 'Tim DietPartner', email: 'dietpartner@contoh.test', dept: 'DietPartner', role: 'Kepala Department', active: true });
   db.users.push({ id: 'u9', name: 'Kepala Digital Campaign', email: 'kepala.digital@contoh.test', dept: 'Digital Campaign', role: 'Kepala Department', active: true });
   db.access = {}; DEPTS.forEach(d => { db.access[d] = defaultDivisionAccess(d); });
-  // Revisi klien 5 Nov 2026: pipeline per jenis pekerjaan. Sales dipakai semua divisi kecuali Digital Campaign (Campaign).
+  // Revisi klien 5 Nov 2026: setiap divisi punya pipeline sendiri. Digital Campaign memakai pipeline Campaign (stage kampanye).
   const old = db.lines[0];
   const mkLine = (id, name, depts, stages) => ({ id, name, depts, stages: stages.map((n, i) => ({ id: id + '-s' + i, name: n })) });
-  db.lines = [mkLine('sales', 'Sales', DEPTS.filter(d => d !== 'Digital Campaign'), PIPELINE_STAGES), mkLine('campaign', 'Campaign', ['Digital Campaign'], CAMPAIGN_STAGES)];
+  db.lines = DEPTS.map(dept => dept === 'Digital Campaign'
+    ? mkLine('campaign', 'Campaign', [dept], CAMPAIGN_STAGES)
+    : mkLine('line-' + dept.toLowerCase().replace(/[^a-z0-9]+/g, '-'), dept, [dept], PIPELINE_STAGES));
   db.lineUsers = [];
   const lineOf = (dept) => db.lines.find(l => l.depts.includes(dept));
   const firstOf = (dept) => db.users.find(u => u.active && u.role !== 'Viewer' && u.dept === dept);

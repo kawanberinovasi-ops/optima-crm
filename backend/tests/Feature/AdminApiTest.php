@@ -119,7 +119,7 @@ class AdminApiTest extends TestCase
         $this->assertSame('C', $res->json('access.lead'));
         $this->assertSame('Ya*', $res->json('access.nilai'));
         $id = $res->json('data.id');
-        $this->assertSame(['Sales'], Department::find($id)->pipelines()->pluck('name')->all(), 'department baru memakai pipeline Sales');
+        $this->assertSame(['Training'], Department::find($id)->pipelines()->pluck('name')->all(), 'department baru langsung punya pipeline sendiri');
 
         $this->as($admin)->patchJson('/api/departments/'.$id, ['name' => 'Training & Development'])->assertOk();
         $this->user('Customer Service'); // department yang masih punya pengguna

@@ -34,6 +34,9 @@ function workflowNotificationVisible(n) {
   return true;
 }
 
+/** Halaman Partner memakai tampilan yang sama dengan Client, hanya isinya Partner. */
+Pages.partner = () => Pages.cp();
+
 const svcChip = (s) => s ? '<span class="chip c-y">' + esc(s) + '</span>' : '';
 
 /* ---------- Pindah PIC / divisi ---------- */

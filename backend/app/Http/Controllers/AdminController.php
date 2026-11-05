@@ -108,13 +108,16 @@ class AdminController extends Controller
 
         $dept = DB::transaction(function () use ($data) {
             $dept = Department::create(['name' => trim($data['name'])]);
-            // Department baru mengelola datanya sendiri (C) dan memakai pipeline pertama (Sales) sampai diatur Super Admin.
+            // Department baru mengelola datanya sendiri (C) dan langsung punya pipeline sendiri dengan stage standar.
             foreach (DivisionDefaults::access($dept->name) as $entity => $level) {
                 AccessGrant::create(['department_id' => $dept->id, 'entity' => $entity, 'level' => $level]);
             }
-            if ($first = Pipeline::whereNull('archived_at')->orderBy('position')->value('id')) {
-                $dept->pipelines()->attach($first);
+            $name = Pipeline::where('name', $dept->name)->exists() ? $dept->name.' (divisi)' : $dept->name;
+            $pipeline = Pipeline::create(['name' => $name, 'position' => (int) Pipeline::max('position') + 1]);
+            foreach (DivisionDefaults::STAGES as $i => $stage) {
+                $pipeline->stages()->create(['name' => $stage, 'position' => $i, 'is_closing' => $stage === 'Closing']);
             }
+            $dept->pipelines()->attach($pipeline->id);
 
             return $dept;
         });

@@ -204,10 +204,11 @@ class LeadFlowTest extends TestCase
         $this->assertSame(1, Handover::first()->deals_moved);
         $this->assertStringContainsString('Pindah ke', Deal::find($open['id'])->histories()->latest('id')->value('note'));
 
-        // Executive dan Customer Service sama-sama memakai Sales, jadi deal tetap di pipeline dan stage-nya.
-        $sales = Pipeline::where('name', 'Sales')->value('id');
-        $this->assertSame([$sales, $sales], [Deal::find($open['id'])->pipeline_id, Deal::find($won['id'])->pipeline_id]);
+        // Executive punya pipeline sendiri: deal pindah ke sana, stage dicocokkan lewat nama, Won tetap di Closing.
+        $exLine = Pipeline::where('name', 'Executive')->value('id');
+        $this->assertSame([$exLine, $exLine], [Deal::find($open['id'])->pipeline_id, Deal::find($won['id'])->pipeline_id]);
         $this->assertSame('Lead', Deal::find($open['id'])->stage->name);
+        $this->assertTrue(Deal::find($won['id'])->stage->is_closing);
 
         // Ke Digital Campaign (pipeline Campaign): deal pindah pipeline, Won tetap di Closing.
         $dc = $this->user('Digital Campaign');
