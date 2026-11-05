@@ -212,7 +212,7 @@ const Store = {
 };
 
 const me = () => Store.db.users.find(u => u.id === Store.db.session) || null;
-const userById = (id) => Store.db.users.find(u => u.id === id);
+const userById = (id) => Store.db.users.find(u => u.id === id) || (Store.db.deletedUsers || []).find(u => u.id === id);
 const recById = (id) => Store.db.records.find(r => r.id === id);
 const lineById = (id) => Store.db.lines.find(l => l.id === id);
 const stageOf = (deal) => { const l = lineById(deal.lineId); return l && l.stages.find(s => s.id === deal.stageId); };

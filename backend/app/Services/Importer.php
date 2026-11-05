@@ -74,9 +74,11 @@ class Importer
             $pic = $users[strtolower(trim($o['email pic'] ?? ''))] ?? null;
             $dept = $depts[strtolower(trim($o['department pemilik'] ?? ''))] ?? null;
             $existing = $code !== '' ? ClientPartner::where('code', $code)->first() : null;
+            $trashed = $code !== '' && ! $existing && ClientPartner::onlyTrashed()->where('code', $code)->exists();
             $err = match (true) {
                 $code === '' || trim($o['nama'] ?? '') === '' => 'Kode sumber dan Nama wajib diisi.',
                 isset($fileCodes[$code]) => 'Kode sumber '.$code.' dobel di file.',
+                $trashed => 'Kode '.$code.' ada di Data terhapus. Pulihkan dulu kalau mau diperbarui.',
                 ! $cat => 'Kategori "'.($o['kategori'] ?? '').'" ga dikenal. Pakai Lead atau Client; KOL/Community/Media isi di kolom Layanan.',
                 $service === false => 'Layanan "'.$serviceName.'" belum ada di daftar.',
                 ! $pic => 'Email PIC "'.($o['email pic'] ?? '').'" belum terdaftar di CRM.',

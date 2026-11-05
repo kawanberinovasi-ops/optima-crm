@@ -13,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'email', 'employee_no', 'job_title', 'department_id', 'role', 'active', 'sso_subject', 'last_login_at', 'deactivated_at'])]
+#[Fillable(['name', 'email', 'employee_no', 'job_title', 'department_id', 'role', 'active', 'sso_subject', 'last_login_at', 'deactivated_at', 'deleted_at'])]
 #[Hidden(['password', 'remember_token', 'sso_subject'])]
 class User extends Authenticatable
 {
@@ -32,6 +32,7 @@ class User extends Authenticatable
             'active' => 'boolean',
             'last_login_at' => 'datetime',
             'deactivated_at' => 'datetime',
+            'deleted_at' => 'datetime',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];

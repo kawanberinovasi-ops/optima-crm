@@ -37,6 +37,8 @@ class FrontShape
             'dept' => $user->department?->name,
             'role' => $user->role->value,
             'active' => $user->active,
+            // Pengguna di Data terhapus tetap dikirim supaya namanya terbaca di riwayat lama, tapi tidak tampil di daftar.
+            'deleted' => $user->deleted_at !== null,
         ];
     }
 

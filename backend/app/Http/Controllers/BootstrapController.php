@@ -14,6 +14,7 @@ use App\Models\Pipeline;
 use App\Models\User;
 use App\Services\Access;
 use App\Services\ChangeHistory;
+use App\Services\Trash;
 use App\Support\FrontShape;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -77,6 +78,7 @@ class BootstrapController extends Controller
             'lines' => $access->scopePipelines(Pipeline::with('stages', 'department'), $me)->whereNull('archived_at')->orderBy('position')->get()->map(fn (Pipeline $p) => FrontShape::line($p))->values(),
             'deals' => $deals,
             'interactions' => $interactions,
+            'trash' => app(Trash::class)->listFor($me),
             'users' => User::with('department')->orderBy('id')->get()->map(fn (User $u) => FrontShape::user($u))->values(),
             'departments' => Department::orderBy('id')->get()->map(fn (Department $d) => ['id' => (string) $d->id, 'name' => $d->name, 'seesAll' => $d->sees_all])->values(),
             'services' => AdminController::servicesShape(),

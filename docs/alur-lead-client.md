@@ -67,6 +67,8 @@ Service**: pengguna, data, serah terima, dan layanannya pindah ke CS. Kolom Comm
 - Tercatat di tabel `handovers` dan audit log: PIC dan divisi asal, PIC dan divisi tujuan, waktu, yang menyerahkan, alasan.
   Riwayatnya tampil di drawer detail.
 - Divisi pemilik ikut pindah, jadi akses pindah ke divisi penerima. Executive tetap melihat. Pembuat awal tidak berubah.
+- Riwayat serah terima tercatat di tabel `handovers`, audit log, dan Riwayat data (tidak lagi ditampilkan sebagai daftar
+  terpisah di detail, sama seperti pratinjau).
 - Interaksi dan deal tetap di relasi yang sama. Semua deal pindah ke **pipeline divisi penerima** (stage dicocokkan lewat
   nama, Won tetap di Closing) dan dicatat di riwayat deal. Deal yang masih berjalan (Open/On Hold) ikut dipegang PIC baru;
   deal Won/Lost tetap tercatat atas PIC lama. Gabung data ganda juga memindahkan deal ke pipeline divisi data yang disimpan.
@@ -85,6 +87,26 @@ Service**: pengguna, data, serah terima, dan layanannya pindah ke CS. Kolom Comm
 - Import: kolom Kategori lama tetap diterima (KOL/KOC, Community, Media dipetakan ke layanan), ada kolom opsional Layanan.
   Pengguna di luar Executive hanya bisa mengimport data untuk divisinya. Data yang sudah ada tidak berubah status, PIC,
   atau divisinya lewat import.
+
+## 5a. Disamakan dengan pratinjau klien versi 27 Okt 2026
+
+- **Halaman awal** setelah login dan logo di header: Client & Partner (`#/cp`), sama seperti pratinjau.
+- **Data terhapus**: tombol Hapus di Client & Partner (baris tabel dan detail), Hapus lini bisnis, hapus stage, Hapus
+  pengguna, hapus department, hapus pengecualian, dan hapus layanan. Semua masuk ke Data terhapus (menu profil dan tombol
+  di Client & Partner) dan bisa dipulihkan. Tidak ada penghapusan permanen otomatis.
+  - Yang boleh menghapus: Client & Partner = level M atas data itu; lini bisnis dan stage = yang boleh mengatur pipeline
+    itu; layanan, department, pengguna, pengecualian = Super Admin. Memulihkan: Super Admin semua, selain itu sesuai hak
+    menghapusnya. Hak dan syarat diperiksa ulang di server saat konfirmasi (`App\Services\Trash`).
+  - Syarat yang menahan penghapusan sama dengan pratinjau: lini bisnis yang masih punya deal, stage Closing atau stage
+    yang masih punya deal, layanan yang masih dipakai, department yang masih punya pengguna/data/layanan/deal, akun yang
+    sedang dipakai, Super Admin aktif terakhir, dan pengguna yang masih jadi PIC relasi atau deal aktif.
+  - Client & Partner yang dihapus disembunyikan (`deleted_at`) beserta interaksi dan deal-nya. Pengguna yang dihapus
+    langsung nonaktif dan dipulihkan dalam keadaan nonaktif; namanya tetap terbaca di riwayat lama. Arsip tetap ada
+    terpisah dari Hapus.
+- Tab Akses & Audit → **Layanan & Divisi** dipindah setelah Department, dengan tombol Layanan baru dan Hapus. Pengaturan
+  "lihat lintas divisi" tidak lagi tampil di kartu department (Executive tetap melihat semua divisi).
+- Layanan deal otomatis mengikuti layanan relasinya. Dashboard, My Work, pencarian, dan pemberitahuan hanya menampilkan
+  data, deal, pipeline, dan tim yang boleh dilihat.
 
 ## 6. Akun internal
 

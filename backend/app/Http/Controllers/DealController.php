@@ -58,7 +58,8 @@ class DealController extends Controller
         $stage = isset($data['stageId']) ? Stage::find($data['stageId']) : null;
 
         $deal = $this->deals->create($me, $record, $pipeline, $stage, [
-            'title' => trim($data['title']), 'service' => $data['service'] ?? null, 'owner_id' => $owner->id,
+            // Layanan deal mengikuti layanan relasinya (mengikuti pratinjau klien).
+            'title' => trim($data['title']), 'service' => $data['service'] ?? $record->service?->name, 'owner_id' => $owner->id,
             'target_closing' => $data['target'] ?? null,
             'offer_value' => $this->access->canSeeDealValue($me) || $owner->id === $me->id ? ($data['offer'] ?? null) : null,
         ]);

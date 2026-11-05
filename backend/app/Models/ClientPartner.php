@@ -8,14 +8,18 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Relasi Client & Partner. category = status relasi (Lead/Client), service_id = layanan (KOL, Community, Media, ...).
- * created_by = pembuat data (tidak pernah berubah), pic_id = PIC aktif, department_id = divisi pemilik. Tidak pernah dihapus permanen.
+ * created_by = pembuat data (tidak pernah berubah), pic_id = PIC aktif, department_id = divisi pemilik. Tidak pernah dihapus permanen:
+ * "Hapus" mengisi deleted_at (Data terhapus) dan bisa dipulihkan.
  */
 #[Fillable(['code', 'name', 'category', 'service_id', 'segment', 'status', 'pic_id', 'department_id', 'source', 'city', 'note', 'rate_card', 'client_info', 'converted_at', 'archived_at', 'archived_by', 'archive_reason', 'merged_into_id', 'created_by'])]
 class ClientPartner extends Model
 {
+    use SoftDeletes;
+
     protected function casts(): array
     {
         return [

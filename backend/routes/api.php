@@ -10,6 +10,7 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\InteractionController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\PipelineController;
+use App\Http\Controllers\TrashController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -91,4 +92,8 @@ Route::middleware('crm')->group(function () {
     Route::get('audit-logs', [AdminController::class, 'auditLogs']);
     Route::get('audit-logs/export', [AdminController::class, 'exportAudit']);
     Route::get('changes', [AdminController::class, 'changes']);
+
+    // Data terhapus: hapus selalu bisa dipulihkan sesuai hak akses
+    Route::delete('trash/{kind}/{id}', [TrashController::class, 'destroy'])->whereNumber('id');
+    Route::post('trash/{entry}/restore', [TrashController::class, 'restore']);
 });
