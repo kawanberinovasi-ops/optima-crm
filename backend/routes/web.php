@@ -12,6 +12,14 @@ Route::get('/', function (Request $request) {
     $html = file_get_contents(config('optima.frontend_path').'/index.html');
     // Path relatif (bukan URL lengkap), supaya cookie sesi tetap terkirim walau dibuka lewat localhost atau 127.0.0.1.
     $flag = '<script>window.OPTIMA_API = '.json_encode($request->getBaseUrl().'/api').';</script>';
+    // Aset tanpa penanda versi (saat pengembangan) diberi ?v=<waktu ubah file>, supaya browser tidak memakai file lama.
+    // Paket produksi dari optima:build-frontend sudah membawa ?v=<hash> sendiri, jadi tidak diubah.
+    $assets = public_path();
+    $html = preg_replace_callback('/(src|href)="(assets\/[^"?]+\.(?:js|css))"/', function ($m) use ($assets) {
+        $file = $assets.'/'.$m[2];
+
+        return $m[1].'="'.$m[2].(is_file($file) ? '?v='.filemtime($file) : '').'"';
+    }, $html);
 
     return response(preg_replace('/<script /', $flag."\n<script ", $html, 1))
         ->header('Content-Type', 'text/html; charset=utf-8')

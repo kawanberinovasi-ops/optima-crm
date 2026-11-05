@@ -9,6 +9,7 @@ use App\Models\UserEmail;
 use App\Services\Audit;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Daftarkan akun internal OPTIMA dari file JSON yang TIDAK ikut git (identitas asli hanya untuk lingkungan internal).
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SyncInternalUsers extends Command
 {
-    protected $signature = 'optima:sync-internal-users {file : Path file JSON di luar repo, misalnya storage/app/private/internal-users.json} {--dry-run : Periksa tanpa menyimpan}';
+    protected $signature = 'optima:sync-internal-users {file : Path file JSON di luar repo, misalnya storage/app/private/internal-users.json} {--dry-run : Periksa tanpa menyimpan} {--replace-demo : Hapus akun uji @contoh.test; data mereka dialihkan ke kepala divisinya}';
 
     protected $description = 'Daftarkan atau perbarui akun internal (kepala department) dari file JSON privat';
 
@@ -90,7 +91,56 @@ class SyncInternalUsers extends Command
             }
         });
         $this->info(count($rows).' akun internal siap. SSO belum aktif sampai GOOGLE_CLIENT_ID diisi.');
+        if ($this->option('replace-demo')) {
+            $this->replaceDemoAccounts($audit);
+        }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Akun uji @contoh.test dihapus. Semua yang mereka pegang (relasi, deal, interaksi, riwayat) dialihkan ke kepala
+     * department divisi yang sama, atau ke Super Admin kalau divisinya belum punya kepala. Audit log lama tidak
+     * dialihkan supaya tidak tampak dikerjakan orang lain (nama pelakunya jadi kosong).
+     */
+    private function replaceDemoAccounts(Audit $audit): void
+    {
+        $demo = User::where('email', 'like', '%@contoh.test')->get();
+        $real = User::where('email', 'not like', '%@contoh.test')->where('active', true)->get();
+        $admin = $real->firstWhere('role', Role::SuperAdmin);
+        if (! $admin) {
+            $this->error('Belum ada Super Admin di akun internal; akun uji tidak dihapus.');
+
+            return;
+        }
+        $refs = collect(DB::select("select kcu.table_name, kcu.column_name from information_schema.table_constraints tc
+            join information_schema.key_column_usage kcu on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema
+            join information_schema.constraint_column_usage ccu on ccu.constraint_name = tc.constraint_name and ccu.table_schema = tc.table_schema
+            where tc.constraint_type = 'FOREIGN KEY' and ccu.table_name = 'users' and ccu.column_name = 'id' and tc.table_schema = current_schema()"));
+        // Baris milik pribadi akun uji dihapus saja; audit log dibiarkan kosong pelakunya.
+        $personal = ['access_overrides', 'user_emails', 'pipeline_user', 'saved_views', 'user_notifications', 'audit_logs'];
+
+        DB::transaction(function () use ($demo, $real, $admin, $refs, $personal, $audit) {
+            foreach ($demo as $user) {
+                $to = $real->first(fn ($u) => $u->department_id === $user->department_id && $u->role === Role::KepalaDepartment) ?? $admin;
+                foreach ($refs as $ref) {
+                    if (in_array($ref->table_name, $personal, true)) {
+                        continue;
+                    }
+                    DB::table($ref->table_name)->where($ref->column_name, $user->id)->update([$ref->column_name => $to->id]);
+                }
+                foreach (array_diff($personal, ['audit_logs']) as $table) {
+                    if (Schema::hasColumn($table, 'user_id')) {
+                        DB::table($table)->where('user_id', $user->id)->delete();
+                    }
+                }
+                if (Schema::hasTable('sessions')) {
+                    DB::table('sessions')->where('user_id', $user->id)->delete();
+                }
+                $user->delete();
+                $this->line('dihapus    '.$user->email.' (data dialihkan ke '.$to->name.')');
+            }
+            $audit->log('Hapus', 'Pengguna', null, $demo->count().' akun uji dihapus; datanya dialihkan ke kepala divisinya');
+        });
     }
 }

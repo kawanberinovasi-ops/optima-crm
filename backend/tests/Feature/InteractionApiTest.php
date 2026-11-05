@@ -11,17 +11,19 @@ use App\Models\Pipeline;
 use App\Models\User;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Interaksi dan follow-up (SRS 4.2, FR-INT-01..04). */
 class InteractionApiTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
     }
 
     private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User

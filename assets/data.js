@@ -2,20 +2,20 @@
 'use strict';
 // Dengan backend (window.OPTIMA_API), cache browser dipisah dari data contoh mode lokal.
 // v4: status relasi (Lead/Client) dipisah dari layanan, akses per divisi. Data contoh lama di browser direset sekali.
-const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v5' : 'optima_crm_local_v7';
+const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v6' : 'optima_crm_local_v8';
 // Commercial dilebur ke Customer Service (keputusan 22 Okt 2026, mengikuti pratinjau klien).
 const DEPTS = ['Executive', 'Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'];
 const SEED_DEPTS = ['Executive', 'Commercial'].concat(DEPTS.slice(1));
 const ROLES = ['Super Admin', 'Kepala Department', 'Koordinator', 'Staf', 'Viewer'];
 // Status relasi. Data baru selalu Lead; jadi Client hanya lewat deal Won.
 const CATS = ['Lead', 'Client', 'Partner'];
-const CAT_KEY = { 'Lead': 'lead', 'Client': 'client', 'Partner': 'client' };
+const CAT_KEY = { 'Lead': 'lead', 'Client': 'client', 'Partner': 'partner' };
 /** Menu Client (Lead dan Client) dan menu Partner dipisah (revisi klien 5 Nov 2026). */
 const cpScopeCats = () => (typeof App !== 'undefined' && App.route === 'partner') ? ['Partner'] : ['Lead', 'Client'];
 // Layanan bukan status. Pemetaan ke divisi bisa diubah admin (KOL dan Community: Digital Campaign, sementara).
 const DEFAULT_SERVICES = [['KOL', 'Digital Campaign'], ['Community', 'Digital Campaign'], ['Media', 'Creative & Media'], ['Digital Campaign', 'Digital Campaign'], ['CampusNet', 'CampusNet'], ['DietPartner', 'DietPartner']];
 const serviceList = () => ((Store.db && Store.db.services) || DEFAULT_SERVICES.map(([name, dept], i) => ({ id: 's' + (i + 1), name, dept, active: true }))).filter(x => x.active !== false);
-const ENTS = [['lead', 'Lead'], ['client', 'Client'], ['interaksi', 'Interaksi'], ['deal', 'Deal']];
+const ENTS = [['lead', 'Lead'], ['client', 'Client'], ['partner', 'Partner'], ['interaksi', 'Interaksi'], ['deal', 'Deal']];
 const DEFAULT_OPTS = {
   segments: ['Korporat', 'Pendidikan', 'Kesehatan', 'Komunitas', 'UMKM', 'F&B', 'Retail', 'Media lokal', 'Radio', 'Online', 'Lifestyle', 'Kuliner', 'Travel'],
   sources: ['Referensi', 'Website', 'Event', 'Media sosial', 'Kunjungan', 'Lainnya'],
@@ -35,10 +35,22 @@ const monthsAgo = (m, day) => { const d = new Date(); d.setDate(1); d.setMonth(d
 const uid = (p) => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 /** Hak akses awal per divisi: Executive dan Customer Service mengelola, divisi lain menambah dan mengubah datanya sendiri. */
+/**
+ * Hak akses awal sesuai keputusan klien (tabel "3. Hak akses awal", 5 Nov 2026); sama dengan App\Support\DivisionDefaults.
+ * Customer Service memakai barisnya sendiri (Commercial sudah dilebur). Partner = level tertinggi Community, KOL/KOC, Media.
+ */
+const ACCESS_MATRIX = {
+  Executive: ['M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
+  'Customer Service': ['C', 'R', 'R', 'M', 'R', 'Tidak', 'R*'],
+  'Digital Campaign': ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+  'Creative & Media': ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+  CampusNet: ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+  DietPartner: ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+  'Business Operation': ['R', 'M', 'R', 'R', 'M', 'Ya', 'M']
+};
 function defaultDivisionAccess(dept) {
-  const manage = dept === 'Executive' || dept === 'Customer Service';
-  const lvl = manage ? 'M' : 'C';
-  return { lead: lvl, client: lvl, interaksi: lvl, deal: lvl, nilai: dept === 'Executive' ? 'Ya' : 'Ya*', rate: dept === 'Digital Campaign' || dept === 'Executive' ? 'M' : 'Tidak' };
+  const [lead, client, partner, interaksi, deal, nilai, rate] = ACCESS_MATRIX[dept] || ['C', 'C', 'C', 'C', 'C', 'Ya*', 'Tidak'];
+  return { lead, client, partner, interaksi, deal, nilai, rate };
 }
 const PIPELINE_STAGES = ['Lead', 'Qualified', 'Meeting', 'Proposal', 'Negotiation', 'Closing'];
 const CAMPAIGN_STAGES = ['Brief', 'Konsep', 'Produksi', 'Tayang', 'Report', 'Closing'];
@@ -252,8 +264,8 @@ const canSeeRec = (r) => !r.hidden && can(catEnt(r.cat), 'R') && (seesAll(me()) 
 /** Mengubah data yang boleh dilihat, dengan level C atau M. */
 const canEditRec = (r) => canSeeRec(r) && LV[perm(catEnt(r.cat))] >= LV.C;
 const canDelRec = (r) => canSeeRec(r) && perm(catEnt(r.cat)) === 'M';
-/** Data baru selalu Lead, jadi yang menentukan adalah hak input Lead. */
-const canCreateAny = () => can('lead', 'C');
+/** Data baru: Lead (butuh hak input Lead) atau Partner (butuh hak input Partner). */
+const canCreateAny = () => can('lead', 'C') || can('partner', 'C');
 const isLead = (u) => ['Kepala Department', 'Koordinator'].includes(u.role);
 function canSeeValue(deal) {
   const u = me(); if (!u) return false; if (deal && !canSeeDeal(deal)) return false; if (seesAll(u)) return true;

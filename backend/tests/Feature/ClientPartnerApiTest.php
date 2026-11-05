@@ -12,17 +12,19 @@ use App\Models\Service;
 use App\Models\User;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** API Client & Partner (SRS 4.2, FR-REL-01..08) dengan akses per divisi dan hak akses di server untuk setiap cara mengakses data. */
 class ClientPartnerApiTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
     }
 
     private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User

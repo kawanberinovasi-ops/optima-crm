@@ -14,10 +14,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * Matriks hak akses awal: tabel SRS bagian 3 (halaman 4) dengan keputusan 22 Okt 2026 (mengikuti pratinjau klien).
- * - Kolom Community, KOL/KOC, dan Media dihapus: sekarang layanan, bukan status relasi.
- * - Commercial dilebur ke Customer Service. Executive dan CS mengelola (M), divisi lain mengelola datanya sendiri (C).
- * Tabel ditulis di sini, bukan dibaca dari seeder, supaya selisih dengan keputusan bisnis langsung ketahuan.
+ * Matriks hak akses awal: keputusan klien di tabel "3. Hak akses awal" (5 Nov 2026).
+ * Commercial sudah dilebur ke Customer Service (CS memakai barisnya sendiri); Partner = level tertinggi Community, KOL/KOC, Media.
+ * Tabel ditulis di sini, bukan dibaca dari seeder, supaya selisih dengan keputusan klien langsung ketahuan.
  */
 class AccessMatrixTest extends TestCase
 {
@@ -29,18 +28,18 @@ class AccessMatrixTest extends TestCase
         $this->seed(ReferenceDataSeeder::class);
     }
 
-    /** Department => [Lead, Client, Interaksi, Deal, Nilai deal, Rate card] */
+    /** Department => [Lead, Client, Partner, Interaksi, Deal, Nilai deal, Rate card] */
     private const SRS = [
-        'Executive' => ['M', 'M', 'M', 'M', 'Ya', 'M'],
-        'Customer Service' => ['M', 'M', 'M', 'M', 'Ya*', 'Tidak'],
-        'Digital Campaign' => ['C', 'C', 'C', 'C', 'Ya*', 'M'],
-        'Creative & Media' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
-        'CampusNet' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
-        'DietPartner' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
-        'Business Operation' => ['C', 'C', 'C', 'C', 'Ya*', 'Tidak'],
+        'Executive' => ['M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
+        'Customer Service' => ['C', 'R', 'R', 'M', 'R', 'Tidak', 'R*'],
+        'Digital Campaign' => ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+        'Creative & Media' => ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+        'CampusNet' => ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+        'DietPartner' => ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
+        'Business Operation' => ['R', 'M', 'R', 'R', 'M', 'Ya', 'M'],
     ];
 
-    private const ENTITIES = ['lead', 'client', 'interaksi', 'deal'];
+    private const ENTITIES = ['lead', 'client', 'partner', 'interaksi', 'deal'];
 
     public static function departments(): array
     {
@@ -70,7 +69,7 @@ class AccessMatrixTest extends TestCase
     #[DataProvider('departments')]
     public function test_deal_value_and_rate_card_follow_srs_stars(string $dept): void
     {
-        [$nilai, $rate] = array_slice(self::SRS[$dept], 4);
+        [$nilai, $rate] = array_slice(self::SRS[$dept], 5);
         $head = $this->user($dept, Role::KepalaDepartment);
         $coord = $this->user($dept, Role::Koordinator);
         $staff = $this->user($dept, Role::Staf);
@@ -99,7 +98,8 @@ class AccessMatrixTest extends TestCase
     public function test_viewer_is_capped_at_read_even_with_personal_override(): void
     {
         $viewer = $this->user('Digital Campaign', Role::Viewer);
-        $this->assertSame(AccessLevel::R, $this->access()->level($viewer, 'deal'));
+        $this->assertSame(AccessLevel::R, $this->access()->level($viewer, 'partner'));
+        $this->assertSame(AccessLevel::N, $this->access()->level($viewer, 'deal'), 'divisi tanpa akses deal tetap N');
 
         AccessOverride::create(['user_id' => $viewer->id, 'entity' => 'deal', 'level' => 'M']);
         $this->access()->forget($viewer);
@@ -139,7 +139,7 @@ class AccessMatrixTest extends TestCase
     public function test_personal_override_beats_department_matrix(): void
     {
         $staff = $this->user('CampusNet');
-        $this->assertSame(AccessLevel::C, $this->access()->level($staff, 'deal'));
+        $this->assertSame(AccessLevel::N, $this->access()->level($staff, 'deal'));
         $this->assertFalse($this->access()->canSeeDealValue($staff));
 
         AccessOverride::create(['user_id' => $staff->id, 'entity' => 'deal', 'level' => 'M', 'reason' => 'Bantu tim CS']);

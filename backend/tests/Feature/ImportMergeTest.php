@@ -10,12 +10,13 @@ use App\Models\Interaction;
 use App\Models\User;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Import (SRS 4.4, 8.3; FR-IMP-01..04) dan gabung data ganda (FR-REL-09). */
 class ImportMergeTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     private User $me;
 
@@ -23,6 +24,7 @@ class ImportMergeTest extends TestCase
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
         $this->me = User::factory()->inDepartment('Customer Service')->role(Role::KepalaDepartment)->create(['email' => 'rina@contoh.test']);
     }
 

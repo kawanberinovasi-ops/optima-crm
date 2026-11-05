@@ -33,19 +33,24 @@ Cakupan yang sama berlaku untuk detail data, pencarian, interaksi, deal, pipelin
 (hanya alasan yang terlihat untuk data divisi lain), import, dan email ringkasan. Flag "lihat lintas divisi" bisa diubah
 Super Admin di Akses & Audit → Department. Kepala department **tidak** otomatis jadi Super Admin.
 
-Matriks hak akses awal (sama dengan pratinjau klien, sumbernya `App\Support\DivisionDefaults`):
+Matriks hak akses awal: **keputusan klien** di tabel "3. Hak akses awal" (5 Nov 2026), sumbernya `App\Support\DivisionDefaults`.
 
-| Department | Lead | Client | Interaksi | Deal | Nilai deal | Rate card |
-|---|---|---|---|---|---|---|
-| Executive | M | M | M | M | Ya | M |
-| Customer Service | M | M | M | M | Ya* | Tidak |
-| Digital Campaign | C | C | C | C | Ya* | M |
-| Creative & Media, CampusNet, DietPartner, Business Operation | C | C | C | C | Ya* | Tidak |
+| Department | Lead | Client | Partner | Interaksi | Deal | Nilai deal | Rate card |
+|---|---|---|---|---|---|---|---|
+| Executive | M | M | M | M | M | Ya | Ya |
+| Customer Service | C | R | R | M | R | Tidak | R* |
+| Digital Campaign | R | R | M | C | N | Tidak | M |
+| Creative & Media | R | R | M | C | N | Tidak | M |
+| CampusNet | C | R | M | C | N | Tidak | M |
+| DietPartner | C | R | M | C | N | Tidak | M |
+| Business Operation | R | M | R | R | M | Ya | M |
 
-Ya* = hanya Kepala Department dan Koordinator (PIC deal tetap melihat nilai deal miliknya). Executive selalu melihat
-nilai deal dan rate card. Pengecualian per orang untuk Viewer tetap dibatasi ke R. **Commercial dilebur ke Customer
-Service**: pengguna, data, serah terima, dan layanannya pindah ke CS. Kolom Community, KOL/KOC, dan Media dihapus
-(sekarang layanan). Semua ini menyimpang dari tabel SRS bagian 3 dan perlu disetujui di revisi SRS.
+- Commercial sudah dilebur ke Customer Service, jadi baris Commercial di tabel klien tidak dipakai; CS memakai barisnya sendiri.
+- Kolom Community, KOL/KOC, dan Media sekarang layanan. Hak **Partner** = level tertinggi dari ketiganya.
+- Ya* / R* = hanya Kepala Department dan Koordinator. Divisi dengan Deal **N** tidak melihat menu Pipeline; Deal **R** hanya
+  melihat deal, tidak bisa membuat. Tombol "Lead baru" butuh Lead minimal C, "Partner baru" butuh Partner minimal C.
+- Migrasi `2026_11_05_000004` mengisi matriks ini ke database yang sudah ada. Super Admin tetap bisa mengubahnya di
+  Akses & Audit → Hak akses, atau memberi pengecualian per orang.
 
 ## 3a. Pipeline per divisi
 
@@ -148,6 +153,9 @@ Perubahan di atas pratinjau klien, sesuai catatan revisi klien:
   masuk ke identitas yang sama. Semua didaftarkan sebagai Kepala Department di divisinya, tidak ada yang otomatis
   Super Admin. Super Admin dibuat terpisah dengan `php artisan optima:create-admin`.
 - Di server, salin file itu lewat jalur aman (bukan lewat git), jalankan perintahnya, lalu hapus filenya.
+- Kepala Executive didaftarkan sebagai **Super Admin** (keputusan 5 Nov 2026); kepala lain sebagai Kepala Department.
+- `--replace-demo` menghapus akun uji `@contoh.test`; semua data yang mereka pegang dialihkan ke kepala department
+  divisi yang sama (atau Super Admin kalau divisinya belum punya kepala). `./start-backend.sh --reset` menjalankan ini otomatis.
 
 ## Menyambungkan SSO Google (Gmail)
 

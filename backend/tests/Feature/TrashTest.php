@@ -13,17 +13,19 @@ use App\Models\TrashEntry;
 use App\Models\User;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Data terhapus (pratinjau klien 27 Okt 2026): hapus bisa dipulihkan, hak dan syarat diperiksa di server. */
 class TrashTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
     }
 
     private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User

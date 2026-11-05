@@ -13,12 +13,13 @@ use App\Models\Pipeline;
 use App\Models\User;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Pipeline deal (SRS 4.3, FR-DEAL-01..06) dan pengaturan stage. */
 class DealApiTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     private Pipeline $pipeline;
 
@@ -26,6 +27,7 @@ class DealApiTest extends TestCase
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
         // Pengguna bawaan tes ada di Customer Service, yang memakai pipeline Sales.
         $this->pipeline = Pipeline::with('stages')->where('name', 'Customer Service')->firstOrFail();
     }

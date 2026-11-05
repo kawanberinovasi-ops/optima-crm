@@ -42,58 +42,65 @@
     "Executive": {
       "lead": "M",
       "client": "M",
+      "partner": "M",
       "interaksi": "M",
       "deal": "M",
       "nilai": "Ya",
-      "rate": "M"
+      "rate": "Ya"
     },
     "Customer Service": {
-      "lead": "M",
-      "client": "M",
+      "lead": "C",
+      "client": "R",
+      "partner": "R",
       "interaksi": "M",
-      "deal": "M",
-      "nilai": "Ya*",
-      "rate": "Tidak"
+      "deal": "R",
+      "nilai": "Tidak",
+      "rate": "R*"
     },
     "Digital Campaign": {
-      "lead": "C",
-      "client": "C",
+      "lead": "R",
+      "client": "R",
+      "partner": "M",
       "interaksi": "C",
-      "deal": "C",
-      "nilai": "Ya*",
+      "deal": "N",
+      "nilai": "Tidak",
       "rate": "M"
     },
     "Creative & Media": {
-      "lead": "C",
-      "client": "C",
+      "lead": "R",
+      "client": "R",
+      "partner": "M",
       "interaksi": "C",
-      "deal": "C",
-      "nilai": "Ya*",
-      "rate": "Tidak"
+      "deal": "N",
+      "nilai": "Tidak",
+      "rate": "M"
     },
     "CampusNet": {
       "lead": "C",
-      "client": "C",
+      "client": "R",
+      "partner": "M",
       "interaksi": "C",
-      "deal": "C",
-      "nilai": "Ya*",
-      "rate": "Tidak"
+      "deal": "N",
+      "nilai": "Tidak",
+      "rate": "M"
     },
     "DietPartner": {
       "lead": "C",
-      "client": "C",
+      "client": "R",
+      "partner": "M",
       "interaksi": "C",
-      "deal": "C",
-      "nilai": "Ya*",
-      "rate": "Tidak"
+      "deal": "N",
+      "nilai": "Tidak",
+      "rate": "M"
     },
     "Business Operation": {
-      "lead": "C",
-      "client": "C",
-      "interaksi": "C",
-      "deal": "C",
-      "nilai": "Ya*",
-      "rate": "Tidak"
+      "lead": "R",
+      "client": "M",
+      "partner": "R",
+      "interaksi": "R",
+      "deal": "M",
+      "nilai": "Ya",
+      "rate": "M"
     }
   },
   "options": {

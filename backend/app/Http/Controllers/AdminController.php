@@ -30,7 +30,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class AdminController extends Controller
 {
-    private const DATA_ENTITIES = ['lead', 'client', 'interaksi', 'deal'];
+    private const DATA_ENTITIES = ['lead', 'client', 'partner', 'interaksi', 'deal'];
 
     private const OPTION_KEYS = ['segments' => 'segments', 'sources' => 'sources', 'intTypes' => 'interaction_types', 'lostReasons' => 'lost_reasons'];
 

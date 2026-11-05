@@ -12,17 +12,19 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Email ringkasan follow-up 08.00 (SRS 4.2, 8.2; FR-INT-05). */
 class DailyDigestTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
         config(['optima.mail_allowed_domains' => ['contoh.test'], 'optima.mail_daily_limit' => 200]);
     }
 

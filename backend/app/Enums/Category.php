@@ -18,7 +18,8 @@ enum Category: string
     {
         return match ($this) {
             self::Lead => 'lead',
-            self::Client, self::Partner => 'client',
+            self::Client => 'client',
+            self::Partner => 'partner',
         };
     }
 }

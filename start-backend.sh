@@ -26,7 +26,7 @@ if [ "$1" = "--reset" ]; then
   "$PHP" artisan migrate:fresh --seed --force >/dev/null || exit 1
   # Akun internal (nama dan email asli) hanya ada di file lokal yang tidak ikut ke git.
   INTERNAL=storage/app/private/internal-users.json
-  [ -f "$INTERNAL" ] && "$PHP" artisan optima:sync-internal-users "$INTERNAL" | tail -1
+  [ -f "$INTERNAL" ] && "$PHP" artisan optima:sync-internal-users "$INTERNAL" --replace-demo | tail -1
 fi
 
 open_browser() { (sleep 2; command -v open >/dev/null && open "$URL" || xdg-open "$URL") >/dev/null 2>&1 & }

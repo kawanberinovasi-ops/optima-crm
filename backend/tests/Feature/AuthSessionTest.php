@@ -10,17 +10,19 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as GoogleUser;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Login dan sesi (SRS 4.1, bagian 3; FR-AUT-01..03, 05). */
 class AuthSessionTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
         config(['optima.dev_login' => true]);
     }
 

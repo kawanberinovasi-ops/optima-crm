@@ -12,17 +12,19 @@ use App\Services\Access;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Akses & Audit (SRS bagian 3, FR-USR, FR-AUD), pemberitahuan, dan tampilan tersimpan. */
 class AdminApiTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
     }
 
     private function user(string $dept = 'Customer Service', Role $role = Role::Staf): User

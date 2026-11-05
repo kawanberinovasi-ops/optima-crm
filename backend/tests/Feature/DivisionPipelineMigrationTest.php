@@ -68,7 +68,7 @@ class DivisionPipelineMigrationTest extends TestCase
         $this->assertSame(['Digital Campaign'], $active->last()->departments()->pluck('name')->all());
         $this->assertTrue($sales->departments()->whereKey($cs->id)->exists());
         $this->assertSame('M', AccessGrant::where(['department_id' => $cs->id, 'entity' => 'interaksi'])->value('level'));
-        $this->assertSame('C', AccessGrant::where(['department_id' => Department::where('name', 'CampusNet')->value('id'), 'entity' => 'deal'])->value('level'));
+        $this->assertSame('C', AccessGrant::where(['department_id' => Department::where('name', 'CampusNet')->value('id'), 'entity' => 'lead'])->value('level'));
 
         // Lanjutan revisi: Sales dipecah jadi pipeline per divisi; deal ikut divisi PIC relasinya.
         $perDivision->up();

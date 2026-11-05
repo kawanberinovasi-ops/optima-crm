@@ -16,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /**
@@ -25,7 +26,7 @@ use Tests\TestCase;
  */
 class LeadFlowTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     private Pipeline $pipeline;
 
@@ -33,6 +34,7 @@ class LeadFlowTest extends TestCase
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
         $this->pipeline = Pipeline::with('stages')->first();
     }
 
@@ -257,7 +259,10 @@ class LeadFlowTest extends TestCase
         DB::table('interactions')->insert(['code' => 'OLD-I1', 'client_partner_id' => $kol, 'user_id' => $pic->id, 'occurred_on' => '2026-01-01',
             'type' => 'Telepon', 'result' => 'Riwayat lama', 'created_at' => now(), 'updated_at' => now()]);
 
+        // Hak "partner" baru ada sejak migrasi matriks klien: lepas dulu supaya migrasi lama bisa diulang, lalu pasang lagi.
+        DB::table('access_grants')->where('entity', 'partner')->delete();
         $migration->up();
+        (require database_path('migrations/2026_11_05_000004_client_access_matrix.php'))->up();
         $this->seed(ReferenceDataSeeder::class);
 
         $get = fn ($id) => ClientPartner::with('service')->find($id);

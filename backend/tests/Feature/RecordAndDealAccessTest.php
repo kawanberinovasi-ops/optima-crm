@@ -13,17 +13,19 @@ use App\Services\Access;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Tests\Concerns\OpenAccessMatrix;
 use Tests\TestCase;
 
 /** Aturan per data: PIC, nilai deal, buka kembali deal, filter periode, dan penyaringan field. */
 class RecordAndDealAccessTest extends TestCase
 {
-    use RefreshDatabase;
+    use OpenAccessMatrix, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(ReferenceDataSeeder::class);
+        $this->openAccessMatrix();
     }
 
     private function access(): Access
@@ -132,7 +134,9 @@ class RecordAndDealAccessTest extends TestCase
         $payload = $kol->only(['id', 'name', 'rate_card']);
 
         $this->assertArrayHasKey('rate_card', $this->access()->filterClientPartner($this->user('Digital Campaign'), $payload));
-        $this->assertArrayNotHasKey('rate_card', $this->access()->filterClientPartner($this->user('Customer Service', Role::Koordinator), $payload));
+        // Rate card Customer Service "R*": hanya Kepala Department dan Koordinator.
+        $this->assertArrayNotHasKey('rate_card', $this->access()->filterClientPartner($this->user('Customer Service'), $payload));
+        $this->assertArrayHasKey('rate_card', $this->access()->filterClientPartner($this->user('Customer Service', Role::Koordinator), $payload));
         $this->assertArrayHasKey('rate_card', $this->access()->filterClientPartner($this->user('Executive', Role::SuperAdmin), $payload));
     }
 

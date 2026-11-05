@@ -94,10 +94,10 @@ class ClientPartnerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $me = $request->user();
-        abort_unless($this->access->canCreateRecord($me, Category::Lead), 403, 'Kamu ga punya izin menambah Lead.');
         $data = $request->validate($this->rules(creating: true));
-        $service = $this->service($data);
         $category = ($data['kind'] ?? 'Lead') === 'Partner' ? Category::Partner : Category::Lead;
+        abort_unless($this->access->canCreateRecord($me, $category), 403, 'Kamu ga punya izin menambah '.$category->value.'.');
+        $service = $this->service($data);
 
         $record = DB::transaction(function () use ($data, $me, $service, $category) {
             [$id, $code] = Codes::next('client_partners', 'CP');
@@ -142,7 +142,8 @@ class ClientPartnerController extends Controller
         DB::transaction(function () use ($me, $clientPartner, $data) {
             $original = $clientPartner->getRawOriginal();
             $fields = isset($data['name']) ? ['name' => trim($data['name'])] : [];
-            if (isset($data['kind']) && $clientPartner->category !== Category::Client) {
+            if (isset($data['kind']) && $clientPartner->category !== Category::Client && $data['kind'] !== $clientPartner->category->value) {
+                abort_unless($this->access->canCreateRecord($me, Category::from($data['kind'])), 403, 'Kamu ga punya izin mengubah data ini jadi '.$data['kind'].'.');
                 $fields['category'] = $data['kind'];
             }
             foreach (['segment', 'source', 'city', 'note'] as $k) {
