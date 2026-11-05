@@ -31,12 +31,12 @@ class AccessMatrixTest extends TestCase
     /** Department => [Lead, Client, Partner, Interaksi, Deal, Nilai deal, Rate card] */
     private const SRS = [
         'Executive' => ['M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
-        'Customer Service' => ['C', 'R', 'R', 'M', 'R', 'Tidak', 'R*'],
-        'Digital Campaign' => ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-        'Creative & Media' => ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-        'CampusNet' => ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-        'DietPartner' => ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-        'Business Operation' => ['R', 'M', 'R', 'R', 'M', 'Ya', 'M'],
+        'Customer Service' => ['C', 'C', 'C', 'M', 'R', 'Tidak', 'R*'],
+        'Digital Campaign' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+        'Creative & Media' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+        'CampusNet' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+        'DietPartner' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+        'Business Operation' => ['C', 'M', 'C', 'R', 'M', 'Ya', 'M'],
     ];
 
     private const ENTITIES = ['lead', 'client', 'partner', 'interaksi', 'deal'];
@@ -123,8 +123,15 @@ class AccessMatrixTest extends TestCase
         foreach ([Role::KepalaDepartment, Role::Koordinator, Role::Staf, Role::Viewer] as $role) {
             $this->assertFalse($this->access()->canAdminister($this->user('Executive', $role)), $role->value);
         }
-        $this->assertTrue($this->access()->canViewAdmin($this->user('Customer Service', Role::KepalaDepartment)));
-        $this->assertFalse($this->access()->canViewAdmin($this->user('Customer Service', Role::Koordinator)));
+        // Akses & Audit lengkap hanya Super Admin; kepala dan koordinator hanya mengubah layanan divisinya dan daftar pilihan.
+        $head = $this->user('Customer Service', Role::KepalaDepartment);
+        $this->assertFalse($this->access()->canViewAdmin($head));
+        $this->assertTrue($this->access()->canViewAdmin($this->user('Executive', Role::SuperAdmin)));
+        $this->assertTrue($this->access()->canEditOptions($head));
+        $this->assertTrue($this->access()->canEditOptions($this->user('CampusNet', Role::Koordinator)));
+        $this->assertFalse($this->access()->canEditOptions($this->user('CampusNet')));
+        $this->assertTrue($this->access()->canManageServices($head, $head->department_id));
+        $this->assertFalse($this->access()->canManageServices($head, $this->user('CampusNet')->department_id));
     }
 
     public function test_inactive_user_has_no_access_at_all(): void

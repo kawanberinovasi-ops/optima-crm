@@ -78,12 +78,39 @@ Forms.handover = (o) => {
 };
 
 /* ---------- Akses & Audit: tab Layanan & Divisi, dan department lintas divisi ---------- */
-AdminTabs.services = (adm) => '<div class="sec-h"><div><span class="lbl">Layanan dan penanggung jawab</span><h2 class="disp h2">Layanan terpisah dari status.</h2></div>' + (adm ? '<button type="button" class="btn btn-sm" data-a="svcnew">Layanan baru</button>' : '') + '</div>' +
-  '<p class="small muted" style="margin:0">Status relasi hanya Lead atau Client. Pemetaan layanan adalah saran divisi penerima, bukan jalur wajib: setiap divisi tetap bisa menerima Lead langsung dan melakukan serah terima.</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Layanan</th><th>Divisi layanan</th><th>Aksi</th></tr></thead><tbody>' +
-  (Store.db.services || []).map(x => '<tr><td><strong>' + esc(x.name) + '</strong></td><td>' + (adm ? '<select class="inp" data-ch="svcdept" data-v="' + esc(x.id) + '" aria-label="Divisi layanan ' + esc(x.name) + '">' + Store.db.departments.map(d => opt(d.name, x.dept)).join('') + '</select>' : esc(x.dept)) + '</td><td>' + (adm ? '<button type="button" class="btn btn-s btn-sm" style="color:var(--bad)" data-a="workflow-delete-service" data-v="' + x.id + '" aria-label="Hapus layanan ' + esc(x.name) + '">Hapus</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>';
-Actions.svcnew = () => { if (!canAdmin()) return; App.modal = { kind: 'svcnew' }; render(); };
-Modals.svcnew = (m) => { const v = m.val || {}; return modalShell('Layanan baru', 'Layanan & Divisi', '<div class="form-grid"><label class="fld"><span>Nama layanan *</span><input class="inp" name="name" value="' + esc(v.name || '') + '" required' + inv(m, 'name') + '>' + fieldErr(m, 'name') + '</label><label class="fld"><span>Divisi layanan</span><select class="inp" name="dept">' + Store.db.departments.map(d => opt(d.name, v.dept)).join('') + '</select></label></div>', '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="submit" class="btn">' + ic('check', 'ic-s') + 'Simpan</button>', false, 'svcnew'); };
-Forms.svcnew = (o) => { if (!canAdmin()) return; const m = App.modal; m.val = o; if (!o.name || (Store.db.services || []).some(x => x.name.toLowerCase() === o.name.toLowerCase())) { m.err = { name: 'Isi nama layanan yang belum ada.' }; m.still = true; render(); return; } Store.db.services = Store.db.services || []; Store.db.services.push({ id: uid('s'), name: o.name, dept: o.dept, active: true }); audit('Tambah', 'Layanan', o.name + ' ditangani ' + o.dept); App.modal = null; commit(); };
+/* Layanan milik setiap divisi (revisi klien 5 Nov 2026): divisi menambah, mengganti nama, dan menghapus layanannya sendiri.
+   Super Admin melihat dan mengatur semua divisi, termasuk memindahkan layanan ke divisi lain. */
+AdminTabs.services = (adm) => {
+  const depts = adm ? Store.db.departments.map(d => d.name) : [me().dept];
+  const all = Store.db.services || [];
+  return '<div class="sec-h"><div><span class="lbl">Layanan</span><h2 class="disp h2">' + (adm ? 'Layanan setiap divisi' : 'Layanan ' + esc(me().dept)) + '</h2></div></div>' +
+    '<p class="small muted" style="margin:0">Setiap divisi mengisi sendiri layanan yang mereka punya. Layanan dipakai di form Lead dan deal; mengganti nama ikut mengubah data yang memakainya, menghapus masuk Data terhapus (ditolak kalau masih dipakai).</p>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">' + depts.map(dept => {
+      const list = all.filter(x => x.dept === dept); const can = canManageServices(dept);
+      return '<div class="card pad" style="display:flex;flex-direction:column;gap:12px;padding:20px"><strong>' + esc(dept) + '</strong>' +
+        (list.length ? '<div style="display:flex;flex-direction:column;gap:8px">' + list.map(x => '<div class="lrow" style="padding:8px 12px;gap:8px"><span style="flex:1;min-width:0"><strong>' + esc(x.name) + '</strong></span>' +
+          (adm ? '<label><span class="sr">Divisi layanan ' + esc(x.name) + '</span><select class="inp" data-ch="svcdept" data-v="' + esc(x.id) + '" style="min-height:40px;width:auto">' + Store.db.departments.map(d => opt(d.name, x.dept)).join('') + '</select></label>' : '') +
+          (can ? '<button type="button" class="btn btn-s btn-sm" data-a="svcedit" data-v="' + x.id + '" aria-label="Ganti nama ' + esc(x.name) + '">' + ic('edit', 'ic-s') + '</button><button type="button" class="btn btn-s btn-sm" style="color:var(--bad)" data-a="workflow-delete-service" data-v="' + x.id + '" aria-label="Hapus layanan ' + esc(x.name) + '">' + ic('trash', 'ic-s') + '</button>' : '') + '</div>').join('') + '</div>'
+          : '<span class="small muted">Belum ada layanan.</span>') +
+        (can ? '<form data-form="svcadd" style="display:flex;gap:8px"><input type="hidden" name="dept" value="' + esc(dept) + '"><label style="flex:1"><span class="sr">Layanan baru ' + esc(dept) + '</span><input class="inp" name="name" placeholder="Layanan baru" style="min-height:44px"></label><button type="submit" class="btn btn-sm">Tambah</button></form>' : '') + '</div>';
+    }).join('') + '</div>';
+};
+Forms.svcadd = (o) => {
+  if (!o.name || !canManageServices(o.dept)) return;
+  Store.db.services = Store.db.services || [];
+  if (Store.db.services.some(x => x.name.toLowerCase() === o.name.toLowerCase())) { toast('Udah ada', o.name + ' udah ada di daftar layanan.', 'bad'); return; }
+  Store.db.services.push({ id: uid('s'), name: o.name, dept: o.dept, active: true }); audit('Tambah', 'Layanan', o.name + ' (' + o.dept + ')'); commit();
+};
+Actions.svcedit = (el) => { const x = (Store.db.services || []).find(s => s.id === el.dataset.v); if (!x || !canManageServices(x.dept)) return; App.modal = { kind: 'svcedit', id: x.id, val: { name: x.name } }; render(); };
+Modals.svcedit = (m) => modalShell('Ganti nama layanan', 'Layanan', '<div class="form-grid"><label class="fld" style="grid-column:1/-1"><span>Nama layanan *</span><input class="inp" name="name" value="' + esc((m.val || {}).name || '') + '"' + inv(m, 'name') + ' autofocus>' + fieldErr(m, 'name') + '</label></div>', '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="submit" class="btn">' + ic('check', 'ic-s') + 'Simpan</button>', false, 'svcedit');
+Forms.svcedit = (o) => {
+  const m = App.modal; const x = (Store.db.services || []).find(s => s.id === m.id); if (!x || !canManageServices(x.dept)) return;
+  if (!o.name || Store.db.services.some(s => s.id !== x.id && s.name.toLowerCase() === o.name.toLowerCase())) { m.err = { name: 'Isi nama layanan yang belum dipakai.' }; m.val = o; m.still = true; render(); return; }
+  const old = x.name; x.name = o.name;
+  Store.db.records.forEach(r => { if (r.service === old) r.service = o.name; });
+  Store.db.deals.forEach(d => { if (d.service === old) d.service = o.name; });
+  audit('Ubah', 'Layanan', old + ' jadi ' + o.name); App.modal = null; commit();
+};
 Changes['record-service'] = (el) => { App.modal.val = Object.assign({}, App.modal.val, fd(el.closest('form'))); App.modal.still = true; render(); };
 Changes.svcdept = (el) => { const x = (Store.db.services || []).find(s => s.id === el.dataset.v); if (!x) return; audit('Ubah', 'Layanan', x.name + ': ditangani ' + (el.value || 'belum ditentukan')); x.dept = el.value; commit(); };
 

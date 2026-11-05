@@ -7,6 +7,7 @@ use App\Enums\Role;
 use App\Models\AccessGrant;
 use App\Models\Department;
 use App\Models\OptionList;
+use App\Models\Service;
 use App\Models\User;
 use App\Services\Access;
 use Database\Seeders\ReferenceDataSeeder;
@@ -48,8 +49,27 @@ class AdminApiTest extends TestCase
 
         $this->as($head)->postJson('/api/users', ['name' => 'X', 'email' => 'x@contoh.test', 'dept' => 'Customer Service', 'role' => 'Staf'])->assertForbidden();
         $this->as($head)->putJson('/api/access-grants', ['dept' => 'Customer Service', 'entity' => 'deal', 'level' => 'R'])->assertForbidden();
-        $this->as($head)->getJson('/api/audit-logs')->assertOk(); // Kepala Department boleh melihat
+        $this->as($head)->getJson('/api/audit-logs')->assertForbidden(); // audit log hanya Super Admin
         $this->as($this->user())->getJson('/api/audit-logs')->assertForbidden();
+    }
+
+    public function test_division_heads_manage_their_own_services_and_option_lists(): void
+    {
+        $head = $this->user('CampusNet', Role::KepalaDepartment);
+        $staff = $this->user('CampusNet');
+
+        // Layanan baru selalu masuk divisi sendiri, walaupun deptId lain dikirim.
+        $this->as($head)->postJson('/api/services', ['name' => 'Aplikasi Sekolah', 'deptId' => Department::where('name', 'Executive')->value('id')])->assertCreated();
+        $svc = Service::where('name', 'Aplikasi Sekolah')->first();
+        $this->assertSame('CampusNet', $svc->department->name);
+        $this->as($head)->patchJson('/api/services/'.$svc->id, ['name' => 'Aplikasi Sekolah Pintar'])->assertOk();
+        $this->as($head)->patchJson('/api/services/'.$svc->id, ['deptId' => null])->assertForbidden();
+        $this->as($head)->patchJson('/api/services/'.Service::where('name', 'Media')->value('id'), ['name' => 'X'])->assertForbidden();
+        $this->as($staff)->postJson('/api/services', ['name' => 'Y'])->assertForbidden();
+        $this->as($head)->deleteJson('/api/trash/service/'.$svc->id)->assertCreated();
+
+        $this->as($head)->postJson('/api/option-lists', ['list' => 'partnerFields', 'value' => 'Pendidikan'])->assertOk();
+        $this->as($staff)->postJson('/api/option-lists', ['list' => 'partnerFields', 'value' => 'Lain'])->assertForbidden();
     }
 
     public function test_register_user_then_login_is_allowed(): void

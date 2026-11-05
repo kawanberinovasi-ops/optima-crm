@@ -170,6 +170,18 @@ Perubahan di atas pratinjau klien, sesuai catatan revisi klien:
   Migrasi `2026_11_05_000005` memindahkan nilai segmen yang bersifat bidang partner ke Bidang partner.
 - Akses & Audit → Pipeline: setiap pipeline punya tombol **Hapus** (masuk Data terhapus; ditolak kalau masih ada deal).
 
+## 5d. Layanan per divisi dan Akses & Audit per role (5 Nov 2026)
+
+- **Layanan milik divisi.** Akses & Audit → Layanan: Kepala Department dan Koordinator menambah, mengganti nama, dan menghapus
+  layanan divisinya sendiri; Super Admin semua divisi (dan bisa memindahkan layanan ke divisi lain). Form Lead hanya
+  menawarkan layanan divisi pemilik data. Mengganti nama ikut mengubah deal yang memakai nama lama.
+- **Akses & Audit per role.** Super Admin melihat semua tab (pengguna, department, pipeline, hak akses, audit log, dst.).
+  Kepala Department dan Koordinator hanya melihat tab Layanan dan Daftar pilihan, dan boleh mengubah keduanya. Audit log
+  dan riwayat data hanya untuk Super Admin.
+- **Setiap divisi menambah Client dan Partner sendiri**: hak Lead, Client, dan Partner minimal C untuk semua divisi
+  (migrasi `2026_11_05_000006`). Data tetap hanya terlihat oleh PIC-nya dan Super Admin.
+- Menu Pipeline tanpa dropdown untuk pengguna yang hanya memakai pipeline divisinya.
+
 ## Menyambungkan SSO Google (Gmail)
 
 Akun kepala department memakai Gmail pribadi dan email optima.web.id, jadi login tidak dibatasi satu domain Workspace.

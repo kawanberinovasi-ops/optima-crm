@@ -18,7 +18,7 @@ const TrashOps = (() => {
     const line = kind === 'stage' ? Store.db.lines.find(l => l.stages.some(s => s.id === id)) : null;
     const item = kind === 'stage' ? line && line.stages.find(s => s.id === id) : tables[kind] && (Store.db[tables[kind]] || []).find(x => x.id === id);
     if (!item || !me() || !me().active) return null;
-    const allowed = kind === 'record' ? canDelRec(item) : kind === 'line' ? canManageLine(item) : kind === 'stage' ? canManageLine(line) : admin();
+    const allowed = kind === 'record' ? canDelRec(item) : kind === 'line' ? canManageLine(item) : kind === 'stage' ? canManageLine(line) : kind === 'service' ? canManageServices(item.dept) : admin();
     const p = { item, line, allowed, label: item.name || (kind === 'override' ? userName(item.userId) + ' · ' + (KEY_LABEL[item.key] || item.key) : labels[kind]), dept: kind === 'record' || kind === 'line' || kind === 'service' || kind === 'user' ? item.dept : kind === 'stage' ? line.dept : kind === 'dept' ? item.name : '', block: '' };
     if (!allowed) return p;
     if (kind === 'line' && Store.db.deals.some(d => d.lineId === id)) p.block = 'Masih ada deal di lini bisnis ini. Pindahkan deal ke lini bisnis lain dahulu.';
@@ -79,6 +79,7 @@ const TrashOps = (() => {
     if (entry.kind === 'record') return canDelRec(entry.data.item);
     if (entry.kind === 'line') return canManageLine(entry.data.item);
     if (entry.kind === 'stage') return canManageLine(lineById(entry.data.lineId));
+    if (entry.kind === 'service') return canManageServices(entry.data.item.dept);
     return false;
   }
 

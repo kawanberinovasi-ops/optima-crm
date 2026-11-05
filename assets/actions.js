@@ -39,7 +39,9 @@ const Modals = {
         (canSeeRate() && v.partnerType === 'KOL/KOC' ? '<label class="fld"><span>Rate card (KOL/KOC)</span><input class="inp" name="rate" value="' + esc(v.rate) + '" inputmode="numeric" placeholder="Angka saja"></label>' : '') +
         tail, foot, true, 'record');
     }
-    const svcs = serviceList().map(x => x.name); if (v.service && !svcs.includes(v.service)) svcs.unshift(v.service);
+    // Layanan yang ditawarkan divisi pemilik data (Super Admin: semua).
+    const ownDept = r.id ? r.dept : u.dept;
+    const svcs = serviceList().filter(x => seesAll(u) || x.dept === ownDept).map(x => x.name); if (v.service && !svcs.includes(v.service)) svcs.unshift(v.service);
     const svc = serviceList().find(x => x.name === v.service);
     return modalShell(r.id ? 'Edit client' : 'Lead baru', r.id ? esc(r.code) : 'Client',
       '<p class="small muted" style="margin:0">' + (r.id ? 'Status jadi Client otomatis setelah deal Won. Pindahkan penanganan lewat Pindah PIC / divisi.' : 'Calon client masuk sebagai Lead dan jadi Client otomatis setelah deal Won. PIC awal otomatis akun pengisi, divisi awal mengikuti divisi akunmu.') + '</p>' +

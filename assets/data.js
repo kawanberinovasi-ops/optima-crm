@@ -42,15 +42,16 @@ const uid = (p) => p + '-' + Date.now().toString(36) + Math.random().toString(36
 /**
  * Hak akses awal sesuai keputusan klien (tabel "3. Hak akses awal", 5 Nov 2026); sama dengan App\Support\DivisionDefaults.
  * Customer Service memakai barisnya sendiri (Commercial sudah dilebur). Partner = level tertinggi Community, KOL/KOC, Media.
+ * Setiap divisi bisa menambah Client (lewat Lead) dan Partner sendiri, jadi Lead, Client, dan Partner minimal C.
  */
 const ACCESS_MATRIX = {
   Executive: ['M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
-  'Customer Service': ['C', 'R', 'R', 'M', 'R', 'Tidak', 'R*'],
-  'Digital Campaign': ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-  'Creative & Media': ['R', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-  CampusNet: ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-  DietPartner: ['C', 'R', 'M', 'C', 'N', 'Tidak', 'M'],
-  'Business Operation': ['R', 'M', 'R', 'R', 'M', 'Ya', 'M']
+  'Customer Service': ['C', 'C', 'C', 'M', 'R', 'Tidak', 'R*'],
+  'Digital Campaign': ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+  'Creative & Media': ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+  CampusNet: ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+  DietPartner: ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+  'Business Operation': ['C', 'M', 'C', 'R', 'M', 'Ya', 'M']
 };
 function defaultDivisionAccess(dept) {
   const [lead, client, partner, interaksi, deal, nilai, rate] = ACCESS_MATRIX[dept] || ['C', 'C', 'C', 'C', 'C', 'Ya*', 'Tidak'];
@@ -331,7 +332,13 @@ function dealLog(d, from, to, status, note) {
   d.history = d.history || [];
   d.history.push({ at: new Date().toISOString(), by: me() ? me().id : '-', from: from || '', to: to || '', status, note: note || '' });
 }
-const canViewAdmin = () => ['Super Admin', 'Kepala Department'].includes(me().role);
+/**
+ * Akses & Audit (revisi klien 5 Nov 2026): Super Admin melihat semuanya. Kepala Department dan Koordinator membuka halaman
+ * yang sama tapi hanya tab Layanan (milik divisinya) dan Daftar pilihan, dan boleh mengubah keduanya.
+ */
+const canViewAdmin = () => !!me() && ['Super Admin', 'Kepala Department', 'Koordinator'].includes(me().role);
+const canEditOptions = canViewAdmin;
+const canManageServices = (dept) => !!me() && (me().role === 'Super Admin' || (isLead(me()) && dept === me().dept));
 
 function audit(action, entity, detail) {
   const u = me();

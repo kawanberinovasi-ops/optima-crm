@@ -100,6 +100,7 @@ class Trash
             'record' => ($r = ClientPartner::withTrashed()->find($s['id'])) !== null && $this->access->canArchiveRecord($by, $r),
             'line' => ($p = Pipeline::find($s['id'])) !== null && $this->access->canConfigurePipeline($by, $p),
             'stage' => ($p = Pipeline::find($s['row']['pipeline_id'])) !== null && $this->access->canConfigurePipeline($by, $p),
+            'service' => $this->access->canManageServices($by, $s['row']['department_id'] ?? null),
             default => false,
         };
     }
@@ -130,6 +131,7 @@ class Trash
             'record' => $this->access->canArchiveRecord($by, $item),
             'line' => $this->access->canConfigurePipeline($by, $item),
             'stage' => $this->access->canConfigurePipeline($by, $item->pipeline),
+            'service' => $this->access->canManageServices($by, $item->department_id),
             default => $this->access->canAdminister($by),
         };
 

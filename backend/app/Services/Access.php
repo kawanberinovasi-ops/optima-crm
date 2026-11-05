@@ -263,10 +263,26 @@ class Access
         return $user->active && $user->isSuperAdmin();
     }
 
-    /** Melihat halaman Akses & Audit (tanpa mengubah). */
+    /** Melihat seluruh Akses & Audit (pengguna, department, hak akses, audit log): hanya Super Admin (revisi klien 5 Nov 2026). */
     public function canViewAdmin(User $user): bool
     {
-        return $user->active && in_array($user->role, [Role::SuperAdmin, Role::KepalaDepartment], true);
+        return $user->active && $user->isSuperAdmin();
+    }
+
+    /** Mengubah daftar pilihan: Super Admin, Kepala Department, dan Koordinator. */
+    public function canEditOptions(User $user): bool
+    {
+        return $user->active && in_array($user->role, [Role::SuperAdmin, Role::KepalaDepartment, Role::Koordinator], true);
+    }
+
+    /** Layanan milik divisi: Super Admin semua divisi, Kepala Department dan Koordinator hanya divisinya. */
+    public function canManageServices(User $user, ?int $departmentId): bool
+    {
+        if (! $user->active) {
+            return false;
+        }
+
+        return $user->isSuperAdmin() || ($user->role->isLead() && $departmentId !== null && $departmentId === $user->department_id);
     }
 
     /**

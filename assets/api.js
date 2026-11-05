@@ -362,10 +362,14 @@
   Actions.optdel = async (el) => { try { Store.db.options = (await req('DELETE', 'option-lists', { list: el.dataset.k, value: el.dataset.v })).data; Store.save(); render(); } catch (e) { fail(e); } };
   Actions.exportaudit = () => { location.href = BASE + '/audit-logs/export'; };
   const svcId = (id) => Number(id);
-  Forms.svcnew = (o) => {
-    const m = App.modal; if (!o.name) { m.err = { name: 'Isi nama layanan yang belum ada.' }; m.val = o; m.still = true; render(); return; }
+  Forms.svcadd = (o) => {
+    if (!o.name) return;
     const d = Store.db.departments.find(x => x.name === o.dept);
-    Api.post('services', { name: o.name, deptId: d ? Number(d.id) : null }).then(res => { Store.db.services = res.data; Store.save(); App.modal = null; render(); toast('Ditambah', o.name + ' masuk daftar layanan.', 'info'); }).catch(e => { m.val = o; fail(e, m); });
+    Api.post('services', { name: o.name, deptId: d ? Number(d.id) : null }).then(res => { Store.db.services = res.data; Store.save(); render(); toast('Ditambah', o.name + ' masuk layanan ' + o.dept + '.', 'info'); }).catch(e => fail(e));
+  };
+  Forms.svcedit = (o) => {
+    const m = App.modal; if (!o.name) { m.err = { name: 'Isi nama layanan.' }; m.still = true; render(); return; }
+    Api.patch('services/' + svcId(m.id), { name: o.name }).then(() => refresh('Tersimpan', 'Nama layanan diganti jadi ' + o.name + '.')).catch(e => { m.val = o; fail(e, m); });
   };
   Changes.svcdept = async (el) => { const d = Store.db.departments.find(x => x.name === el.value); try { Store.db.services = (await Api.patch('services/' + svcId(el.dataset.v), { deptId: d ? Number(d.id) : null })).data; Store.save(); render(); toast('Tersimpan', 'Pemetaan layanan diubah. PIC data yang ada ga berubah.', 'info'); } catch (e) { fail(e); render(); } };
   Actions.notifall = async () => { try { Store.db.notifs = (await Api.post('notifications/read')).data; Store.save(); render(); } catch (e) { fail(e); } };
@@ -379,7 +383,7 @@
   Actions.viewdel = async (el) => { try { Store.db.views = (await Api.del('saved-views/' + el.dataset.v)).data; Store.save(); render(); } catch (e) { fail(e); } };
   // Audit log dan riwayat data dimuat ulang setiap kali halaman Akses & Audit dibuka.
   window.addEventListener('hashchange', () => {
-    if (!me() || !/^#\/akses/.test(location.hash) || !canViewAdmin()) return;
+    if (!me() || !/^#\/akses/.test(location.hash) || !canAdmin()) return;
     Promise.all([Api.get('audit-logs'), Api.get('changes')]).then(([a, c]) => { Store.db.audit = a.data; Store.db.changes = c.data; Store.save(); render(); }).catch(() => {});
   });
 

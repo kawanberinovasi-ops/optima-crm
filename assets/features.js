@@ -378,7 +378,7 @@ Object.assign(Actions, {
   dbtab: (el) => { App.ui.db.tab = el.dataset.v; App.anim = true; render(); },
   newoverride: () => { App.modal = { kind: 'override' }; render(); },
   ovdel: (el) => { const o = Store.db.overrides.find(x => x.id === el.dataset.v); Store.db.overrides = Store.db.overrides.filter(x => x.id !== o.id); audit('Ubah', 'Hak akses', 'Pengecualian ' + KEY_LABEL[o.key] + ' buat ' + userName(o.userId) + ' dicabut'); commit(); },
-  optdel: (el) => { const k = el.dataset.k, v = el.dataset.v; Store.db.options = Store.db.options || JSON.parse(JSON.stringify(DEFAULT_OPTS)); Store.db.options[k] = optList(k).filter(x => x !== v); audit('Ubah', 'Daftar pilihan', OPT_LABEL[k] + ': ' + v + ' dihapus'); commit(); },
+  optdel: (el) => { if (!canEditOptions()) return; const k = el.dataset.k, v = el.dataset.v; Store.db.options = Store.db.options || JSON.parse(JSON.stringify(DEFAULT_OPTS)); Store.db.options[k] = optList(k).filter(x => x !== v); audit('Ubah', 'Daftar pilihan', OPT_LABEL[k] + ': ' + v + ' dihapus'); commit(); },
   notifall: () => { (Store.db.notifs || []).forEach(n => { if (n.userId === me().id) n.read = true; }); Store.save(); render(); },
   notifopen: (el) => { const n = (Store.db.notifs || []).find(x => x.id === el.dataset.v); if (!n) return; n.read = true; Store.save(); App.pop = null; const [k, id] = (n.link || '').split(':'); if (k === 'rec') { App.drawer = { id }; if (App.route !== 'cp') location.hash = '#/cp'; else render(); } else if (k === 'deal' && findDeal(id)) { App.modal = { kind: 'deal', deal: findDeal(id) }; render(); } else render(); },
   simexpire: () => expireSession('Ini simulasi sesi berakhir buat uji coba.'),
@@ -492,7 +492,7 @@ Object.assign(Forms, {
     audit('Ubah', 'Hak akses', 'Pengecualian ' + KEY_LABEL[o.key] + ' = ' + o.value + ' buat ' + userName(o.userId) + ' (' + o.reason + ')'); notify(o.userId, 'Hak akses kamu buat ' + KEY_LABEL[o.key] + ' diubah jadi ' + o.value, '');
     App.modal = null; commit(); toast('Pengecualian disimpan', userName(o.userId) + ' · ' + KEY_LABEL[o.key] + ' ' + o.value, 'info');
   },
-  optadd: (o) => { if (!o.v) return; Store.db.options = Store.db.options || JSON.parse(JSON.stringify(DEFAULT_OPTS)); const list = optList(o.k); if (list.some(x => x.toLowerCase() === o.v.toLowerCase())) { toast('Udah ada', o.v + ' udah ada di daftar.', 'bad'); return; } list.push(o.v); Store.db.options[o.k] = list; audit('Ubah', 'Daftar pilihan', OPT_LABEL[o.k] + ': ' + o.v + ' ditambah'); commit(); }
+  optadd: (o) => { if (!o.v || !canEditOptions()) return; Store.db.options = Store.db.options || JSON.parse(JSON.stringify(DEFAULT_OPTS)); const list = optList(o.k); if (list.some(x => x.toLowerCase() === o.v.toLowerCase())) { toast('Udah ada', o.v + ' udah ada di daftar.', 'bad'); return; } list.push(o.v); Store.db.options[o.k] = list; audit('Ubah', 'Daftar pilihan', OPT_LABEL[o.k] + ': ' + o.v + ' ditambah'); commit(); }
 });
 
 /* ---------- import: catat batch supaya bisa dibatalkan ---------- */

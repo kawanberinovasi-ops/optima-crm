@@ -267,28 +267,40 @@ class AdminController extends Controller
     /* ---------- layanan dan pemetaan ke divisi ---------- */
 
     /** Layanan baru, atau ubah divisi penanganan / status aktif layanan yang ada. Tidak memindahkan PIC data mana pun. */
+    /** Layanan baru milik satu divisi. Selain Super Admin, layanan selalu masuk divisi pengguna itu sendiri. */
     public function storeService(Request $request): JsonResponse
     {
-        $this->authorizeAdmin($request);
+        $me = $request->user();
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', Rule::unique('services', 'name')],
             'deptId' => ['nullable', 'integer', Rule::exists('departments', 'id')],
         ], ['name.required' => 'Nama layanan wajib diisi.', 'name.unique' => 'Layanan ini udah ada.']);
-        $service = Service::create(['name' => trim($data['name']), 'department_id' => $data['deptId'] ?? null, 'position' => (int) Service::max('position') + 1]);
+        $deptId = $me->isSuperAdmin() ? ($data['deptId'] ?? null) : $me->department_id;
+        abort_unless($this->access->canManageServices($me, $deptId), 403, 'Kamu cuma bisa menambah layanan divisimu.');
+        $service = Service::create(['name' => trim($data['name']), 'department_id' => $deptId, 'position' => (int) Service::max('position') + 1]);
         $this->audit->log('Tambah', 'Layanan', $service->id, $service->name.' ditangani '.($service->department?->name ?? 'belum ditentukan'));
 
         return response()->json(['data' => self::servicesShape()], 201);
     }
 
+    /** Ganti nama layanan (divisi pemiliknya), atau pindah divisi / nonaktifkan (Super Admin). */
     public function updateService(Request $request, Service $service): JsonResponse
     {
-        $this->authorizeAdmin($request);
+        $me = $request->user();
+        abort_unless($this->access->canManageServices($me, $service->department_id), 403, 'Layanan ini milik divisi lain.');
         $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:100', Rule::unique('services', 'name')->ignore($service->id)],
             'deptId' => ['sometimes', 'nullable', 'integer', Rule::exists('departments', 'id')],
             'active' => ['sometimes', 'boolean'],
-        ]);
-        $before = ['department' => $service->department?->name, 'active' => $service->active];
+        ], ['name.unique' => 'Layanan ini udah ada.']);
+        abort_if(! $me->isSuperAdmin() && (array_key_exists('deptId', $data) || array_key_exists('active', $data)), 403, 'Cuma Super Admin yang bisa memindahkan layanan ke divisi lain.');
+        $before = ['name' => $service->name, 'department' => $service->department?->name, 'active' => $service->active];
         $fields = [];
+        if (array_key_exists('name', $data)) {
+            $fields['name'] = trim($data['name']);
+            // Relasi menyimpan layanan lewat id, jadi ikut nama baru; deal menyimpan nama, jadi ikut diganti.
+            DB::table('deals')->where('service', $service->name)->update(['service' => $fields['name']]);
+        }
         if (array_key_exists('deptId', $data)) {
             $fields['department_id'] = $data['deptId'];
         }
@@ -297,8 +309,8 @@ class AdminController extends Controller
         }
         $service->update($fields);
         $service->load('department');
-        $after = ['department' => $service->department?->name, 'active' => $service->active];
-        $this->audit->log('Ubah', 'Layanan', $service->id, $service->name.': ditangani '.($after['department'] ?? 'belum ditentukan').($after['active'] ? '' : ', nonaktif'), $before, $after);
+        $after = ['name' => $service->name, 'department' => $service->department?->name, 'active' => $service->active];
+        $this->audit->log('Ubah', 'Layanan', $service->id, ($before['name'] !== $service->name ? $before['name'].' jadi ' : '').$service->name.': ditangani '.($after['department'] ?? 'belum ditentukan').($after['active'] ? '' : ', nonaktif'), $before, $after);
 
         return response()->json(['data' => self::servicesShape()]);
     }
@@ -314,7 +326,7 @@ class AdminController extends Controller
 
     public function storeOption(Request $request): JsonResponse
     {
-        $this->authorizeAdmin($request);
+        abort_unless($this->access->canEditOptions($request->user()), 403, 'Akun ini tidak bisa mengubah daftar pilihan.');
         $data = $request->validate(['list' => ['required', Rule::in(array_keys(self::OPTION_KEYS))], 'value' => ['required', 'string', 'max:100']]);
         $list = self::OPTION_KEYS[$data['list']];
         $value = trim($data['value']);
@@ -332,7 +344,7 @@ class AdminController extends Controller
     /** Pilihan tidak dihapus, hanya dinonaktifkan, supaya data lama yang memakainya tetap terbaca. */
     public function destroyOption(Request $request): JsonResponse
     {
-        $this->authorizeAdmin($request);
+        abort_unless($this->access->canEditOptions($request->user()), 403, 'Akun ini tidak bisa mengubah daftar pilihan.');
         $data = $request->validate(['list' => ['required', Rule::in(array_keys(self::OPTION_KEYS))], 'value' => ['required', 'string']]);
         $list = self::OPTION_KEYS[$data['list']];
 

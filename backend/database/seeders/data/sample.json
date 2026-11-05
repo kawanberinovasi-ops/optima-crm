@@ -50,16 +50,16 @@
     },
     "Customer Service": {
       "lead": "C",
-      "client": "R",
-      "partner": "R",
+      "client": "C",
+      "partner": "C",
       "interaksi": "M",
       "deal": "R",
       "nilai": "Tidak",
       "rate": "R*"
     },
     "Digital Campaign": {
-      "lead": "R",
-      "client": "R",
+      "lead": "C",
+      "client": "C",
       "partner": "M",
       "interaksi": "C",
       "deal": "N",
@@ -67,8 +67,8 @@
       "rate": "M"
     },
     "Creative & Media": {
-      "lead": "R",
-      "client": "R",
+      "lead": "C",
+      "client": "C",
       "partner": "M",
       "interaksi": "C",
       "deal": "N",
@@ -77,7 +77,7 @@
     },
     "CampusNet": {
       "lead": "C",
-      "client": "R",
+      "client": "C",
       "partner": "M",
       "interaksi": "C",
       "deal": "N",
@@ -86,7 +86,7 @@
     },
     "DietPartner": {
       "lead": "C",
-      "client": "R",
+      "client": "C",
       "partner": "M",
       "interaksi": "C",
       "deal": "N",
@@ -94,9 +94,9 @@
       "rate": "M"
     },
     "Business Operation": {
-      "lead": "R",
+      "lead": "C",
       "client": "M",
-      "partner": "R",
+      "partner": "C",
       "interaksi": "R",
       "deal": "M",
       "nilai": "Ya",
