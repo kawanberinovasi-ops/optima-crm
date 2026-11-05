@@ -21,13 +21,14 @@ class ImportController extends Controller
             403, 'Akun ini cuma bisa melihat dan export.');
         $data = $request->validate([
             'filename' => ['required', 'string', 'max:255'],
+            'module' => ['nullable', 'in:client,partner'],
             'sheets' => ['required', 'array'],
             'sheets.records' => ['nullable', 'array', 'max:'.Importer::MAX_ROWS],
             'sheets.interactions' => ['nullable', 'array', 'max:'.Importer::MAX_ROWS],
             'sheets.deals' => ['nullable', 'array', 'max:'.Importer::MAX_ROWS],
         ], ['sheets.*.max' => 'Maksimal '.Importer::MAX_ROWS.' baris per sheet. Pecah filenya jadi beberapa bagian.']);
 
-        $import = $this->importer->check($me, $data['filename'], $data['sheets']);
+        $import = $this->importer->check($me, $data['filename'], $data['sheets'], $data['module'] ?? 'client');
 
         return response()->json(['data' => Importer::preview($import)], 201);
     }

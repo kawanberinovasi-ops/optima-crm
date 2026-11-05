@@ -173,7 +173,7 @@
 
   /* ---------- Client & Partner lewat API ---------- */
   // Status (selalu Lead saat dibuat), PIC, dan divisi ditentukan server dari akun yang login, jadi tidak dikirim.
-  const PAYLOAD = ['name', 'kind', 'service', 'segment', 'source', 'city', 'note', 'rate', 'contact', 'title', 'cEmail', 'phone'];
+  const PAYLOAD = ['name', 'kind', 'partnerType', 'service', 'segment', 'source', 'city', 'note', 'rate', 'contact', 'title', 'cEmail', 'phone'];
   Forms.record = async (o) => {
     const m = App.modal; if (m.busy) return;
     const err = {};
@@ -395,7 +395,9 @@
         sheets = { records: sheetRows(wb, '7', 'kode sumber') || [], interactions: sheetRows(wb, '8', 'kode sumber') || [], deals: sheetRows(wb, '9', 'kode sumber') || [] };
       } catch (x) { toast('File ga bisa dibaca', 'Pastikan formatnya .xlsx atau .csv.', 'bad'); return; }
       toast('Lagi dicek…', file.name, 'info');
-      try { const res = await Api.post('imports/check', { filename: file.name, sheets }); App.modal = { kind: 'import', file: file.name, parsed: res.data, importId: res.data.id }; render(); }
+      // Import dari menu Partner diperiksa sebagai modul Partner (semua baris Partner, tanpa sheet deal).
+      const module = App.route === 'partner' ? 'partner' : 'client';
+      try { const res = await Api.post('imports/check', { filename: file.name, sheets, module }); App.modal = { kind: 'import', file: file.name, parsed: res.data, importId: res.data.id }; render(); }
       catch (x) { fail(x); }
     };
     rd.readAsArrayBuffer(file);

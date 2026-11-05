@@ -157,6 +157,19 @@ Perubahan di atas pratinjau klien, sesuai catatan revisi klien:
 - `--replace-demo` menghapus akun uji `@contoh.test`; semua data yang mereka pegang dialihkan ke kepala department
   divisi yang sama (atau Super Admin kalau divisinya belum punya kepala). `./start-backend.sh --reset` menjalankan ini otomatis.
 
+## 5c. Modul Client dan modul Partner dipisah (5 Nov 2026)
+
+- Menu header **Client** langsung membuka halaman Client (tanpa dropdown); import dan export ada di halamannya.
+- **Form berbeda.** Client: Lead baru (Status, Layanan, Segmen, PIC, Divisi, kontak). Partner: Partner baru (Jenis partner,
+  Bidang, PIC, Divisi, kontak; rate card muncul kalau jenisnya KOL/KOC). Jenis partner disimpan di `client_partners.partner_type`.
+- **Import dan export terpisah.** Dari menu Client: sheet "7 Data Client" (+ interaksi dan deal); baris Partner ditolak.
+  Dari menu Partner: template "Template kosong partner" (sheet "7 Data Partner" dan interaksi), semua baris jadi Partner,
+  sheet deal tidak dibaca. Kode yang sudah dipakai modul lain ditolak.
+- **Daftar pilihan per modul** (Akses & Audit → Daftar pilihan, tambah dan hapus oleh Super Admin): Modul Client (Segmen client,
+  Alasan deal Lost), Modul Partner (Jenis partner, Bidang partner), dipakai keduanya (Sumber data, Jenis interaksi).
+  Migrasi `2026_11_05_000005` memindahkan nilai segmen yang bersifat bidang partner ke Bidang partner.
+- Akses & Audit → Pipeline: setiap pipeline punya tombol **Hapus** (masuk Data terhapus; ditolak kalau masih ada deal).
+
 ## Menyambungkan SSO Google (Gmail)
 
 Akun kepala department memakai Gmail pribadi dan email optima.web.id, jadi login tidak dibatasi satu domain Workspace.

@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * created_by = pembuat data (tidak pernah berubah), pic_id = PIC aktif, department_id = divisi pemilik. Tidak pernah dihapus permanen:
  * "Hapus" mengisi deleted_at (Data terhapus) dan bisa dipulihkan.
  */
-#[Fillable(['code', 'name', 'category', 'service_id', 'segment', 'status', 'pic_id', 'department_id', 'source', 'city', 'note', 'rate_card', 'client_info', 'converted_at', 'archived_at', 'archived_by', 'archive_reason', 'merged_into_id', 'created_by'])]
+#[Fillable(['code', 'name', 'category', 'service_id', 'partner_type', 'segment', 'status', 'pic_id', 'department_id', 'source', 'city', 'note', 'rate_card', 'client_info', 'converted_at', 'archived_at', 'archived_by', 'archive_reason', 'merged_into_id', 'created_by'])]
 class ClientPartner extends Model
 {
     use SoftDeletes;

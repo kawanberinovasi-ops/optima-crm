@@ -73,7 +73,7 @@ Pages.cp = function () {
   const imp = (Store.db.imports || []).find(b => !b.undone && (b.by === me().id || canAdmin()));
   if (imp && canCreateAny()) {
     const n = imp.created.r.length + imp.created.i.length + imp.created.d.length + imp.updated.length;
-    html = html.replace('<div style="display:flex;flex-wrap:wrap;gap:8px"><a class="btn-ghost" href="assets/Template_Data_Klien_CRM_OPTIMA.xlsx"', '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:var(--bg)"><span class="tile">' + ic('up') + '</span><span style="flex:1;min-width:0"><span class="small" style="font-weight:800;display:block">Import terakhir: ' + esc(imp.file) + '</span><span class="small muted">' + fmtTime(imp.at) + ' · ' + n + ' baris · ' + esc(userName(imp.by)) + '</span></span><button type="button" class="btn btn-s btn-sm" data-a="undoimport" data-v="' + imp.id + '">Batalkan</button></div><div style="display:flex;flex-wrap:wrap;gap:8px"><a class="btn-ghost" href="assets/Template_Data_Klien_CRM_OPTIMA.xlsx"');
+    html = html.replace('<div style="display:flex;flex-wrap:wrap;gap:8px"><', '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:var(--bg)"><span class="tile">' + ic('up') + '</span><span style="flex:1;min-width:0"><span class="small" style="font-weight:800;display:block">Import terakhir: ' + esc(imp.file) + '</span><span class="small muted">' + fmtTime(imp.at) + ' · ' + n + ' baris · ' + esc(userName(imp.by)) + '</span></span><button type="button" class="btn btn-s btn-sm" data-a="undoimport" data-v="' + imp.id + '">Batalkan</button></div><div style="display:flex;flex-wrap:wrap;gap:8px"><');
   }
   if (ui.arch) html = html.replace('Belum ada data.<br>Yuk isi duluan.', 'Arsip masih<br>kosong.').replace('Import dari template Excel biar cepat, atau tambah satu per satu.', 'Data yang diarsipkan muncul di sini dan bisa dipulihkan.').replace('Ga ketemu.', 'Arsip kosong.').replace('Coba kata lain atau reset filter.', 'Data yang diarsipkan muncul di sini dan bisa dipulihkan.');
   return html;
@@ -85,8 +85,10 @@ function Drawer() {
   ensureRec(r);
   const ints = Store.db.interactions.filter(i => i.recordId === r.id).sort((a, b) => b.date.localeCompare(a.date));
   const deals = can('deal', 'R') ? Store.db.deals.filter(d => d.recordId === r.id && canSeeDeal(d)) : [];
-  const info = [['Kota', r.city], ['Status', r.cat], ['Layanan', r.service || 'Belum ditentukan'], ['Pengisi data', userName(r.createdBy)], ['Segmen', r.segment], ['Sumber', r.source], ['PIC', userName(r.picId)], ['Department pemilik', r.dept], ['Dibuat', fmtDate(r.createdAt)]];
-  if (r.service === 'KOL' && canSeeRate()) info.push(['Rate card', r.rate ? fmtRp(r.rate) : '-']);
+  const info = r.cat === 'Partner'
+    ? [['Kota', r.city], ['Status', 'Partner'], ['Jenis partner', r.partnerType || '-'], ['Bidang', r.segment], ['Pengisi data', userName(r.createdBy)], ['Sumber', r.source], ['PIC', userName(r.picId)], ['Department pemilik', r.dept], ['Dibuat', fmtDate(r.createdAt)]]
+    : [['Kota', r.city], ['Status', r.cat], ['Layanan', r.service || 'Belum ditentukan'], ['Pengisi data', userName(r.createdBy)], ['Segmen', r.segment], ['Sumber', r.source], ['PIC', userName(r.picId)], ['Department pemilik', r.dept], ['Dibuat', fmtDate(r.createdAt)]];
+  if ((r.service === 'KOL' || r.partnerType === 'KOL/KOC') && canSeeRate()) info.push(['Rate card', r.rate ? fmtRp(r.rate) : '-']);
   const ed = canEditRec(r) && !r.archived;
   const hb = (a, icon, label, extra) => '<button type="button" class="btn btn-sm" style="background:rgba(255,255,255,.14)" data-a="' + a + '" data-v="' + r.id + '"' + (extra || '') + '>' + ic(icon, 'ic-s') + label + '</button>';
   const more = [];
@@ -260,10 +262,14 @@ const AdminTabs = {
       (list.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pengguna</th><th>Bagian</th><th>Akses</th><th>Alasan</th><th>Dibuat</th><th><span class="sr">Aksi</span></th></tr></thead><tbody>' + list.map(o => { const u = userById(o.userId) || {}; return '<tr><td><div style="display:flex;gap:10px;align-items:center">' + av(u.name || '?', o.userId, 'round sm') + '<span><strong>' + esc(u.name || '-') + '</strong><div class="small muted">' + esc(u.role || '') + ' · ' + esc(u.dept || '') + '</div></span></div></td><td>' + esc(KEY_LABEL[o.key] || o.key) + '</td><td><span class="chip c-info">' + esc(o.value) + '</span></td><td class="small">' + esc(o.reason) + '</td><td class="small muted">' + fmtShort(o.at) + ' · ' + esc(userName(o.by)) + '</td><td style="text-align:right">' + (adm ? '<button type="button" class="btn btn-s btn-sm" data-a="ovdel" data-v="' + o.id + '" aria-label="Hapus pengecualian ' + esc(userName(o.userId)) + '">Hapus</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
         : empty('Belum ada pengecualian.', 'Semua orang ikut aturan department masing-masing.', adm ? '<button type="button" class="btn btn-sm" data-a="newoverride">+ Pengecualian</button>' : ''));
   },
-  options: (adm) => '<div class="sec-h"><div><span class="lbl">Daftar pilihan</span><h2 class="disp h2">Isi dropdown, diatur admin</h2></div></div><p class="small muted" style="margin:0">Pilihan yang dihapus ga mengubah data lama. Data lama tetap menyimpan nilainya.</p>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">' + Object.keys(DEFAULT_OPTS).map(k => '<div class="card pad" style="display:flex;flex-direction:column;gap:12px;padding:20px"><strong>' + OPT_LABEL[k] + '</strong><div style="display:flex;flex-wrap:wrap;gap:6px">' +
+  options: (adm) => {
+    // Daftar pilihan dikelompokkan per modul (revisi klien 5 Nov 2026).
+    const card = (k) => '<div class="card pad" style="display:flex;flex-direction:column;gap:12px;padding:20px"><strong>' + OPT_LABEL[k] + '</strong><div style="display:flex;flex-wrap:wrap;gap:8px">' +
       optList(k).map(v => '<span class="chip c-n" style="padding:4px 6px 4px 12px">' + esc(v) + (adm ? '<button type="button" class="btn-ghost" style="min-height:26px;padding:0 4px" data-a="optdel" data-k="' + k + '" data-v="' + esc(v) + '" aria-label="Hapus ' + esc(v) + '">' + ic('x', 'ic-s') + '</button>' : '') + '</span>').join('') + '</div>' +
-      (adm ? '<form data-form="optadd" style="display:flex;gap:8px"><input type="hidden" name="k" value="' + k + '"><label style="flex:1"><span class="sr">Tambah ' + OPT_LABEL[k] + '</span><input class="inp" name="v" placeholder="Tambah pilihan" style="min-height:44px"></label><button type="submit" class="btn btn-sm">Tambah</button></form>' : '') + '</div>').join('') + '</div>',
+      (adm ? '<form data-form="optadd" style="display:flex;gap:8px"><input type="hidden" name="k" value="' + k + '"><label style="flex:1"><span class="sr">Tambah ' + OPT_LABEL[k] + '</span><input class="inp" name="v" placeholder="Tambah pilihan" style="min-height:44px"></label><button type="submit" class="btn btn-sm">Tambah</button></form>' : '') + '</div>';
+    return '<div class="sec-h"><div><span class="lbl">Daftar pilihan</span><h2 class="disp h2">Isi dropdown, diatur admin</h2></div></div><p class="small muted" style="margin:0">Pilihan bisa ditambah dan dihapus oleh Super Admin. Pilihan yang dihapus ga mengubah data lama; data lama tetap menyimpan nilainya.</p>' +
+      OPT_GROUPS.map(([title, keys]) => '<section style="display:flex;flex-direction:column;gap:12px"><span class="lbl">' + title + '</span><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">' + keys.map(card).join('') + '</div></section>').join('');
+  },
   changes: () => {
     const q = App.ui.ak.q.toLowerCase();
     const refName = (c) => c.kind === 'record' ? ((recById(c.refId) || {}).name || '-') : c.kind === 'deal' ? ((findDeal(c.refId) || {}).title || '-') : '-';
@@ -395,14 +401,14 @@ Object.assign(Forms, {
     if (dupes.length && !m.dupeOk) { m.dupes = dupes.map(x => ({ id: x.r.id, vis: canSeeRec(x.r), why: x.why })); m.dupeOk = true; m.val = o; m.err = {}; m.still = true; render(); return; }
     if ('rate' in o) o.rate = num(o.rate);
     if (m.rec) {
-      const r = ensureRec(m.rec); const L = { name: 'Nama', service: 'Layanan', segment: 'Segmen', source: 'Sumber', city: 'Kota', note: 'Catatan', rate: 'Rate card' };
+      const r = ensureRec(m.rec); const L = r.cat === 'Partner' ? { name: 'Nama', partnerType: 'Jenis partner', segment: 'Bidang', source: 'Sumber', city: 'Kota', note: 'Catatan', rate: 'Rate card' } : { name: 'Nama', service: 'Layanan', segment: 'Segmen', source: 'Sumber', city: 'Kota', note: 'Catatan', rate: 'Rate card' };
       if (o.kind && r.cat !== 'Client' && o.kind !== r.cat) { trackChange('record', r.id, 'Jenis relasi', r.cat, o.kind); r.cat = o.kind; }
       Object.keys(L).forEach(k => { if (k in o) { trackChange('record', r.id, L[k], k === 'rate' && r[k] ? fmtRp(r[k]) : r[k], k === 'rate' && o[k] ? fmtRp(o[k]) : o[k]); r[k] = o[k]; } });
       const c0 = r.contacts[0] || (r.contacts[0] = { id: uid('c') });
       [['contact', 'name', 'Nama kontak utama'], ['title', 'title', 'Jabatan kontak'], ['cEmail', 'email', 'Email kontak'], ['phone', 'phone', 'Telepon kontak']].forEach(([f, cf, l]) => { if (f in o) { trackChange('record', r.id, l, c0[cf], o[f]); c0[cf] = o[f]; } });
       syncPrimary(r); r.updatedAt = today(); audit('Ubah', 'Client & Partner', r.name); toast('Tersimpan!', r.name + ' udah diperbarui.');
     } else {
-      const r = { id: uid('r'), code: nextCode('r'), createdAt: today(), updatedAt: today(), name: o.name, cat: o.kind === 'Partner' ? 'Partner' : 'Lead', service: o.service || '', createdBy: me().id, segment: o.segment || '', picId: me().id, dept: me().dept, source: o.source, city: o.city || '', note: o.note || '', rate: o.rate || '', archived: false, contacts: [{ id: uid('c'), name: o.contact || '', title: o.title || '', email: o.cEmail || '', phone: o.phone || '' }] };
+      const r = { id: uid('r'), code: nextCode('r'), createdAt: today(), updatedAt: today(), name: o.name, cat: o.kind === 'Partner' ? 'Partner' : 'Lead', service: o.kind === 'Partner' ? '' : (o.service || ''), partnerType: o.kind === 'Partner' ? (o.partnerType || '') : '', createdBy: me().id, segment: o.segment || '', picId: me().id, dept: me().dept, source: o.source, city: o.city || '', note: o.note || '', rate: o.rate || '', archived: false, contacts: [{ id: uid('c'), name: o.contact || '', title: o.title || '', email: o.cEmail || '', phone: o.phone || '' }] };
       syncPrimary(r); Store.db.records.push(r); audit('Tambah', 'Client & Partner', r.name + ' (' + r.code + ') sebagai ' + r.cat + ', PIC ' + me().name); toast('Masuk, mantap!', r.name + ' ditambahkan.'); App.drawer = { id: r.id };
     }
     App.modal = null; commit();

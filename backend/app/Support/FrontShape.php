@@ -141,6 +141,7 @@ class FrontShape
             'service' => (string) $r->service?->name,
             'createdBy' => $r->created_by ? (string) $r->created_by : '',
             'segment' => (string) $r->segment,
+            'partnerType' => (string) $r->partner_type,
             'status' => (string) $r->status,
             'picId' => (string) $r->pic_id,
             'dept' => $r->department?->name,

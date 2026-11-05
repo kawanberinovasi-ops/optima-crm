@@ -21,6 +21,8 @@ class ReferenceDataSeeder extends Seeder
         'sources' => 'sources',
         'intTypes' => 'interaction_types',
         'lostReasons' => 'lost_reasons',
+        'partnerTypes' => 'partner_types',
+        'partnerFields' => 'partner_fields',
     ];
 
     public function run(): void
@@ -47,7 +49,7 @@ class ReferenceDataSeeder extends Seeder
         }
 
         foreach (self::OPTION_KEYS as $from => $list) {
-            foreach ($data['options'][$from] as $i => $value) {
+            foreach ($data['options'][$from] ?? [] as $i => $value) {
                 OptionList::updateOrCreate(['list' => $list, 'value' => $value], ['position' => $i]);
             }
         }

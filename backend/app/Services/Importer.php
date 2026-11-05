@@ -37,8 +37,15 @@ class Importer
     /**
      * @param  array<string, list<array<string, string>>>  $sheets  baris per sheet, kunci kolom huruf kecil seperti di template
      */
-    public function check(User $by, string $filename, array $sheets): Import
+    /**
+     * @param  string  $module  client: Lead dan Client (sheet 7, 8, 9); partner: Partner (sheet 7 dan 8, tanpa deal).
+     */
+    public function check(User $by, string $filename, array $sheets, string $module = 'client'): Import
     {
+        $partnerModule = $module === 'partner';
+        if ($partnerModule) {
+            $sheets['deals'] = [];
+        }
         $records = array_slice($sheets['records'] ?? [], 0, self::MAX_ROWS);
         $ints = array_slice($sheets['interactions'] ?? [], 0, self::MAX_ROWS);
         $deals = array_slice($sheets['deals'] ?? [], 0, self::MAX_ROWS);
@@ -77,7 +84,7 @@ class Importer
             $err = null;
             $code = trim($o['kode sumber'] ?? '');
             // Kolom Kategori lama boleh berisi KOL/KOC, Community, atau Media: itu layanan, statusnya Lead.
-            [$cat, $serviceName] = self::statusAndService($o['kategori'] ?? '', $o['layanan'] ?? '');
+            [$cat, $serviceName] = $partnerModule ? [Category::Partner, null] : self::statusAndService($o['kategori'] ?? '', $o['layanan'] ?? '');
             $service = $serviceName === null ? null : ($services[strtolower($serviceName)] ?? false);
             $pic = $users[strtolower(trim($o['email pic'] ?? ''))] ?? null;
             $dept = $depts[strtolower(trim($o['department pemilik'] ?? ''))] ?? null;
@@ -87,7 +94,9 @@ class Importer
                 $code === '' || trim($o['nama'] ?? '') === '' => 'Kode sumber dan Nama wajib diisi.',
                 isset($fileCodes[$code]) => 'Kode sumber '.$code.' dobel di file.',
                 $trashed => 'Kode '.$code.' ada di Data terhapus. Pulihkan dulu kalau mau diperbarui.',
-                ! $cat => 'Kategori "'.($o['kategori'] ?? '').'" ga dikenal. Pakai Lead, Client, atau Partner; KOL/Community/Media isi di kolom Layanan.',
+                ! $cat => 'Kategori "'.($o['kategori'] ?? '').'" ga dikenal. Pakai Lead atau Client; KOL/Community/Media isi di kolom Layanan.',
+                $cat === Category::Partner && ! $partnerModule => 'Data Partner diimport dari menu Partner.',
+                $existing && $partnerModule !== ($existing->category === Category::Partner) => 'Kode '.$code.' sudah dipakai data '.($partnerModule ? 'Client' : 'Partner').'.',
                 $service === false => 'Layanan "'.$serviceName.'" belum ada di daftar.',
                 ! $pic => 'Email PIC "'.($o['email pic'] ?? '').'" belum terdaftar di CRM.',
                 ! $dept => 'Department "'.($o['department pemilik'] ?? '').'" belum ada.',
@@ -103,7 +112,8 @@ class Importer
             $source = trim($o['sumber'] ?? '');
             $rows[] = $this->row('records', $o, $err, $err ? null : [
                 'code' => $code, 'name' => trim($o['nama']), 'category' => $cat->value, 'service_id' => $service ? $service->id : null,
-                'service_name' => $service ? $service->name : null, 'segment' => trim($o['segmen'] ?? '') ?: null,
+                'service_name' => $service ? $service->name : null, 'segment' => trim($o['bidang'] ?? $o['segmen'] ?? '') ?: null,
+                'partner_type' => $partnerModule ? (trim($o['jenis partner'] ?? '') ?: null) : null,
                 'pic_id' => $pic->id, 'department_id' => $dept->id, 'source' => $source === '' ? 'Lainnya' : ($sources->first(fn ($s) => strtolower($s) === strtolower($source)) ?? $source),
                 'city' => trim($o['kota'] ?? '') ?: null, 'note' => trim($o['catatan'] ?? '') ?: null,
                 'rate' => self::digits($o['rate card (kol/koc)'] ?? ''),
@@ -222,12 +232,12 @@ class Importer
                 $d = $row->data;
                 $existing = ClientPartner::where('code', $d['code'])->first();
                 // Data yang sudah ada: status, PIC, dan divisi tidak diubah lewat import (status lewat Won, PIC dan divisi lewat serah terima).
-                $keys = $existing ? ['name', 'segment', 'source', 'city', 'note'] : ['name', 'category', 'segment', 'pic_id', 'department_id', 'source', 'city', 'note'];
+                $keys = $existing ? ['name', 'segment', 'partner_type', 'source', 'city', 'note'] : ['name', 'category', 'segment', 'partner_type', 'pic_id', 'department_id', 'source', 'city', 'note'];
                 $fields = collect($d)->only($keys)->all();
                 if ($d['service_id'] ?? null) {
                     $fields['service_id'] = $d['service_id'];
                 }
-                if (($d['service_name'] ?? null) === 'KOL' && $d['rate'] && $this->access->canManageRateCard($by)) {
+                if ((($d['service_name'] ?? null) === 'KOL' || ($d['partner_type'] ?? null) === 'KOL/KOC') && $d['rate'] && $this->access->canManageRateCard($by)) {
                     $fields['rate_card'] = ['rate' => (int) $d['rate']];
                 }
                 if ($existing) {

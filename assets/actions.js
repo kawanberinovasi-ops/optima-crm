@@ -14,30 +14,44 @@ const keepModal = () => { const f = document.querySelector('[data-form=int]'); c
 const Modals = {
   confirm: (m) => modalShell(m.title, m.sub || 'Konfirmasi', '<p style="margin:0;color:var(--ink2)">' + m.text + '</p>', '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="button" class="btn ' + (m.danger ? 'btn-d' : '') + '" data-a="confirmok">' + esc(m.ok || 'Lanjut') + '</button>'),
   record: (m) => {
-    // Data baru selalu Lead, PIC dan divisi otomatis dari yang mengisi. Status jadi Client lewat deal Won; PIC dan divisi lewat Pindah PIC / divisi.
+    // Form Client (Lead/Client) dan form Partner dipisah (revisi klien 5 Nov 2026).
+    // Data baru: PIC dan divisi otomatis dari yang mengisi. Client hanya lewat deal Won; PIC dan divisi lewat Pindah PIC / divisi.
     const r = m.rec || {}; const u = me(); const v = Object.assign({ source: 'Referensi', service: '' }, r, m.val || {});
+    const partner = r.id ? r.cat === 'Partner' : (v.kind === 'Partner' || (!v.kind && App.route === 'partner'));
+    const field = (name, label, extra) => '<label class="fld"><span>' + label + '</span><input class="inp" name="' + name + '" value="' + esc(v[name]) + '"' + (extra || '') + inv(m, name) + '>' + fieldErr(m, name) + '</label>';
+    const owner = '<div class="fld"><span>PIC' + (r.id ? '' : ' awal (otomatis)') + '</span><input class="inp" value="' + esc(r.id ? userName(r.picId) : u.name) + '" disabled></div>' +
+      '<div class="fld"><span>Divisi pemilik</span><input class="inp" value="' + esc(r.id ? r.dept : u.dept) + '" disabled></div>';
+    const contact = '<label class="fld"><span>Sumber</span><select class="inp" name="source">' + optList('sources').map(x => opt(x, v.source)).join('') + '</select></label>' +
+      field('city', 'Kota') + field('contact', 'Nama kontak utama') + field('title', 'Jabatan kontak') + field('cEmail', 'Email kontak', ' type="email"') + field('phone', 'Telepon kontak', ' inputmode="tel"');
+    const tail = '<label class="fld" style="grid-column:1/-1"><span>Catatan</span><textarea class="inp" name="note">' + esc(v.note) + '</textarea></label></div>' +
+      (m.dupe ? '<div style="padding:12px 14px;border-radius:16px;background:#FFF3DA;color:#6A4300" class="small"><strong>Nama mirip udah ada:</strong> ' + esc(m.dupe) + '. Simpan sekali lagi kalau memang beda.</div>' : '');
+    const foot = '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="submit" class="btn">' + ic('check', 'ic-s') + 'Simpan</button>';
+    if (partner) {
+      const types = optList('partnerTypes'); if (v.partnerType && !types.includes(v.partnerType)) types.unshift(v.partnerType);
+      const fields = optList('partnerFields'); if (v.segment && !fields.includes(v.segment)) fields.unshift(v.segment);
+      return modalShell(r.id ? 'Edit partner' : 'Partner baru', r.id ? esc(r.code) : 'Partner',
+        '<p class="small muted" style="margin:0">Partner (vendor, media partner, KOL/KOC, komunitas) langsung tercatat sebagai Partner, tanpa tahap Lead. PIC awal otomatis akun pengisi.</p>' +
+        '<input type="hidden" name="kind" value="Partner"><div class="form-grid">' +
+        '<label class="fld" style="grid-column:1/-1"><span>Nama partner *</span><input class="inp" id="f-name" name="name" value="' + esc(v.name) + '"' + inv(m, 'name') + ' placeholder="Contoh: Sound System Harmoni" autofocus>' + fieldErr(m, 'name') + '</label>' +
+        '<label class="fld"><span>Jenis partner</span><select class="inp" name="partnerType" data-ch="record-service">' + opt('', v.partnerType, 'Pilih jenis') + types.map(x => opt(x, v.partnerType)).join('') + '</select><small>Daftar jenis diatur admin.</small></label>' +
+        '<label class="fld"><span>Bidang</span><select class="inp" name="segment">' + opt('', v.segment, 'Pilih bidang') + fields.map(x => opt(x, v.segment)).join('') + '</select></label>' +
+        owner + contact +
+        (canSeeRate() && v.partnerType === 'KOL/KOC' ? '<label class="fld"><span>Rate card (KOL/KOC)</span><input class="inp" name="rate" value="' + esc(v.rate) + '" inputmode="numeric" placeholder="Angka saja"></label>' : '') +
+        tail, foot, true, 'record');
+    }
     const svcs = serviceList().map(x => x.name); if (v.service && !svcs.includes(v.service)) svcs.unshift(v.service);
     const svc = serviceList().find(x => x.name === v.service);
-    return modalShell(r.id ? 'Edit data' : 'Lead baru', r.id ? esc(r.code) : 'Client & Partner',
-      '<p class="small muted" style="margin:0">' + (r.id ? 'Status jadi Client otomatis setelah deal Won. Pindahkan penanganan lewat Pindah PIC / divisi.' : 'Siapa pun bisa menerima Lead langsung. PIC awal otomatis akun pengisi, divisi awal mengikuti divisi akunmu. CS juga bisa menerima lead umum.') + '</p>' +
-      '<div class="form-grid">' +
+    return modalShell(r.id ? 'Edit client' : 'Lead baru', r.id ? esc(r.code) : 'Client',
+      '<p class="small muted" style="margin:0">' + (r.id ? 'Status jadi Client otomatis setelah deal Won. Pindahkan penanganan lewat Pindah PIC / divisi.' : 'Calon client masuk sebagai Lead dan jadi Client otomatis setelah deal Won. PIC awal otomatis akun pengisi, divisi awal mengikuti divisi akunmu.') + '</p>' +
+      '<input type="hidden" name="kind" value="Lead"><div class="form-grid">' +
       '<label class="fld" style="grid-column:1/-1"><span>Nama *</span><input class="inp" id="f-name" name="name" value="' + esc(v.name) + '"' + inv(m, 'name') + ' placeholder="Contoh: PT Maju Bersama" autofocus>' + fieldErr(m, 'name') + '</label>' +
-      (r.cat === 'Client' ? '<div class="fld"><span>Jenis relasi</span><div>' + catChip('Client') + '</div><small>Client setelah closing / Won.</small></div>'
-        : '<label class="fld"><span>Jenis relasi</span><select class="inp" name="kind">' + (can('lead', 'C') || r.cat === 'Lead' ? opt('Lead', v.kind || r.cat || (can('lead', 'C') ? 'Lead' : 'Partner'), 'Client (mulai sebagai Lead)') : '') + (can('partner', 'C') || r.cat === 'Partner' ? opt('Partner', v.kind || r.cat || (can('lead', 'C') ? 'Lead' : 'Partner'), 'Partner') : '') + '</select><small>Lead jadi Client setelah deal Won. Partner (vendor, media partner, KOL, komunitas) tanpa tahap Lead.</small></label>') +
+      '<div class="fld"><span>Status</span><div>' + catChip(r.cat || 'Lead') + '</div><small>Client setelah closing / Won.</small></div>' +
       '<label class="fld"><span>Layanan</span><select class="inp" name="service" data-ch="record-service"' + inv(m, 'service') + '>' + opt('', v.service, 'Belum ditentukan') + svcs.map(x => opt(x, v.service)).join('') + '</select>' + fieldErr(m, 'service') + '<small>' + (svc && svc.dept ? 'Divisi layanan yang disarankan: ' + esc(svc.dept) + '. Serah terima tetap lewat Pindah PIC / divisi.' : 'Layanan bisa ditentukan setelah kebutuhan Lead diketahui.') + '</small></label>' +
-      '<div class="fld"><span>PIC' + (r.id ? '' : ' awal (otomatis)') + '</span><input class="inp" value="' + esc(r.id ? userName(r.picId) : u.name) + '" disabled></div>' +
-      '<div class="fld"><span>Divisi pemilik</span><input class="inp" value="' + esc(r.id ? r.dept : u.dept) + '" disabled></div>' +
+      owner +
       '<label class="fld"><span>Segmen</span><input class="inp" name="segment" value="' + esc(v.segment) + '" placeholder="Korporat, pendidikan, …"></label>' +
-      '<label class="fld"><span>Sumber</span><select class="inp" name="source">' + optList('sources').map(x => opt(x, v.source)).join('') + '</select></label>' +
-      '<label class="fld"><span>Kota</span><input class="inp" name="city" value="' + esc(v.city) + '"></label>' +
-      '<label class="fld"><span>Nama kontak utama</span><input class="inp" name="contact" value="' + esc(v.contact) + '"></label>' +
-      '<label class="fld"><span>Jabatan kontak</span><input class="inp" name="title" value="' + esc(v.title) + '"></label>' +
-      '<label class="fld"><span>Email kontak</span><input class="inp" type="email" name="cEmail" value="' + esc(v.cEmail) + '"' + inv(m, 'cEmail') + '>' + fieldErr(m, 'cEmail') + '</label>' +
-      '<label class="fld"><span>Telepon kontak</span><input class="inp" name="phone" value="' + esc(v.phone) + '" inputmode="tel"></label>' +
-      (canSeeRate() ? '<label class="fld"><span>Rate card (KOL)</span><input class="inp" name="rate" value="' + esc(v.rate) + '" inputmode="numeric" placeholder="Angka saja"><small>Diisi kalau layanannya KOL.</small></label>' : '') +
-      '<label class="fld" style="grid-column:1/-1"><span>Catatan</span><textarea class="inp" name="note">' + esc(v.note) + '</textarea></label></div>' +
-      (m.dupe ? '<div style="padding:12px 14px;border-radius:16px;background:#FFF3DA;color:#6A4300" class="small"><strong>Nama mirip udah ada:</strong> ' + esc(m.dupe) + '. Simpan sekali lagi kalau memang beda.</div>' : ''),
-      '<button type="button" class="btn btn-s" data-a="close">Batal</button><button type="submit" class="btn">' + ic('check', 'ic-s') + 'Simpan</button>', true, 'record');
+      contact +
+      (canSeeRate() && v.service === 'KOL' ? '<label class="fld"><span>Rate card (KOL)</span><input class="inp" name="rate" value="' + esc(v.rate) + '" inputmode="numeric" placeholder="Angka saja"></label>' : '') +
+      tail, foot, true, 'record');
   },
   int: (m) => {
     const v = Object.assign({ type: 'WhatsApp', date: today(), recordId: m.recordId || '' }, m.val || {});
@@ -192,7 +206,8 @@ const Actions = {
   export: () => { App.pop = null; exportXlsx(); },
   import: () => { App.pop = null; if (App.route !== 'cp' && App.route !== 'partner') { location.hash = '#/cp'; } setTimeout(() => Actions.pickfile(), 80); },
   pickfile: () => { const i = document.querySelector('[data-ch=importfile]'); if (i) i.click(); },
-  doimport: () => doImport()
+  doimport: () => doImport(),
+  partnertemplate: () => partnerTemplate()
 };
 
 /* ---------- input & change ---------- */
@@ -343,25 +358,29 @@ function parseWorkbook(wb) {
   const out = { records: [], ints: [], deals: [], errors: [], skippedExample: false };
   const uByEmail = (e) => Store.db.users.find(u => u.email.toLowerCase() === String(e).toLowerCase());
   const codes = {};
+  // Import Client dan import Partner dipisah: dari menu Partner semua baris jadi Partner dan sheet deal tidak dibaca.
+  const partnerModule = App.route === 'partner';
   const R = sheetRows(wb, '7', 'kode sumber') || [];
-  if (!R.length && !sheetRows(wb, '8', 'kode sumber') && !sheetRows(wb, '9', 'kode sumber')) { out.errors.push('Sheet "7 Data Client & Partner" ga ketemu. Pakai template dari tombol Template kosong.'); return out; }
+  if (!R.length && !sheetRows(wb, '8', 'kode sumber') && !sheetRows(wb, '9', 'kode sumber')) { out.errors.push('Sheet "7 Data ' + (partnerModule ? 'Partner' : 'Client') + '" ga ketemu. Pakai template dari tombol Template kosong.'); return out; }
   R.slice(0, 2000).forEach(o => {
     if (o['kode sumber'] === 'CP-0001' && o['nama'] === 'PT Contoh Sejahtera') { out.skippedExample = true; return; }
     const row = 'Sheet 7 baris ' + o._row + ': ';
     const LEG = { 'kol/koc': 'KOL', kol: 'KOL', community: 'Community', media: 'Media', 'digital campaign': 'Digital Campaign' }; const k = (o['kategori'] || '').toLowerCase().trim();
-    const cat = k === '' || LEG[k] ? 'Lead' : CATS.find(c => c.toLowerCase() === k); const service = o['layanan'] || LEG[k] || '';
+    const cat = partnerModule ? 'Partner' : (k === '' || LEG[k] ? 'Lead' : CATS.find(c => c.toLowerCase() === k)); const service = partnerModule ? '' : (o['layanan'] || LEG[k] || '');
     const pic = uByEmail(o['email pic']); const dept = Store.db.departments.find(d => d.name.toLowerCase() === (o['department pemilik'] || '').toLowerCase());
     if (!o['kode sumber'] || !o['nama']) return out.errors.push(row + 'Kode sumber dan Nama wajib diisi.');
     if (codes[o['kode sumber']]) return out.errors.push(row + 'Kode sumber ' + o['kode sumber'] + ' dobel di file.');
-    if (!cat) return out.errors.push(row + 'Kategori "' + (o['kategori'] || '') + '" ga dikenal. Pakai Lead, Client, atau Partner.');
+    if (!cat) return out.errors.push(row + 'Kategori "' + (o['kategori'] || '') + '" ga dikenal. Pakai Lead atau Client.');
+    if (cat === 'Partner' && !partnerModule) return out.errors.push(row + 'Data Partner diimport dari menu Partner.');
     if (!pic) return out.errors.push(row + 'Email PIC "' + (o['email pic'] || '') + '" belum terdaftar di CRM.');
     if (!dept) return out.errors.push(row + 'Department "' + (o['department pemilik'] || '') + '" belum ada.');
     if (!can(catEnt(cat), 'C')) return out.errors.push(row + 'Akun ini ga boleh menambah ' + cat + '.');
     if (!seesAll(me()) && pic.id !== me().id) return out.errors.push(row + 'PIC harus kamu sendiri (' + me().email + '). Data untuk orang lain diserahkan lewat Pindah PIC / divisi.');
     const ex = Store.db.records.find(r => r.code === o['kode sumber']);
+    if (ex && partnerModule !== (ex.cat === 'Partner')) return out.errors.push(row + 'Kode ' + o['kode sumber'] + ' sudah dipakai data ' + (partnerModule ? 'Client' : 'Partner') + '.');
     if (ex && !canEditRec(ex)) return out.errors.push(row + 'Data ' + ex.name + ' udah ada dan akun ini ga boleh mengubahnya.');
     codes[o['kode sumber']] = true;
-    out.records.push({ isNew: !ex, ex, data: { code: o['kode sumber'], name: o['nama'], cat, service, createdBy: me().id, segment: o['segmen'] || '', picId: pic.id, dept: dept.name, source: optList('sources').includes(o['sumber']) ? o['sumber'] : (o['sumber'] || 'Lainnya'), contact: o['nama kontak utama'] || '', title: o['jabatan kontak'] || '', cEmail: o['email kontak'] || '', phone: o['telepon kontak'] || '', city: o['kota'] || '', rate: num(o['rate card (kol/koc)']), note: o['catatan'] || '' } });
+    out.records.push({ isNew: !ex, ex, data: { code: o['kode sumber'], name: o['nama'], cat, service, partnerType: partnerModule ? (o['jenis partner'] || '') : '', createdBy: me().id, segment: o['bidang'] || o['segmen'] || '', picId: pic.id, dept: dept.name, source: optList('sources').includes(o['sumber']) ? o['sumber'] : (o['sumber'] || 'Lainnya'), contact: o['nama kontak utama'] || '', title: o['jabatan kontak'] || '', cEmail: o['email kontak'] || '', phone: o['telepon kontak'] || '', city: o['kota'] || '', rate: num(o['rate card (kol/koc)']), note: o['catatan'] || '' } });
   });
   const recByCode = (c) => codes[c] ? { code: c } : Store.db.records.find(r => r.code === c);
   (sheetRows(wb, '8', 'kode sumber') || []).forEach(o => {
@@ -374,7 +393,7 @@ function parseWorkbook(wb) {
     if (Store.db.interactions.some(i => i.code === o['kode sumber'])) return out.errors.push(row + 'Interaksi ' + o['kode sumber'] + ' udah pernah diimport.');
     out.ints.push({ code: o['kode sumber'], recCode: o['kode client & partner'], date: normDate(o['tanggal']) || today(), type: optList('intTypes').find(t => t.toLowerCase() === (o['jenis'] || '').toLowerCase()) || 'Lainnya', result: o['hasil pembicaraan'], next: o['langkah berikutnya'] || '', fuDate: normDate(o['tanggal follow-up']), by: by.id });
   });
-  (sheetRows(wb, '9', 'kode sumber') || []).forEach(o => {
+  (partnerModule ? [] : (sheetRows(wb, '9', 'kode sumber') || [])).forEach(o => {
     if (o['kode sumber'] === 'DL-0001' && o['kode client & partner'] === 'CP-0001') { out.skippedExample = true; return; }
     const row = 'Sheet 9 baris ' + o._row + ': '; const owner = uByEmail(o['email pic']);
     const line = Store.db.lines.find(l => l.name.toLowerCase() === (o['lini bisnis'] || '').toLowerCase());
@@ -409,12 +428,26 @@ function exportXlsx() {
   const recs = (App.route === 'cp' || App.route === 'partner' ? cpFiltered().list.map(x => x.r) : Store.db.records.filter(canSeeRec));
   const ids = new Set(recs.map(r => r.id)); const seeRate = canSeeRate();
   const wb = XLSX.utils.book_new();
-  const s7 = [['Kode sumber *', 'Nama *', 'Kategori *', 'Segmen', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan', 'Layanan']].concat(recs.map(r => [r.code, r.name, r.cat, r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate ? r.rate : '', r.note, r.service || '']));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s7), '7 Data Client & Partner');
+  const partnerModule = App.route === 'partner';
+  const s7 = partnerModule
+    ? [['Kode sumber *', 'Nama *', 'Jenis partner', 'Bidang', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan']]
+      .concat(recs.map(r => [r.code, r.name, r.partnerType || '', r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate && r.partnerType === 'KOL/KOC' ? r.rate : '', r.note]))
+    : [['Kode sumber *', 'Nama *', 'Kategori *', 'Segmen', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan', 'Layanan']].concat(recs.map(r => [r.code, r.name, r.cat, r.segment, (userById(r.picId) || {}).email || '', r.dept, r.source, r.contact, r.title, r.cEmail, r.phone, r.city, seeRate ? r.rate : '', r.note, r.service || '']));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s7), partnerModule ? '7 Data Partner' : '7 Data Client');
   if (can('interaksi', 'R')) { const s8 = [['Kode sumber *', 'Kode Client & Partner *', 'Tanggal *', 'Jenis *', 'Hasil pembicaraan *', 'Langkah berikutnya', 'Tanggal follow-up', 'Email pencatat *', 'Catatan']].concat(Store.db.interactions.filter(i => ids.has(i.recordId)).map(i => [i.code, (recById(i.recordId) || {}).code, i.date, i.type, i.result, i.next, i.fuDate, (userById(i.by) || {}).email || '', i.done ? 'Follow-up selesai' : ''])); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s8), '8 Data Interaksi'); }
-  if (can('deal', 'R')) { const s9 = [['Kode sumber *', 'Kode Client & Partner *', 'Lini bisnis *', 'Stage *', 'Status *', 'Layanan', 'Nilai penawaran (Rp)', 'Nilai deal (Rp)', 'Target closing', 'Tanggal closing', 'Alasan Lost / On Hold', 'Email PIC *', 'Catatan']].concat(Store.db.deals.filter(d => ids.has(d.recordId)).map(d => [d.code, (recById(d.recordId) || {}).code, (lineById(d.lineId) || {}).name, (stageOf(d) || {}).name, d.status, d.service || d.title, canSeeValue(d) ? d.offer : '', canSeeValue(d) ? d.value : '', d.target, d.closedAt, d.reason, (userById(d.ownerId) || {}).email || '', ''])); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s9), '9 Data Deal'); }
-  XLSX.writeFile(wb, 'Export_CRM_OPTIMA_' + today() + '.xlsx');
-  audit('Export', 'Client & Partner', recs.length + ' data diexport'); Store.save(); render(); toast('Export jadi!', recs.length + ' data diunduh.');
+  if (can('deal', 'R') && !partnerModule) { const s9 = [['Kode sumber *', 'Kode Client & Partner *', 'Lini bisnis *', 'Stage *', 'Status *', 'Layanan', 'Nilai penawaran (Rp)', 'Nilai deal (Rp)', 'Target closing', 'Tanggal closing', 'Alasan Lost / On Hold', 'Email PIC *', 'Catatan']].concat(Store.db.deals.filter(d => ids.has(d.recordId)).map(d => [d.code, (recById(d.recordId) || {}).code, (lineById(d.lineId) || {}).name, (stageOf(d) || {}).name, d.status, d.service || d.title, canSeeValue(d) ? d.offer : '', canSeeValue(d) ? d.value : '', d.target, d.closedAt, d.reason, (userById(d.ownerId) || {}).email || '', ''])); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s9), '9 Data Deal'); }
+  XLSX.writeFile(wb, 'Export_' + (partnerModule ? 'Partner' : 'Client') + '_CRM_OPTIMA_' + today() + '.xlsx');
+  audit('Export', partnerModule ? 'Partner' : 'Client', recs.length + ' data diexport'); Store.save(); render(); toast('Export jadi!', recs.length + ' data diunduh.');
+}
+
+/** Template kosong import Partner (sheet 7 Data Partner dan 8 Data Interaksi), dibuat langsung di browser. */
+function partnerTemplate() {
+  if (typeof XLSX === 'undefined') { toast('Library Excel ga kebaca', 'Cek file assets/xlsx.full.min.js.', 'bad'); return; }
+  const wb = XLSX.utils.book_new();
+  const info = 'Isi satu partner per baris mulai baris 3. Kolom bertanda * wajib. Jenis partner dan Bidang mengikuti Daftar pilihan di Akses & Audit.';
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[info], ['Kode sumber *', 'Nama *', 'Jenis partner', 'Bidang', 'Email PIC *', 'Department pemilik *', 'Sumber', 'Nama kontak utama', 'Jabatan kontak', 'Email kontak', 'Telepon kontak', 'Kota', 'Rate card (KOL/KOC)', 'Catatan']]), '7 Data Partner');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Kode sumber *', 'Kode Client & Partner *', 'Tanggal *', 'Jenis *', 'Hasil pembicaraan *', 'Langkah berikutnya', 'Tanggal follow-up', 'Email pencatat *', 'Catatan']]), '8 Data Interaksi');
+  XLSX.writeFile(wb, 'Template_Data_Partner_CRM_OPTIMA.xlsx');
 }
 
 /* ---------- event ---------- */

@@ -107,14 +107,15 @@ class ClientPartnerController extends Controller
                 'code' => $code,
                 'name' => trim($data['name']),
                 'category' => $category,
-                'service_id' => $service?->id,
+                'service_id' => $category === Category::Partner ? null : $service?->id,
+                'partner_type' => $category === Category::Partner ? ($data['partnerType'] ?? null) : null,
                 'segment' => $data['segment'] ?? null,
                 'pic_id' => $me->id,
                 'department_id' => $me->department_id,
                 'source' => $data['source'] ?? null,
                 'city' => $data['city'] ?? null,
                 'note' => $data['note'] ?? null,
-                'rate_card' => $this->rateCard($me, $service, $data),
+                'rate_card' => $this->rateCard($me, $service, $data, $category === Category::Partner ? ($data['partnerType'] ?? null) : null),
                 'created_by' => $me->id,
             ])->save();
             if (($data['contact'] ?? '') !== '' || ($data['cEmail'] ?? '') !== '' || ($data['phone'] ?? '') !== '') {
@@ -156,8 +157,11 @@ class ClientPartnerController extends Controller
                 $service = $this->service($data);
                 $fields['service_id'] = $service?->id;
             }
+            if (array_key_exists('partnerType', $data) && ($fields['category'] ?? $clientPartner->category->value) === Category::Partner->value) {
+                $fields['partner_type'] = $data['partnerType'];
+            }
             if (array_key_exists('rate', $data) && $this->access->canManageRateCard($me)) {
-                $fields['rate_card'] = $this->rateCard($me, $service, $data);
+                $fields['rate_card'] = $this->rateCard($me, $service, $data, $fields['partner_type'] ?? $clientPartner->partner_type);
             }
             $clientPartner->update($fields);
             $this->audit->changed(self::ENTITY, $clientPartner, $original, $clientPartner->name);
@@ -378,6 +382,7 @@ class ClientPartnerController extends Controller
         return [
             'name' => [$req, 'string', 'max:200'],
             'kind' => ['nullable', Rule::in(['Lead', 'Partner'])],
+            'partnerType' => ['nullable', 'string', 'max:100'],
             'service' => ['nullable', 'string', 'max:100'],
             'segment' => ['nullable', 'string', 'max:100'],
             'source' => ['nullable', 'string', 'max:100'],
@@ -392,9 +397,11 @@ class ClientPartnerController extends Controller
     }
 
     /** Rate card hanya untuk layanan KOL dan hanya disimpan oleh pengguna yang boleh mengelolanya. */
-    private function rateCard(User $me, ?Service $service, array $data): ?array
+    /** Rate card hanya untuk KOL: layanan KOL (client) atau jenis partner KOL/KOC. */
+    private function rateCard(User $me, ?Service $service, array $data, ?string $partnerType = null): ?array
     {
-        if ($service?->name !== 'KOL' || ! $this->access->canManageRateCard($me) || ($data['rate'] ?? '') === '') {
+        $kol = $service?->name === 'KOL' || $partnerType === 'KOL/KOC';
+        if (! $kol || ! $this->access->canManageRateCard($me) || ($data['rate'] ?? '') === '') {
             return null;
         }
 

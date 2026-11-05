@@ -2,7 +2,7 @@
 'use strict';
 // Dengan backend (window.OPTIMA_API), cache browser dipisah dari data contoh mode lokal.
 // v4: status relasi (Lead/Client) dipisah dari layanan, akses per divisi. Data contoh lama di browser direset sekali.
-const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v6' : 'optima_crm_local_v8';
+const DB_KEY = window.OPTIMA_API ? 'optima_crm_backend_v7' : 'optima_crm_local_v9';
 // Commercial dilebur ke Customer Service (keputusan 22 Okt 2026, mengikuti pratinjau klien).
 const DEPTS = ['Executive', 'Customer Service', 'Digital Campaign', 'Creative & Media', 'CampusNet', 'DietPartner', 'Business Operation'];
 const SEED_DEPTS = ['Executive', 'Commercial'].concat(DEPTS.slice(1));
@@ -17,12 +17,16 @@ const DEFAULT_SERVICES = [['KOL', 'Digital Campaign'], ['Community', 'Digital Ca
 const serviceList = () => ((Store.db && Store.db.services) || DEFAULT_SERVICES.map(([name, dept], i) => ({ id: 's' + (i + 1), name, dept, active: true }))).filter(x => x.active !== false);
 const ENTS = [['lead', 'Lead'], ['client', 'Client'], ['partner', 'Partner'], ['interaksi', 'Interaksi'], ['deal', 'Deal']];
 const DEFAULT_OPTS = {
-  segments: ['Korporat', 'Pendidikan', 'Kesehatan', 'Komunitas', 'UMKM', 'F&B', 'Retail', 'Media lokal', 'Radio', 'Online', 'Lifestyle', 'Kuliner', 'Travel'],
+  segments: ['Korporat', 'Pendidikan', 'Kesehatan', 'Komunitas', 'UMKM', 'F&B', 'Retail'],
   sources: ['Referensi', 'Website', 'Event', 'Media sosial', 'Kunjungan', 'Lainnya'],
   intTypes: ['Telepon', 'Email', 'WhatsApp', 'Meeting', 'Kunjungan', 'Lainnya'],
-  lostReasons: ['Harga di atas anggaran', 'Pilih vendor lain', 'Kebutuhan berubah', 'Ga ada respons', 'Waktu ga cocok', 'Lainnya']
+  lostReasons: ['Harga di atas anggaran', 'Pilih vendor lain', 'Kebutuhan berubah', 'Ga ada respons', 'Waktu ga cocok', 'Lainnya'],
+  partnerTypes: ['Vendor', 'Media partner', 'KOL/KOC', 'Komunitas', 'Lainnya'],
+  partnerFields: ['Media lokal', 'Radio', 'Online', 'Lifestyle', 'Kuliner', 'Travel', 'Event', 'Produksi']
 };
-const OPT_LABEL = { segments: 'Segmen', sources: 'Sumber data', intTypes: 'Jenis interaksi', lostReasons: 'Alasan deal Lost' };
+const OPT_LABEL = { segments: 'Segmen client', sources: 'Sumber data', intTypes: 'Jenis interaksi', lostReasons: 'Alasan deal Lost', partnerTypes: 'Jenis partner', partnerFields: 'Bidang partner' };
+/** Daftar pilihan dikelompokkan per modul (revisi klien 5 Nov 2026). */
+const OPT_GROUPS = [['Modul Client', ['segments', 'lostReasons']], ['Modul Partner', ['partnerTypes', 'partnerFields']], ['Dipakai Client dan Partner', ['sources', 'intTypes']]];
 const optList = (k) => ((Store.db && Store.db.options && Store.db.options[k]) || DEFAULT_OPTS[k]).slice();
 const DEAL_STATUS = ['Open', 'Won', 'Lost', 'On Hold'];
 const LV = { N: 0, R: 1, C: 2, M: 3 };
@@ -109,10 +113,10 @@ function divisionWorkflow(db) {
   });
   db.records.forEach(r => { const w = db.deals.filter(d => d.recordId === r.id && d.status === 'Won').map(d => d.closedAt).sort()[0]; if (w) r.convertedAt = w; });
   // Contoh Partner (revisi klien): vendor dan media partner, tanpa tahap Lead.
-  [['Sound System Harmoni', 'Vendor', 'u6', 'Customer Service', 'Hendro S.', 'Pemilik', 'Bandung'], ['Majalah Kampus Kita', 'Media partner', 'u5', 'Digital Campaign', 'Tia Lestari', 'Pemimpin Redaksi', 'Bandung']]
-    .forEach(([name, segment, picId, dept, contact, title, city], i) => {
+  [['Sound System Harmoni', 'Vendor', 'Event', 'u6', 'Customer Service', 'Hendro S.', 'Pemilik', 'Bandung'], ['Majalah Kampus Kita', 'Media partner', 'Media lokal', 'u5', 'Digital Campaign', 'Tia Lestari', 'Pemimpin Redaksi', 'Bandung']]
+    .forEach(([name, partnerType, segment, picId, dept, contact, title, city], i) => {
       const n = db.records.length + 1; const id = 'r' + n; const cEmail = contact.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '') + '@contoh.test';
-      db.records.push({ id, code: 'CP-' + String(n).padStart(4, '0'), name, cat: 'Partner', service: '', createdBy: picId, segment, picId, dept, source: 'Referensi', contact, title, cEmail, phone: '0812-0000-' + String(3100 + i * 7), city, rate: '', note: '', createdAt: addDays(-40 + i * 9), updatedAt: addDays(-5 - i), archived: false, handovers: [], contacts: [{ id: 'cp' + n, name: contact, title, email: cEmail, phone: '0812-0000-' + String(3100 + i * 7) }] });
+      db.records.push({ id, code: 'CP-' + String(n).padStart(4, '0'), name, cat: 'Partner', service: '', partnerType, createdBy: picId, segment, picId, dept, source: 'Referensi', contact, title, cEmail, phone: '0812-0000-' + String(3100 + i * 7), city, rate: '', note: '', createdAt: addDays(-40 + i * 9), updatedAt: addDays(-5 - i), archived: false, handovers: [], contacts: [{ id: 'cp' + n, name: contact, title, email: cEmail, phone: '0812-0000-' + String(3100 + i * 7) }] });
     });
   db.seq.r = db.records.length;
   return db;

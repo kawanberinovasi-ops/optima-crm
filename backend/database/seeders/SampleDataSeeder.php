@@ -43,6 +43,7 @@ class SampleDataSeeder extends Seeder
                 'category' => $r['category'],
                 'service_id' => $r['service'] ? Service::where('name', $r['service'])->value('id') : null,
                 'converted_at' => $day($r['converted_days'] ?? null),
+                'partner_type' => $r['partner_type'] ?? null,
                 'segment' => $r['segment'],
                 'pic_id' => $users[$r['pic']],
                 'department_id' => $dept[$r['department']],

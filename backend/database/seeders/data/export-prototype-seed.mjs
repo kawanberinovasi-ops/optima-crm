@@ -35,7 +35,7 @@ const out = {
   users: db.users.map((u) => ({ name: u.name, email: u.email, department: u.dept, role: u.role, active: u.active })),
   pipelines: db.lines.map((l) => ({ name: l.name, departments: l.depts || [], stages: l.stages.map((s) => s.name) })),
   client_partners: db.records.map((r) => ({
-    code: r.code, name: r.name, category: r.cat, service: r.service || null, segment: r.segment || null, pic: userEmail[r.picId], department: r.dept,
+    code: r.code, name: r.name, category: r.cat, service: r.service || null, partner_type: r.partnerType || null, segment: r.segment || null, pic: userEmail[r.picId], department: r.dept,
     created_by: userEmail[r.createdBy || r.picId], converted_days: off(r.convertedAt),
     source: r.source || null, city: r.city || null, note: r.note || null,
     rate_card: r.rate ? { rate: r.rate } : null,

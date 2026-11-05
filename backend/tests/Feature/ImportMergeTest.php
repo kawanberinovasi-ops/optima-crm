@@ -64,7 +64,7 @@ class ImportMergeTest extends TestCase
         $this->assertCount(1, $res['deals']);
         $this->assertTrue($res['skippedExample']);
         $this->assertSame([
-            'Sheet 7 baris 8: Kategori "Planet" ga dikenal. Pakai Lead, Client, atau Partner; KOL/Community/Media isi di kolom Layanan.',
+            'Sheet 7 baris 8: Kategori "Planet" ga dikenal. Pakai Lead atau Client; KOL/Community/Media isi di kolom Layanan.',
             'Sheet 9 baris 7: Deal Won wajib ada nilai deal dan tanggal closing.',
         ], $res['errors']);
         // Pencocokan SRS 8.3: baris di file = baris lolos + baris ditolak.
@@ -153,5 +153,30 @@ class ImportMergeTest extends TestCase
 
         $staff = User::factory()->inDepartment('CampusNet')->create();
         $this->as($staff)->postJson('/api/client-partners/'.$keep->id.'/merge', ['srcId' => $dup->id])->assertForbidden();
+    }
+
+    public function test_client_and_partner_imports_are_separate_modules(): void
+    {
+        $row = fn (string $code, array $extra = []) => array_merge(['_row' => 6, 'kode sumber' => $code, 'nama' => 'Data '.$code, 'email pic' => 'rina@contoh.test',
+            'department pemilik' => 'Customer Service'], $extra);
+
+        // Modul Client menolak baris Partner.
+        $client = $this->as()->postJson('/api/imports/check', ['filename' => 'c.xlsx', 'sheets' => ['records' => [$row('C-1', ['kategori' => 'Partner'])]]])->json('data');
+        $this->assertStringContainsString('diimport dari menu Partner', $client['errors'][0]);
+
+        // Modul Partner: semua baris jadi Partner, dengan jenis dan bidang partner; sheet deal diabaikan.
+        $partner = $this->as()->postJson('/api/imports/check', ['filename' => 'p.xlsx', 'module' => 'partner', 'sheets' => [
+            'records' => [$row('P-1', ['jenis partner' => 'Vendor', 'bidang' => 'Event'])],
+            'deals' => [['_row' => 6, 'kode sumber' => 'PD-1', 'kode client & partner' => 'P-1']],
+        ]])->json('data');
+        $this->assertSame([], $partner['errors']);
+        $this->assertCount(0, $partner['deals']);
+        $this->as()->postJson('/api/imports/'.$partner['id'].'/commit')->assertOk();
+        $saved = ClientPartner::where('code', 'P-1')->first();
+        $this->assertSame(['Partner', 'Vendor', 'Event'], [$saved->category->value, $saved->partner_type, $saved->segment]);
+
+        // Kode yang sudah dipakai Partner tidak bisa ditimpa lewat import Client.
+        $again = $this->as()->postJson('/api/imports/check', ['filename' => 'c2.xlsx', 'sheets' => ['records' => [$row('P-1', ['kategori' => 'Lead'])]]])->json('data');
+        $this->assertStringContainsString('sudah dipakai data Partner', $again['errors'][0]);
     }
 }

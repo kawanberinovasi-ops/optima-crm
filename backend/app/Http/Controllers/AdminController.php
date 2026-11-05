@@ -32,9 +32,9 @@ class AdminController extends Controller
 {
     private const DATA_ENTITIES = ['lead', 'client', 'partner', 'interaksi', 'deal'];
 
-    private const OPTION_KEYS = ['segments' => 'segments', 'sources' => 'sources', 'intTypes' => 'interaction_types', 'lostReasons' => 'lost_reasons'];
+    private const OPTION_KEYS = ['segments' => 'segments', 'sources' => 'sources', 'intTypes' => 'interaction_types', 'lostReasons' => 'lost_reasons', 'partnerTypes' => 'partner_types', 'partnerFields' => 'partner_fields'];
 
-    private const OPTION_LABEL = ['segments' => 'Segmen', 'sources' => 'Sumber data', 'interaction_types' => 'Jenis interaksi', 'lost_reasons' => 'Alasan deal Lost'];
+    private const OPTION_LABEL = ['segments' => 'Segmen client', 'sources' => 'Sumber data', 'interaction_types' => 'Jenis interaksi', 'lost_reasons' => 'Alasan deal Lost', 'partner_types' => 'Jenis partner', 'partner_fields' => 'Bidang partner'];
 
     public function __construct(private Access $access, private Audit $audit) {}
 
