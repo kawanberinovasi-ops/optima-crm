@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\User;
 use App\Models\UserEmail;
 use App\Services\Audit;
+use Dotenv\Dotenv;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -29,8 +30,12 @@ class SyncInternalUsers extends Command
     public function handle(Audit $audit): int
     {
         if ($this->option('from-env')) {
-            // Dibaca langsung dari proses, bukan config(), supaya tetap terbaca setelah php artisan optimize.
+            // Dibaca dari proses lalu dari file .env (Laravel Cloud menulis variabel ke .env), bukan config(),
+            // supaya tetap terbaca setelah php artisan optimize.
             $raw = trim((string) ($_SERVER['OPTIMA_INTERNAL_USERS_JSON'] ?? $_ENV['OPTIMA_INTERNAL_USERS_JSON'] ?? getenv('OPTIMA_INTERNAL_USERS_JSON') ?: ''));
+            if ($raw === '' && is_file($envFile = base_path('.env'))) {
+                $raw = trim((string) (Dotenv::parse((string) file_get_contents($envFile))['OPTIMA_INTERNAL_USERS_JSON'] ?? ''));
+            }
             $raw = str_starts_with($raw, '[') ? $raw : (string) base64_decode($raw, true);
             $rows = json_decode($raw, true);
             $source = 'environment variable OPTIMA_INTERNAL_USERS_JSON';
