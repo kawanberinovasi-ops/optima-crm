@@ -44,4 +44,20 @@ class ReplaceDemoAccountsTest extends TestCase
         $this->assertSame(0, ClientPartner::whereNotIn('pic_id', User::pluck('id'))->count());
         $this->assertTrue(ClientPartner::where('department_id', Department::where('name', 'Digital Campaign')->value('id'))->where('pic_id', $admin->id)->exists());
     }
+
+    public function test_accounts_can_be_read_from_an_environment_variable(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        // Server tanpa akses file (Laravel Cloud): JSON disimpan di environment variable, boleh base64.
+        $json = json_encode([['department' => 'Executive', 'name' => 'Kepala Exec', 'email' => 'exec@kantor.test', 'role' => 'Super Admin']]);
+        putenv('OPTIMA_INTERNAL_USERS_JSON='.base64_encode($json));
+        try {
+            $this->artisan('optima:sync-internal-users', ['--from-env' => true])->assertSuccessful();
+        } finally {
+            putenv('OPTIMA_INTERNAL_USERS_JSON');
+        }
+        $this->assertSame(Role::SuperAdmin, User::where('email', 'exec@kantor.test')->first()?->role);
+
+        $this->artisan('optima:sync-internal-users', ['--from-env' => true])->assertFailed();
+    }
 }

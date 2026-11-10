@@ -22,16 +22,25 @@ use Illuminate\Support\Facades\Schema;
  */
 class SyncInternalUsers extends Command
 {
-    protected $signature = 'optima:sync-internal-users {file : Path file JSON di luar repo, misalnya storage/app/private/internal-users.json} {--dry-run : Periksa tanpa menyimpan} {--replace-demo : Hapus akun uji @contoh.test; data mereka dialihkan ke kepala divisinya}';
+    protected $signature = 'optima:sync-internal-users {file? : Path file JSON di luar repo, misalnya storage/app/private/internal-users.json} {--from-env : Baca JSON (atau base64 dari JSON) dari environment variable OPTIMA_INTERNAL_USERS_JSON, untuk server tanpa akses file seperti Laravel Cloud} {--dry-run : Periksa tanpa menyimpan} {--replace-demo : Hapus akun uji @contoh.test; data mereka dialihkan ke kepala divisinya}';
 
     protected $description = 'Daftarkan atau perbarui akun internal (kepala department) dari file JSON privat';
 
     public function handle(Audit $audit): int
     {
-        $path = $this->argument('file');
-        $rows = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+        if ($this->option('from-env')) {
+            // Dibaca langsung dari proses, bukan config(), supaya tetap terbaca setelah php artisan optimize.
+            $raw = trim((string) ($_SERVER['OPTIMA_INTERNAL_USERS_JSON'] ?? $_ENV['OPTIMA_INTERNAL_USERS_JSON'] ?? getenv('OPTIMA_INTERNAL_USERS_JSON') ?: ''));
+            $raw = str_starts_with($raw, '[') ? $raw : (string) base64_decode($raw, true);
+            $rows = json_decode($raw, true);
+            $source = 'environment variable OPTIMA_INTERNAL_USERS_JSON';
+        } else {
+            $path = (string) $this->argument('file');
+            $rows = $path !== '' && is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+            $source = 'file '.($path ?: '(tidak diisi)');
+        }
         if (! is_array($rows)) {
-            $this->error('File tidak ada atau bukan JSON yang valid: '.$path);
+            $this->error('Daftar akun tidak ada atau bukan JSON yang valid: '.$source);
 
             return self::FAILURE;
         }

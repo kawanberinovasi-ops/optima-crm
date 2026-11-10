@@ -1,6 +1,6 @@
 # Deploy OPTIMA CRM ke Laravel Cloud
 
-Panduan ini untuk lingkungan uji (UAT) dan produksi. Repo ini monorepo: frontend prototipe ada di root
+Panduan ini untuk lingkungan uji (UAT) dan produksi. Versi singkat khusus UAT: [uat-laravel-cloud.md](uat-laravel-cloud.md). Repo ini monorepo: frontend prototipe ada di root
 (`index.html`, `assets/`), aplikasi Laravel di `backend/`. Laravel Cloud men-deploy satu folder saja (root directory),
 tapi semua folder repo bisa dibaca saat build. Karena itu frontend disalin ke dalam `backend/` di langkah build.
 
