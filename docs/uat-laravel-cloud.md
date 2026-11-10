@@ -1,5 +1,8 @@
 # Menyiapkan UAT di Laravel Cloud (langkah cepat)
 
+> Laravel Cloud berbayar (Starter $5/bulan + pemakaian; Postgres-nya terpisah). Versi tanpa biaya:
+> [uat-gratis-render-neon.md](uat-gratis-render-neon.md).
+
 Tujuannya: versi online dari branch `feat/revisi-klien` dengan akun kepala divisi asli. Login lewat SSO Google, karena
 login akun uji mati otomatis di luar `local`. Panduan lengkap produksi ada di [deploy-laravel-cloud.md](deploy-laravel-cloud.md).
 

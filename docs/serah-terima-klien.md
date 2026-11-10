@@ -3,6 +3,12 @@
 Selama pengembangan, beberapa layanan memakai akun Campus Innovate (kawanberinovasi). Dokumen ini menjelaskan cara
 memindahkannya ke akun milik klien tanpa kehilangan data dan tanpa pengguna perlu mendaftar ulang.
 
+## 0. Satu akun Google khusus proyek
+
+Semua layanan (Render, Neon, Google Cloud OAuth, dan Laravel Cloud kalau dipakai) didaftarkan dengan satu Gmail khusus
+proyek, bukan akun pribadi atau akun Campus Innovate. Saat serah terima: ganti password, nomor HP dan email pemulihan,
+serta 2FA ke milik klien, lalu ganti metode pembayaran (kalau ada) ke milik klien. Semua layanan ikut pindah sekaligus.
+
 ## 1. SSO Google
 
 ### Kenapa aman dipindah
