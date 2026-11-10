@@ -68,6 +68,10 @@ Matriks hak akses awal: **keputusan klien** di tabel "3. Hak akses awal" (5 Nov 
   pipeline Customer Service dan Campaign). Pengecualian per pengguna (tambah atau cabut satu pipeline untuk satu orang)
   ada di bawahnya, lalu daftar pipeline dengan tombol Hapus dan Pipeline baru. Orang di divisi itu melihat perubahan
   setelah halaman dimuat ulang.
+- Tampilan ini lalu dibuat lebih ringkas: satu baris per divisi, pipeline yang dipakai tampil sebagai chip (tanda silang
+  untuk melepas), dan dropdown **+ Tambah pipeline** untuk menambah.
+- Tab Hak akses memakai kata, bukan huruf: Tidak ada (N), Lihat saja (R), Milik sendiri (C), Kelola penuh (M); nilai deal
+  Semua / Hanya kepala / Tidak; rate card Kelola / Lihat, kepala / Tidak. Yang disimpan di database tetap N/R/C/M.
 
 ## 4. Pindah PIC / divisi (serah terima)
 
@@ -203,7 +207,8 @@ Akun kepala department memakai Gmail pribadi dan email optima.web.id, jadi login
    biarkan `GOOGLE_HOSTED_DOMAIN` kosong, lalu `php artisan config:clear`.
 4. Email utama maupun email alternatif di daftar akun internal sama-sama bisa dipakai login.
 
-Saat proyek dialihkan ke klien: OAuth client sebaiknya dibuat ulang di akun Google milik klien, lalu ganti isi `.env` server.
+Saat proyek dialihkan ke klien: lihat [serah-terima-klien.md](serah-terima-klien.md). Singkatnya, klien membuat OAuth
+client sendiri lalu dua variabel `GOOGLE_*` di server diganti; akun pengguna tidak berubah karena dikenali dari email.
 
 ## Status autentikasi yang benar-benar tersedia
 

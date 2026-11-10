@@ -123,14 +123,13 @@ AdminTabs.pipelines = (adm) => {
   const lines = (Store.db.lines || []).filter(l => !l.archived);
   const ov = Store.db.lineUsers || [];
   const userOpts = Store.db.users.filter(u => u.active && u.role !== 'Super Admin');
-  const divisions = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">' + Store.db.departments.map(d => {
+  // Satu baris per divisi: pipeline yang dipakai tampil sebagai chip (bisa dilepas), tambah lewat dropdown.
+  const divisions = '<div class="card" style="padding:6px 0">' + Store.db.departments.map((d, i) => {
     const used = lines.filter(l => (l.depts || []).includes(d.name));
-    return '<div class="card pad" style="display:flex;flex-direction:column;gap:10px;padding:20px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><strong style="font-size:17px">' + esc(d.name) + '</strong><span class="small muted">' + used.length + ' pipeline</span></div>' +
-      '<span class="lbl">Pipeline yang dipakai</span><div style="display:flex;flex-direction:column;gap:6px">' + lines.map(l => {
-        const on = (l.depts || []).includes(d.name);
-        return adm ? '<label class="lrow" style="padding:8px 12px;gap:10px;cursor:pointer;' + (on ? 'background:var(--tint)' : '') + '"><input type="checkbox" data-ch="linedept" data-v="' + l.id + '" data-d="' + esc(d.name) + '"' + (on ? ' checked' : '') + '><span style="flex:1;min-width:0"><strong>' + esc(l.name) + '</strong><span class="small muted" style="display:block">' + l.stages.map(s => esc(s.name)).join(' → ') + '</span></span></label>'
-          : (on ? '<span class="chip c-info">' + esc(l.name) + '</span>' : '');
-      }).join('') + '</div></div>';
+    const free = lines.filter(l => !(l.depts || []).includes(d.name));
+    return '<div class="pl-row"' + (i ? ' style="border-top:1px solid var(--line)"' : '') + '><strong class="pl-dept">' + esc(d.name) + '</strong>' +
+      '<div class="pl-used">' + (used.length ? used.map(l => '<span class="chip c-info" style="padding-right:' + (adm ? '4px' : '12px') + '">' + esc(l.name) + (adm ? '<button type="button" class="btn-ghost" style="min-height:30px;padding:0 6px" data-a="linedeptdel" data-v="' + l.id + '" data-d="' + esc(d.name) + '" aria-label="Lepas pipeline ' + esc(l.name) + ' dari ' + esc(d.name) + '">' + ic('x', 'ic-s') + '</button>' : '') + '</span>').join('') : '<span class="small muted">Belum memakai pipeline</span>') + '</div>' +
+      (adm && free.length ? '<label class="pl-add"><span class="sr">Tambah pipeline untuk ' + esc(d.name) + '</span><select class="inp" data-ch="lineadd" data-d="' + esc(d.name) + '">' + opt('', '', '+ Tambah pipeline') + free.map(l => opt(l.id, '', l.name)).join('') + '</select></label>' : '') + '</div>';
   }).join('') + '</div>';
   const exceptions = '<div class="card pad" style="display:flex;flex-direction:column;gap:12px;padding:20px"><strong>Pengecualian per pengguna</strong>' +
     '<p class="small muted" style="margin:0">Tambahkan pipeline untuk orang tertentu di luar divisinya, atau cabut pipeline divisinya khusus untuk orang itu.</p>' +
@@ -139,7 +138,7 @@ AdminTabs.pipelines = (adm) => {
   const list = '<div class="card pad" style="display:flex;flex-direction:column;gap:10px;padding:20px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>Daftar pipeline</strong>' + (adm ? '<button type="button" class="btn btn-sm" data-a="newline">' + ic('plus', 'ic-s') + 'Pipeline baru</button>' : '') + '</div>' +
     lines.map(l => '<div class="lrow" style="padding:10px 12px;gap:10px"><span style="flex:1;min-width:0"><strong>' + esc(l.name) + '</strong><span class="small muted" style="display:block">Dipakai: ' + esc((l.depts || []).join(', ') || 'belum ada divisi') + '</span></span>' + (adm ? '<button type="button" class="btn btn-s btn-sm" style="color:var(--bad)" data-a="delline" data-v="' + l.id + '" aria-label="Hapus pipeline ' + esc(l.name) + '">' + ic('trash', 'ic-s') + 'Hapus</button>' : '') + '</div>').join('') + '</div>';
   return '<div class="sec-h"><div><span class="lbl">Pipeline per divisi</span><h2 class="disp h2">Divisi pakai pipeline apa</h2></div></div>' +
-    '<p class="small muted" style="margin:0">Centang pipeline yang dipakai setiap divisi. Satu divisi boleh memakai lebih dari satu pipeline. Orang di divisi itu melihat pipeline yang dicentang setelah halaman dimuat ulang. Stage diatur dari halaman Pipeline.</p>' +
+    '<p class="small muted" style="margin:0">Pilih pipeline untuk setiap divisi lewat dropdown Tambah pipeline, lepas dengan tanda silang. Satu divisi boleh memakai lebih dari satu pipeline. Orang di divisi itu melihat perubahannya setelah halaman dimuat ulang. Stage diatur dari halaman Pipeline.</p>' +
     divisions + exceptions + list;
 };
 Changes.linedept = (el) => {
@@ -148,6 +147,9 @@ Changes.linedept = (el) => {
   l.depts = el.checked ? (l.depts || []).concat([el.dataset.d]) : (l.depts || []).filter(x => x !== el.dataset.d);
   audit('Ubah', 'Pipeline', l.name + ' dipakai: ' + (l.depts.join(', ') || 'tidak ada divisi')); commit();
 };
+// Dropdown dan tombol lepas memakai handler centang yang sama (lokal maupun API).
+Changes.lineadd = (el) => { if (el.value) Changes.linedept({ dataset: { v: el.value, d: el.dataset.d }, checked: true }); };
+Actions.linedeptdel = (el) => Changes.linedept({ dataset: { v: el.dataset.v, d: el.dataset.d }, checked: false });
 const setLineUser = (lineId, userId, allowed) => {
   Store.db.lineUsers = (Store.db.lineUsers || []).filter(x => !(x.lineId === lineId && x.userId === userId));
   if (allowed !== null) Store.db.lineUsers.push({ lineId, userId, allowed });

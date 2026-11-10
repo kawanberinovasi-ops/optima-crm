@@ -10,7 +10,7 @@ Tampilan dashboard Cloud bisa berubah; nama menu di bawah mengikuti dokumentasi 
 
 ## 1. Siapkan repo
 
-1. Push repo ini ke GitHub (private), termasuk branch yang akan di-deploy.
+1. Push repo ini ke GitHub, termasuk branch yang akan di-deploy. Sebaiknya private; untuk serah terima lihat [serah-terima-klien.md](serah-terima-klien.md).
 2. Pastikan `backend/composer.lock` ikut ter-commit.
 
 ## 2. Buat aplikasi di Laravel Cloud
