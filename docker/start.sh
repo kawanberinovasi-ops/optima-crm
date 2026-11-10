@@ -3,11 +3,11 @@
 set -e
 cd /app
 
-# Render "generateValue" memberi base64 tanpa awalan; Laravel butuh "base64:".
-case "${APP_KEY:-}" in
-  ""|base64:*) ;;
-  *) export APP_KEY="base64:${APP_KEY}" ;;
-esac
+# APP_KEY dari platform bisa berupa 32 karakter mentah (tombol Generate Render: 32 hex) yang langsung valid untuk
+# AES-256-CBC, atau base64 tanpa awalan (perlu "base64:").
+if [ -n "${APP_KEY:-}" ] && [ "${APP_KEY#base64:}" = "$APP_KEY" ] && [ "${#APP_KEY}" -ne 32 ]; then
+  export APP_KEY="base64:${APP_KEY}"
+fi
 
 php artisan optimize
 php artisan migrate --force
