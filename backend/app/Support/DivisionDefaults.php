@@ -7,6 +7,7 @@ namespace App\Support;
  * - Commercial sudah dilebur ke Customer Service, jadi Customer Service memakai barisnya sendiri.
  * - Kolom Community, KOL/KOC, dan Media sekarang layanan; hak Partner diambil dari level tertinggi ketiganya.
  * - Setiap divisi bisa menambah Client (lewat Lead) dan Partner sendiri: Lead, Client, dan Partner minimal C (5 Nov 2026).
+ * - Setiap divisi memakai pipelinenya sendiri: Deal minimal C, Customer Service M (10 Nov 2026).
  * Dipakai migrasi, seeder, dan department baru, supaya angkanya sama di semua tempat.
  */
 class DivisionDefaults
@@ -16,11 +17,11 @@ class DivisionDefaults
     /** Department => [lead, client, partner, interaksi, deal, nilai, rate] */
     public const MATRIX = [
         'Executive' => ['M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
-        'Customer Service' => ['C', 'C', 'C', 'M', 'R', 'Tidak', 'R*'],
-        'Digital Campaign' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-        'Creative & Media' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-        'CampusNet' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-        'DietPartner' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+        'Customer Service' => ['C', 'C', 'C', 'M', 'M', 'Tidak', 'R*'],
+        'Digital Campaign' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+        'Creative & Media' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+        'CampusNet' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+        'DietPartner' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
         'Business Operation' => ['C', 'M', 'C', 'R', 'M', 'Ya', 'M'],
     ];
 

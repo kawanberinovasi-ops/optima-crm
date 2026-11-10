@@ -88,9 +88,11 @@ AdminTabs.services = (adm) => {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">' + depts.map(dept => {
       const list = all.filter(x => x.dept === dept); const can = canManageServices(dept);
       return '<div class="card pad" style="display:flex;flex-direction:column;gap:12px;padding:20px"><strong>' + esc(dept) + '</strong>' +
-        (list.length ? '<div style="display:flex;flex-direction:column;gap:8px">' + list.map(x => '<div class="lrow" style="padding:8px 12px;gap:8px"><span style="flex:1;min-width:0"><strong>' + esc(x.name) + '</strong></span>' +
-          (adm ? '<label><span class="sr">Divisi layanan ' + esc(x.name) + '</span><select class="inp" data-ch="svcdept" data-v="' + esc(x.id) + '" style="min-height:40px;width:auto">' + Store.db.departments.map(d => opt(d.name, x.dept)).join('') + '</select></label>' : '') +
-          (can ? '<button type="button" class="btn btn-s btn-sm" data-a="svcedit" data-v="' + x.id + '" aria-label="Ganti nama ' + esc(x.name) + '">' + ic('edit', 'ic-s') + '</button><button type="button" class="btn btn-s btn-sm" style="color:var(--bad)" data-a="workflow-delete-service" data-v="' + x.id + '" aria-label="Hapus layanan ' + esc(x.name) + '">' + ic('trash', 'ic-s') + '</button>' : '') + '</div>').join('') + '</div>'
+        (list.length ? '<div style="display:flex;flex-direction:column;gap:8px">' + list.map(x => '<div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:16px;background:var(--bg)">' +
+          '<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1;min-width:0;overflow-wrap:anywhere">' + esc(x.name) + '</strong>' +
+          (can ? '<button type="button" class="icb" data-a="svcedit" data-v="' + x.id + '" aria-label="Ganti nama ' + esc(x.name) + '">' + ic('edit', 'ic-s') + '</button><button type="button" class="icb" style="color:var(--bad)" data-a="workflow-delete-service" data-v="' + x.id + '" aria-label="Hapus layanan ' + esc(x.name) + '">' + ic('trash', 'ic-s') + '</button>' : '') + '</div>' +
+          (adm ? '<label style="display:flex;align-items:center;gap:8px" class="small muted"><span style="white-space:nowrap">Pindah ke divisi</span><select class="inp" data-ch="svcdept" data-v="' + esc(x.id) + '" style="min-height:40px;flex:1;min-width:0">' + Store.db.departments.map(d => opt(d.name, x.dept)).join('') + '</select></label>' : '') +
+          '</div>').join('') + '</div>'
           : '<span class="small muted">Belum ada layanan.</span>') +
         (can ? '<form data-form="svcadd" style="display:flex;gap:8px"><input type="hidden" name="dept" value="' + esc(dept) + '"><label style="flex:1"><span class="sr">Layanan baru ' + esc(dept) + '</span><input class="inp" name="name" placeholder="Layanan baru" style="min-height:44px"></label><button type="submit" class="btn btn-sm">Tambah</button></form>' : '') + '</div>';
     }).join('') + '</div>';

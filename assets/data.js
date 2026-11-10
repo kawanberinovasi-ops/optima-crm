@@ -15,7 +15,7 @@ const cpScopeCats = () => (typeof App !== 'undefined' && App.route === 'partner'
 // Layanan bukan status. Pemetaan ke divisi bisa diubah admin (KOL dan Community: Digital Campaign, sementara).
 const DEFAULT_SERVICES = [['KOL', 'Digital Campaign'], ['Community', 'Digital Campaign'], ['Media', 'Creative & Media'], ['Digital Campaign', 'Digital Campaign'], ['CampusNet', 'CampusNet'], ['DietPartner', 'DietPartner']];
 const serviceList = () => ((Store.db && Store.db.services) || DEFAULT_SERVICES.map(([name, dept], i) => ({ id: 's' + (i + 1), name, dept, active: true }))).filter(x => x.active !== false);
-const ENTS = [['lead', 'Lead'], ['client', 'Client'], ['partner', 'Partner'], ['interaksi', 'Interaksi'], ['deal', 'Deal']];
+const ENTS = [['lead', 'Lead'], ['client', 'Client'], ['partner', 'Partner'], ['interaksi', 'Interaksi'], ['deal', 'Deal & pipeline']];
 const DEFAULT_OPTS = {
   segments: ['Korporat', 'Pendidikan', 'Kesehatan', 'Komunitas', 'UMKM', 'F&B', 'Retail'],
   sources: ['Referensi', 'Website', 'Event', 'Media sosial', 'Kunjungan', 'Lainnya'],
@@ -43,14 +43,15 @@ const uid = (p) => p + '-' + Date.now().toString(36) + Math.random().toString(36
  * Hak akses awal sesuai keputusan klien (tabel "3. Hak akses awal", 5 Nov 2026); sama dengan App\Support\DivisionDefaults.
  * Customer Service memakai barisnya sendiri (Commercial sudah dilebur). Partner = level tertinggi Community, KOL/KOC, Media.
  * Setiap divisi bisa menambah Client (lewat Lead) dan Partner sendiri, jadi Lead, Client, dan Partner minimal C.
+ * Setiap divisi memakai pipelinenya sendiri: Deal minimal C, Customer Service M (10 Nov 2026).
  */
 const ACCESS_MATRIX = {
   Executive: ['M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
-  'Customer Service': ['C', 'C', 'C', 'M', 'R', 'Tidak', 'R*'],
-  'Digital Campaign': ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-  'Creative & Media': ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-  CampusNet: ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-  DietPartner: ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+  'Customer Service': ['C', 'C', 'C', 'M', 'M', 'Tidak', 'R*'],
+  'Digital Campaign': ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+  'Creative & Media': ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+  CampusNet: ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+  DietPartner: ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
   'Business Operation': ['C', 'M', 'C', 'R', 'M', 'Ya', 'M']
 };
 function defaultDivisionAccess(dept) {

@@ -181,6 +181,9 @@ Perubahan di atas pratinjau klien, sesuai catatan revisi klien:
 - **Setiap divisi menambah Client dan Partner sendiri**: hak Lead, Client, dan Partner minimal C untuk semua divisi
   (migrasi `2026_11_05_000006`). Data tetap hanya terlihat oleh PIC-nya dan Super Admin.
 - Menu Pipeline tanpa dropdown untuk pengguna yang hanya memakai pipeline divisinya.
+- **Setiap divisi memakai pipelinenya** (10 Nov 2026): kolom Hak akses "Deal & pipeline" minimal C untuk semua divisi
+  (Customer Service M), migrasi `2026_11_10_000001`. Kolom ini menentukan boleh apa di pipeline; tab Pipeline menentukan
+  pipeline mana yang dipakai divisi atau orang tertentu. Deal N berarti menu Pipeline tidak muncul sama sekali.
 
 ## Menyambungkan SSO Google (Gmail)
 

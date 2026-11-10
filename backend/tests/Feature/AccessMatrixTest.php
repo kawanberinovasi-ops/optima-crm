@@ -31,11 +31,11 @@ class AccessMatrixTest extends TestCase
     /** Department => [Lead, Client, Partner, Interaksi, Deal, Nilai deal, Rate card] */
     private const SRS = [
         'Executive' => ['M', 'M', 'M', 'M', 'M', 'Ya', 'Ya'],
-        'Customer Service' => ['C', 'C', 'C', 'M', 'R', 'Tidak', 'R*'],
-        'Digital Campaign' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-        'Creative & Media' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-        'CampusNet' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
-        'DietPartner' => ['C', 'C', 'M', 'C', 'N', 'Tidak', 'M'],
+        'Customer Service' => ['C', 'C', 'C', 'M', 'M', 'Tidak', 'R*'],
+        'Digital Campaign' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+        'Creative & Media' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+        'CampusNet' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
+        'DietPartner' => ['C', 'C', 'M', 'C', 'C', 'Tidak', 'M'],
         'Business Operation' => ['C', 'M', 'C', 'R', 'M', 'Ya', 'M'],
     ];
 
@@ -99,7 +99,7 @@ class AccessMatrixTest extends TestCase
     {
         $viewer = $this->user('Digital Campaign', Role::Viewer);
         $this->assertSame(AccessLevel::R, $this->access()->level($viewer, 'partner'));
-        $this->assertSame(AccessLevel::N, $this->access()->level($viewer, 'deal'), 'divisi tanpa akses deal tetap N');
+        $this->assertSame(AccessLevel::R, $this->access()->level($viewer, 'deal'), 'Viewer tetap hanya melihat deal');
 
         AccessOverride::create(['user_id' => $viewer->id, 'entity' => 'deal', 'level' => 'M']);
         $this->access()->forget($viewer);
@@ -146,7 +146,7 @@ class AccessMatrixTest extends TestCase
     public function test_personal_override_beats_department_matrix(): void
     {
         $staff = $this->user('CampusNet');
-        $this->assertSame(AccessLevel::N, $this->access()->level($staff, 'deal'));
+        $this->assertSame(AccessLevel::C, $this->access()->level($staff, 'deal'));
         $this->assertFalse($this->access()->canSeeDealValue($staff));
 
         AccessOverride::create(['user_id' => $staff->id, 'entity' => 'deal', 'level' => 'M', 'reason' => 'Bantu tim CS']);
