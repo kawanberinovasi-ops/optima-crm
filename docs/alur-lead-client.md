@@ -63,6 +63,12 @@ Matriks hak akses awal: **keputusan klien** di tabel "3. Hak akses awal" (5 Nov 
 - **Migrasi** (`2026_10_22_000002_division_pipelines`): pipeline lama tanpa divisi diarsipkan (tidak dihapus), deal-nya
   pindah ke pipeline divisi relasinya dengan stage dicocokkan lewat nama (kalau tidak ada, urutan; Won ke Closing).
 
+- **Pengaturan (revisi 10 Nov 2026):** Akses & Audit → Pipeline disusun per divisi. Setiap kartu adalah satu divisi;
+  Super Admin mencentang pipeline yang dipakai divisi itu (boleh lebih dari satu, misalnya Customer Service memakai
+  pipeline Customer Service dan Campaign). Pengecualian per pengguna (tambah atau cabut satu pipeline untuk satu orang)
+  ada di bawahnya, lalu daftar pipeline dengan tombol Hapus dan Pipeline baru. Orang di divisi itu melihat perubahan
+  setelah halaman dimuat ulang.
+
 ## 4. Pindah PIC / divisi (serah terima)
 
 - Dari divisi mana pun ke divisi mana pun, termasuk ke dan dari Customer Service. Pengguna memilih divisi tujuan dan
