@@ -1,0 +1,16 @@
+.git
+.github
+.playwright-mcp
+node_modules
+backend/vendor
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/storage/app/private/*
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/resources/frontend
+backend/public/assets
+docs

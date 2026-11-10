@@ -1,0 +1,57 @@
+# Membangun image Docker (dipakai Render/Koyeb/VPS) dan menjalankannya bersama PostgreSQL:
+# container harus start, migrasi + data awal berhasil, dan /up serta halaman utama menjawab 200.
+name: Docker image
+
+on:
+  push:
+    paths: ['Dockerfile', '.dockerignore', 'docker/**', 'backend/**', 'assets/**', 'index.html', '.github/workflows/docker.yml']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t optima-crm:ci .
+
+      - name: Start PostgreSQL
+        run: |
+          docker network create optima
+          docker run -d --name db --network optima -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=optima postgres:16
+          for i in $(seq 1 30); do docker exec db pg_isready -U postgres && break; sleep 2; done
+
+      - name: Start app (staging, data contoh)
+        run: |
+          docker run -d --name app --network optima -p 8080:8080 \
+            -e APP_ENV=staging -e APP_DEBUG=false -e APP_KEY=$(openssl rand -base64 32) \
+            -e APP_URL=http://localhost:8080 -e SESSION_DRIVER=database -e CACHE_STORE=database \
+            -e DB_URL=postgres://postgres:postgres@db:5432/optima \
+            -e OPTIMA_INTERNAL_USERS_JSON='[{"department":"Executive","name":"Admin CI","email":"admin@kantor.test","role":"Super Admin"}]' \
+            optima-crm:ci
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/up && break; sleep 2; done
+
+      - name: Check responses
+        run: |
+          docker logs app 2>&1 | tail -40
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/up)" = 200
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/)" = 200
+          curl -fs http://localhost:8080/ | grep -q 'assets/app.css?v='
+          test "$(docker exec db psql -U postgres -d optima -Atc "select count(*) from users where email='admin@kantor.test'")" = 1
+          test "$(docker exec db psql -U postgres -d optima -Atc "select count(*) from users where email like '%@contoh.test'")" = 0
+
+      - name: Restart is safe (first-run diulang)
+        run: |
+          docker restart app
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/up && break; sleep 2; done
+          docker logs app 2>&1 | tail -20
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/up)" = 200
