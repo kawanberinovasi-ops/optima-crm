@@ -35,6 +35,10 @@ return [
     | backup_keep_days dihapus otomatis.
     */
     'backup_disk' => env('OPTIMA_BACKUP_DISK', 'local'),
+    // Backup dienkripsi (default). Kunci: OPTIMA_BACKUP_KEY (base64 32 byte) atau turunan APP_KEY. Simpan kuncinya
+    // di tempat terpisah dari backup; tanpa kunci, backup tidak bisa dipulihkan.
+    'backup_encrypt' => (bool) env('OPTIMA_BACKUP_ENCRYPT', true),
+    'backup_key' => env('OPTIMA_BACKUP_KEY'),
     'backup_time' => env('OPTIMA_BACKUP_TIME', '01:00'),
     'backup_keep_days' => (int) env('OPTIMA_BACKUP_KEEP_DAYS', 30),
 

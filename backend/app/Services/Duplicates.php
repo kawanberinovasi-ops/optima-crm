@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ClientPartner;
 use App\Models\Contact;
 use App\Models\User;
+use App\Support\ContactIndex;
 use Illuminate\Support\Collection;
 
 /**
@@ -67,11 +68,12 @@ class Duplicates
                     $q->orWhereRaw('similarity(lower(name), lower(?)) > 0.25', [$name])
                         ->orWhere('name', 'ilike', '%'.addcslashes(trim($name), '%_\\').'%');
                 }
+                // Email dan telepon kontak terenkripsi: dicari lewat indeks HMAC (lihat ContactIndex).
                 if ($email !== '') {
-                    $q->orWhereHas('contacts', fn ($c) => $c->whereRaw('lower(email) = ?', [$email]));
+                    $q->orWhereHas('contacts', fn ($c) => $c->where('email_hash', ContactIndex::email($email)));
                 }
                 if (strlen($phone) >= 7) {
-                    $q->orWhereHas('contacts', fn ($c) => $c->whereRaw("right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 8) = ?", [$phone]));
+                    $q->orWhereHas('contacts', fn ($c) => $c->where('phone_hash', ContactIndex::phone($phone)));
                 }
             })
             ->limit(200)
@@ -90,7 +92,7 @@ class Duplicates
 
     public static function digits8(?string $s): string
     {
-        return substr(preg_replace('/\D/', '', (string) $s), -8) ?: '';
+        return ContactIndex::digits8($s);
     }
 
     /** Koefisien Dice atas bigram, sama dengan fungsi dice di prototipe. */

@@ -14,7 +14,8 @@ class TrashEntry extends Model
 
     protected function casts(): array
     {
-        return ['snapshot' => 'array', 'created_at' => 'datetime'];
+        // Snapshot bisa berisi data pribadi (kontak, akun): disimpan terenkripsi.
+        return ['snapshot' => 'encrypted:array', 'created_at' => 'datetime'];
     }
 
     public function department(): BelongsTo

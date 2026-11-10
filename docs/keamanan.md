@@ -31,6 +31,20 @@ Ringkasan lapisan keamanan yang aktif. Pengetatan terakhir: 10 Nov 2026 (tes: `t
   sendiri. Ditambah `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, `COOP`, dan HSTS lewat HTTPS.
 - Respons API `Cache-Control: no-store`.
 
+## Enkripsi data tersimpan
+
+- **Email dan telepon kontak** dienkripsi di database (AES-256 dengan APP_KEY). Cek duplikat tetap jalan lewat indeks
+  HMAC (`email_hash`, `phone_hash`) yang tidak bisa dibalik ke email/telepon aslinya.
+- **Data terhapus** (snapshot di `trash_entries`) dienkripsi.
+- **Backup harian** dienkripsi per potongan (libsodium XChaCha20-Poly1305, file `.ndjson.gz.enc`): isinya tidak
+  terbaca, dan file yang diubah, terpotong, atau dibuka dengan kunci lain ditolak tanpa memasukkan data apa pun.
+  Backup kini memuat semua tabel data (termasuk pipeline per divisi, layanan, serah terima, Data terhapus).
+
+> **APP_KEY sekarang kunci data.** Tanpa APP_KEY yang sama, email/telepon kontak, Data terhapus, dan backup tidak bisa
+> dibaca lagi. Simpan APP_KEY di password manager milik klien, jangan pernah diganti/di-generate ulang di server yang
+> sudah berisi data, dan ikutkan saat pindah server. Untuk memisahkan kunci backup dari server, isi
+> `OPTIMA_BACKUP_KEY` (`openssl rand -base64 32`) dan simpan salinannya terpisah dari lokasi backup.
+
 ## Server dan file
 
 - Halaman debug Laravel **tidak pernah tampil** ke luar laptop pengembang walaupun `APP_DEBUG=true`.
@@ -41,7 +55,7 @@ Ringkasan lapisan keamanan yang aktif. Pengetatan terakhir: 10 Nov 2026 (tes: `t
 
 ## Yang masih bisa ditingkatkan
 
-- Enkripsi kolom kontak (email/telepon) di database: perlu menyesuaikan pencarian duplikat.
-- Backup harian dienkripsi sebelum diunggah ke object storage.
+- Audit log menyimpan nilai sebelum/sesudah apa adanya (termasuk perubahan email/telepon kontak); bisa ikut dienkripsi
+  atau disamarkan kalau diperlukan.
 - Verifikasi consent screen Google dan halaman kebijakan privasi sebelum dipublikasikan untuk semua akun.
 - Hosting produksi milik klien dengan HTTPS dan domain sendiri (tunnel hanya untuk UAT).

@@ -11,6 +11,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -92,6 +93,8 @@ class DeployTest extends TestCase
     public function test_restore_refuses_non_empty_database_and_corrupted_files(): void
     {
         Storage::fake('backups');
+        // Backup format lama (tanpa enkripsi) tetap bisa dibaca; dipakai di sini supaya isinya bisa diubah.
+        config(['optima.backup_encrypt' => false]);
         $this->seed(DatabaseSeeder::class);
         $this->artisan('optima:backup', ['--disk' => 'backups'])->assertSuccessful();
         $path = app(Backup::class)->latest('backups');
@@ -115,11 +118,12 @@ class DeployTest extends TestCase
     {
         Storage::fake('backups');
         Storage::disk('backups')->put(Backup::PREFIX.now()->subDays(40)->format('Ymd-His').'.ndjson.gz', 'lama');
+        Storage::disk('backups')->put(Backup::PREFIX.now()->subDays(41)->format('Ymd-His').'.ndjson.gz.enc', 'lama');
         Storage::disk('backups')->put(Backup::PREFIX.now()->subDays(2)->format('Ymd-His').'.ndjson.gz', 'baru');
 
         $deleted = app(Backup::class)->prune(30, 'backups');
 
-        $this->assertCount(1, $deleted);
+        $this->assertCount(2, $deleted);
         $this->assertCount(1, Storage::disk('backups')->files('backups'));
     }
 
@@ -131,12 +135,51 @@ class DeployTest extends TestCase
         $this->assertSame('Asia/Jakarta', $event->timezone);
     }
 
+    public function test_backups_are_encrypted_and_tampering_or_wrong_key_is_refused(): void
+    {
+        Storage::fake('backups');
+        $this->seed(DatabaseSeeder::class);
+        $this->artisan('optima:backup', ['--disk' => 'backups'])->assertSuccessful();
+        $path = app(Backup::class)->latest('backups');
+        $this->assertStringEndsWith('.ndjson.gz.enc', $path);
+        $raw = Storage::disk('backups')->get($path);
+        $this->assertStringStartsWith('OPTIMAENC1', $raw);
+        $this->assertStringNotContainsString('Executive', $raw, 'isi tidak terbaca');
+        $this->assertFalse(@gzdecode(substr($raw, 10)), 'bukan gzip biasa');
+
+        foreach (array_reverse(Backup::TABLES) as $table) {
+            DB::table($table)->delete();
+        }
+        // Satu byte diubah: autentikasi gagal, tidak ada data yang masuk.
+        $bad = $raw;
+        $bad[strlen($bad) - 20] = chr(ord($bad[strlen($bad) - 20]) ^ 1);
+        Storage::disk('backups')->put('backups/ubah.ndjson.gz.enc', $bad);
+        $this->artisan('optima:restore', ['path' => 'backups/ubah.ndjson.gz.enc', '--disk' => 'backups', '--force' => true])->assertFailed();
+        // File terpotong ditolak.
+        Storage::disk('backups')->put('backups/potong.ndjson.gz.enc', substr($raw, 0, intdiv(strlen($raw), 2)));
+        $this->artisan('optima:restore', ['path' => 'backups/potong.ndjson.gz.enc', '--disk' => 'backups', '--force' => true])->assertFailed();
+        // Kunci lain tidak bisa membuka.
+        config(['optima.backup_key' => base64_encode(random_bytes(32))]);
+        $this->artisan('optima:restore', ['path' => $path, '--disk' => 'backups', '--force' => true])->assertFailed();
+        $this->assertSame(0, DB::table('departments')->count());
+
+        config(['optima.backup_key' => null]);
+        $this->artisan('optima:restore', ['path' => $path, '--disk' => 'backups', '--force' => true])->assertSuccessful();
+        $this->assertGreaterThan(0, DB::table('client_partners')->count());
+        $this->assertGreaterThan(0, DB::table('department_pipeline')->count(), 'tabel penghubung ikut ter-backup');
+    }
+
     /** @return array<string, list<array<string, mixed>>> */
     private function snapshot(): array
     {
         $out = [];
         foreach (Backup::TABLES as $table) {
-            $out[$table] = DB::table($table)->orderBy('id')->get()->map(fn ($r) => (array) $r)->all();
+            $cols = Schema::hasColumn($table, 'id') ? ['id'] : array_slice(Schema::getColumnListing($table), 0, 2);
+            $q = DB::table($table);
+            foreach ($cols as $c) {
+                $q->orderBy($c);
+            }
+            $out[$table] = $q->get()->map(fn ($r) => (array) $r)->all();
         }
 
         return $out;

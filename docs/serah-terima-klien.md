@@ -76,5 +76,6 @@ Kelemahannya: tagihan dan riwayat project tetap tercatat dari akun lama sampai k
 | SMTP (`MAIL_*`) | Ganti ke akun email OPTIMA, lalu ubah `OPTIMA_MAIL_ALLOWED_DOMAINS` ke domain asli |
 | Super Admin | Pastikan minimal 2 Super Admin dari pihak klien, lalu nonaktifkan atau hapus akun Campus Innovate di Akses & Audit |
 | Object Storage backup | Bucket di akun klien; uji restore sekali setelah pindah |
-| `APP_KEY` | Tidak perlu diganti kecuali bocor. Menggantinya membuat sesi dan data terenkripsi lama tidak terbaca |
+| `APP_KEY` | **Wajib diserahkan dan disimpan klien** (password manager). Kontak, Data terhapus, dan backup dienkripsi dengan kunci ini; kalau hilang atau diganti, data itu tidak bisa dibaca lagi. Jangan di-generate ulang |
+| `OPTIMA_BACKUP_KEY` | Kalau diisi, kunci backup terpisah dari APP_KEY: serahkan juga dan simpan terpisah dari lokasi backup |
 | Daftar akun internal | File `storage/app/private/internal-users.json` hanya ada di laptop pengembang; di produksi pengguna dikelola dari Akses & Audit |
