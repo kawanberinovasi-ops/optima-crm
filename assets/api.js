@@ -77,8 +77,9 @@
     const rm = idMap(db.records, b.records, 'code');
     remapLocal(um, rm);
     // Profil (foto, bio) masih disimpan di browser: bawa ke data pengguna dari server.
-    const prof = {}; (db.users || []).forEach(u => { if (u.profile) prof[String(u.email).toLowerCase()] = u.profile; });
-    const users = b.users.map(u => Object.assign(u, prof[u.email.toLowerCase()] ? { profile: prof[u.email.toLowerCase()] } : {}));
+    // Profil lokal dipetakan lewat id: email pengguna lain tidak dikirim server kecuali ke Super Admin.
+    const prof = {}; (db.users || []).forEach(u => { if (u.profile) prof[String(u.id)] = u.profile; });
+    const users = b.users.map(u => Object.assign(u, prof[String(u.id)] ? { profile: prof[String(u.id)] } : {}));
     // Pengguna di Data terhapus hanya dipakai untuk menampilkan nama di riwayat lama.
     db.users = users.filter(u => !u.deleted); db.deletedUsers = users.filter(u => u.deleted);
     db.trash = b.trash || [];
@@ -160,7 +161,9 @@
   };
   Actions.logout = async () => {
     try { await Api.post('auth/logout'); } catch (e) { /* tetap keluar di sisi browser */ }
-    Store.db.session = null; App.pop = null; App.drawer = null; App.modal = null; Store.save();
+    // Buang data CRM dari memori tab, bukan hanya sesinya.
+    purgeBackendCache(); Store.mem = null; Store.db = seed(); Store.db.session = null;
+    App.pop = null; App.drawer = null; App.modal = null;
     location.hash = '#/login'; await loadLoginInfo();
   };
   const _relogin = Actions.relogin;

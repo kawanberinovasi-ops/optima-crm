@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\Audit;
+use App\Support\LocalRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,7 +69,7 @@ class AuthController extends Controller
     /** Login akun uji tanpa SSO. Hanya ada di APP_ENV=local (config optima.dev_login). */
     public function devLogin(Request $request): JsonResponse
     {
-        abort_unless(config('optima.dev_login'), 404);
+        abort_unless(LocalRequest::devLoginAllowed($request), 404);
         $data = $request->validate(['email' => ['required', 'email']]);
 
         $error = $this->startSession($request, strtolower($data['email']), 'akun uji lokal');

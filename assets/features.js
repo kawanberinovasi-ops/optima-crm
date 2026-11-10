@@ -36,9 +36,11 @@ Pages.expired = () => { const x = App.expired || {}; return '<div class="login">
   '<div style="display:flex;flex-direction:column;gap:16px"><span class="lbl">Sesi berakhir</span><h1 class="disp" style="margin:0;font-size:clamp(48px,6vw,92px)">Udah lama<br>ditinggal nih.</h1><p style="margin:0;font-size:18px;max-width:460px">Demi keamanan, sesi otomatis berakhir setelah 60 menit ga ada aktivitas atau 12 jam sejak login.</p></div><span></span></section>' +
   '<section class="login-side"><div class="card login-card enter s2"><div style="display:flex;flex-direction:column;gap:6px"><span class="lbl">Keamanan</span><h2 class="disp" style="margin:0;font-size:40px;color:var(--p)">Masuk lagi, yuk.</h2><p style="margin:0;color:var(--ink2)">' + esc(x.reason || 'Sesi berakhir.') + (x.name ? ' Terakhir login sebagai ' + esc(x.name) + '.' : '') + '</p></div>' +
   '<button type="button" class="btn" data-a="relogin" style="min-height:56px;width:100%">' + ic('lock') + 'Masuk lagi</button><p class="small muted" style="margin:0">Data yang belum disimpan di form terakhir perlu diisi ulang.</p></div></section></div>'; };
+// Tanpa onclick inline supaya lolos Content-Security-Policy.
+Actions.reloadapp = () => { location.hash = '#/mywork'; location.reload(); };
 function errorPage(e) {
   return '<main class="wrap"><section class="hero">' + stripesArt(2) + '<span class="lbl">Galat</span><h1 class="disp hero-title">Waduh, ada<br>yang galat.</h1><p style="margin:12px 0 0">Halaman ini gagal ditampilkan. Data kamu aman, coba muat ulang.</p></section>' +
-    empty('Coba muat ulang halaman.', 'Kalau masih muncul, kirim pesan galat di bawah ke tim Campus Innovate.', '<button type="button" class="btn btn-sm" onclick="location.hash=\'#/mywork\';location.reload()">Muat ulang</button>') +
+    empty('Coba muat ulang halaman.', 'Kalau masih muncul, kirim pesan galat di bawah ke tim Campus Innovate.', '<button type="button" class="btn btn-sm" data-a="reloadapp">Muat ulang</button>') +
     '<pre class="small" style="white-space:pre-wrap;padding:14px;border-radius:16px;background:var(--bg);color:var(--ink2)">' + esc(String(e && e.message || e)) + '</pre></main>';
 }
 

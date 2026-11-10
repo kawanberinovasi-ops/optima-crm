@@ -232,14 +232,20 @@ function seed() {
   return divisionWorkflow(db);
 }
 
+// Mode backend: data CRM hanya di memori tab, tidak pernah ditulis ke localStorage, supaya tidak tertinggal di
+// komputer bersama setelah logout. Mode prototipe (tanpa backend) tetap menyimpan data contoh di browser.
+const PERSIST_LOCAL = !window.OPTIMA_API;
+const purgeBackendCache = () => { try { Object.keys(localStorage).filter(k => k.startsWith('optima_crm_backend_')).forEach(k => localStorage.removeItem(k)); } catch (e) { /* storage tidak tersedia */ } };
+if (!PERSIST_LOCAL) purgeBackendCache();
+
 const Store = {
   db: null,
   mem: null,
   load() {
-    try { const raw = localStorage.getItem(DB_KEY); if (raw) { this.db = JSON.parse(raw); return; } } catch (e) { /* storage tidak tersedia */ }
+    if (PERSIST_LOCAL) { try { const raw = localStorage.getItem(DB_KEY); if (raw) { this.db = JSON.parse(raw); return; } } catch (e) { /* storage tidak tersedia */ } }
     this.db = this.mem || seed();
   },
-  save() { this.mem = this.db; try { localStorage.setItem(DB_KEY, JSON.stringify(this.db)); } catch (e) { /* abaikan */ } },
+  save() { this.mem = this.db; if (!PERSIST_LOCAL) return; try { localStorage.setItem(DB_KEY, JSON.stringify(this.db)); } catch (e) { /* abaikan */ } },
   reset() { const s = this.db && this.db.session; this.db = seed(); this.db.session = s; this.save(); }
 };
 

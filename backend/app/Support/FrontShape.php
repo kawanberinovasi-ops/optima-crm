@@ -28,12 +28,12 @@ class FrontShape
     ];
 
     /** @return array<string, mixed> */
-    public static function user(User $user): array
+    public static function user(User $user, bool $withEmail = true): array
     {
         return [
             'id' => (string) $user->id,
             'name' => $user->name,
-            'email' => $user->email,
+            'email' => $withEmail ? $user->email : '',
             'dept' => $user->department?->name,
             'role' => $user->role->value,
             'active' => $user->active,

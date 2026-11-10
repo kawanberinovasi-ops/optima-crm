@@ -155,6 +155,9 @@ function moveDeal(id, toStage) {
   audit('Ubah', 'Deal', d.title + ' pindah dari ' + (from ? from.name : '-') + ' ke ' + stageOf(d).name);
   commit();
 }
+/** Cegah formula injection di Excel: sel diawali = + - @ tab/CR diberi kutip tunggal. */
+const csvSafe = (c) => { const v = String(c == null ? '' : c); return /^[=+\-@\t\r]/.test(v) ? "'" + v : v; };
+
 const Actions = {
   pop: (el) => { App.pop = App.pop === el.dataset.v ? null : el.dataset.v; render(); },
   nav: (el) => go(el.dataset.v),
@@ -198,7 +201,7 @@ const Actions = {
   newdept: () => { App.modal = { kind: 'dept' }; render(); },
   editdept: (el) => { App.modal = { kind: 'dept', id: el.dataset.v }; render(); },
   deldept: (el) => { const d = Store.db.departments.find(x => x.id === el.dataset.v); Store.db.departments = Store.db.departments.filter(x => x.id !== d.id); delete Store.db.access[d.name]; audit('Hapus', 'Department', d.name); commit(); },
-  exportaudit: () => { const rows = [['Waktu', 'Pengguna', 'Aksi', 'Bagian', 'Detail']].concat(Store.db.audit.map(a => [a.at, (userById(a.by) || {}).name || '-', a.action, a.entity, a.detail])); const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'Audit_CRM_OPTIMA_' + today() + '.csv'; a.click(); audit('Export', 'Audit log', rows.length - 1 + ' baris'); Store.save(); render(); },
+  exportaudit: () => { const rows = [['Waktu', 'Pengguna', 'Aksi', 'Bagian', 'Detail']].concat(Store.db.audit.map(a => [a.at, (userById(a.by) || {}).name || '-', a.action, a.entity, a.detail])); const csv = rows.map(r => r.map(c => '"' + csvSafe(c).replace(/"/g, '""') + '"').join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'Audit_CRM_OPTIMA_' + today() + '.csv'; a.click(); audit('Export', 'Audit log', rows.length - 1 + ' baris'); Store.save(); render(); },
   switch: (el) => { const u = userById(el.dataset.v); Store.db.session = u.id; audit('Login', 'Sesi', 'Ganti akun uji ke ' + u.name); App.pop = null; App.drawer = null; Store.save(); go(App.route === 'akses' && !canViewAdmin() ? 'mywork' : App.route); toast('Halo, ' + u.name + '!', u.role + ' · ' + u.dept); },
   sso: () => { if (App.login.step !== 'idle') return; App.login.step = 'loading'; render(); setTimeout(() => { App.login.step = 'pick'; render(); }, 900); },
   loginback: () => { App.login.step = 'idle'; render(); },

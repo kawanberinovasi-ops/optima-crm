@@ -6,11 +6,9 @@ tunnel berjalan; setiap tunnel di-restart, link-nya berganti.
 ## Menjalankan
 
 1. Server lokal jalan: `./start-backend.sh` (PostgreSQL + `php artisan serve` di 127.0.0.1:8000).
-2. Pastikan di `backend/.env` (wajib, karena situs terbuka ke publik):
-   ```
-   APP_DEBUG=false
-   OPTIMA_DEV_LOGIN=false
-   ```
+2. Login uji dan halaman debug otomatis terkunci ke laptop (host dan IP `127.0.0.1`), jadi aman walaupun
+   `OPTIMA_DEV_LOGIN=true` atau `APP_DEBUG=true`. Lewat link tunnel login hanya bisa dengan Google. Lihat
+   [keamanan.md](keamanan.md).
 3. Jalankan tunnel: `~/.local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000`
    (unduhan resmi: github.com/cloudflare/cloudflared/releases). Catat link `https://....trycloudflare.com`.
 4. Di `backend/.env` ganti `APP_URL` dan `GOOGLE_REDIRECT_URI=<link>/api/auth/google/callback`, lalu
@@ -24,10 +22,9 @@ tunnel berjalan; setiap tunnel di-restart, link-nya berganti.
   Test users consent screen (mode Testing).
 - `innovatecampus@gmail.com` didaftarkan sebagai Super Admin pengembang (hanya di database lokal). Nonaktifkan saat
   serah terima.
-- Email kantor `@optima.web.id` milik Ali dan Chitta bukan akun Google; mereka login dengan Gmail alternatifnya.
+- Email kantor `@optima.web.id` yang belum terhubung ke akun Google tidak bisa dipakai login Google; pemiliknya login
+  dengan Gmail alternatif yang terdaftar.
 
 ## Selesai
 
-Hentikan tunnel (Ctrl-C di tab terminalnya). Untuk kembali ke login uji lokal, kembalikan `.env` dari
-`backend/storage/app/private/.env.before-tunnel` (tanpa GOOGLE_CLIENT_SECRET) atau set `OPTIMA_DEV_LOGIN=true`
-dan `APP_URL=http://127.0.0.1:8000`.
+Hentikan tunnel (Ctrl-C di tab terminalnya). Login uji di `http://127.0.0.1:8000` tetap jalan selama tunnel aktif.

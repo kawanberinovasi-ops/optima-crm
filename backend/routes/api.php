@@ -19,12 +19,12 @@ use Illuminate\Support\Facades\Route;
 
 // Login (SRS 4.1)
 Route::get('session', [BootstrapController::class, 'session']);
-Route::get('auth/google/redirect', [AuthController::class, 'googleRedirect']);
-Route::get('auth/google/callback', [AuthController::class, 'googleCallback']);
-Route::post('auth/dev-login', [AuthController::class, 'devLogin'])->middleware('throttle:20,1');
+Route::get('auth/google/redirect', [AuthController::class, 'googleRedirect'])->middleware('throttle:crm-login');
+Route::get('auth/google/callback', [AuthController::class, 'googleCallback'])->middleware('throttle:crm-login');
+Route::post('auth/dev-login', [AuthController::class, 'devLogin'])->middleware('throttle:crm-login');
 Route::post('auth/logout', [AuthController::class, 'logout']);
 
-Route::middleware('crm')->group(function () {
+Route::middleware(['crm', 'throttle:crm-api'])->group(function () {
     Route::get('bootstrap', [BootstrapController::class, 'bootstrap']);
     Route::post('ping', [AuthController::class, 'ping']);
 
@@ -69,7 +69,7 @@ Route::middleware('crm')->group(function () {
     Route::post('interactions/{interaction}/cancel', [InteractionController::class, 'cancel']);
 
     // Import (SRS 4.4)
-    Route::post('imports/check', [ImportController::class, 'check']);
+    Route::post('imports/check', [ImportController::class, 'check'])->middleware('throttle:crm-heavy');
     Route::post('imports/{import}/commit', [ImportController::class, 'commit']);
     Route::post('imports/{import}/undo', [ImportController::class, 'undo']);
 
@@ -92,7 +92,7 @@ Route::middleware('crm')->group(function () {
     Route::post('option-lists', [AdminController::class, 'storeOption']);
     Route::delete('option-lists', [AdminController::class, 'destroyOption']);
     Route::get('audit-logs', [AdminController::class, 'auditLogs']);
-    Route::get('audit-logs/export', [AdminController::class, 'exportAudit']);
+    Route::get('audit-logs/export', [AdminController::class, 'exportAudit'])->middleware('throttle:crm-heavy');
     Route::get('changes', [AdminController::class, 'changes']);
 
     // Data terhapus: hapus selalu bisa dipulihkan sesuai hak akses

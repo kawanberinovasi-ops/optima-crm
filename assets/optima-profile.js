@@ -64,7 +64,7 @@
     const updated = Object.assign({}, u, { name: val.name, profile: Object.assign({}, previous, { phone: val.phone, bio: val.bio, photo: val.photo }), profileUpdatedAt: new Date().toISOString() });
     const entry = { id: uid('a'), at: updated.profileUpdatedAt, by: u.id, action: 'Ubah', entity: 'Profil', detail: 'Memperbarui profil sendiri: ' + changed.join(', ') + '.' };
     const next = Object.assign({}, Store.db, { users: Store.db.users.map(x => x.id === u.id ? updated : x), audit: [entry, ...Store.db.audit].slice(0, 800) });
-    try { localStorage.setItem(DB_KEY, JSON.stringify(next)); }
+    try { if (PERSIST_LOCAL) localStorage.setItem(DB_KEY, JSON.stringify(next)); }
     catch (e) { m.err.storage = 'Profil belum tersimpan. Penyimpanan browser tidak tersedia atau penuh. Coba tanpa foto, lalu simpan lagi.'; refresh(m); return; }
     Store.db = next; Store.mem = next; App.modal = null; render(); toast('Profil tersimpan', 'Perubahan profil kamu sudah diperbarui.', 'info');
   };

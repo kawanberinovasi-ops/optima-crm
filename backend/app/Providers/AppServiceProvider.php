@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Services\Access;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -26,5 +29,10 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->isProduction()) {
             URL::forceScheme('https');
         }
+
+        // Batas permintaan: mencegah tebak-tebakan login, scraping data, dan beban berlebih dari satu akun atau IP.
+        RateLimiter::for('crm-api', fn (Request $r) => Limit::perMinute(240)->by('u'.($r->user()?->id ?? $r->ip())));
+        RateLimiter::for('crm-login', fn (Request $r) => Limit::perMinute(20)->by($r->ip()));
+        RateLimiter::for('crm-heavy', fn (Request $r) => Limit::perMinute(10)->by('u'.($r->user()?->id ?? $r->ip())));
     }
 }

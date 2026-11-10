@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\Access;
 use App\Services\Audit;
 use App\Services\ChangeHistory;
+use App\Support\CsvSafe;
 use App\Support\DivisionDefaults;
 use App\Support\FrontShape;
 use App\Support\Notify;
@@ -376,11 +377,11 @@ class AdminController extends Controller
             fputcsv($out, ['Waktu', 'Pengguna', 'Aksi', 'Bagian', 'Id data', 'Detail', 'Sebelum', 'Sesudah', 'IP']);
             AuditLog::orderBy('id')->chunk(1000, function ($logs) use ($out, $users) {
                 foreach ($logs as $log) {
-                    fputcsv($out, [
+                    fputcsv($out, array_map([CsvSafe::class, 'cell'], [
                         $log->created_at->toDateTimeString(), $users[$log->user_id] ?? 'Sistem', $log->action, $log->entity_type, $log->entity_id,
                         $log->summary, $log->before ? json_encode($log->before, JSON_UNESCAPED_UNICODE) : '',
                         $log->after ? json_encode($log->after, JSON_UNESCAPED_UNICODE) : '', $log->ip_address,
-                    ]);
+                    ]));
                 }
             });
             fclose($out);

@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function (Request $request) {
     $html = file_get_contents(config('optima.frontend_path').'/index.html');
     // Path relatif (bukan URL lengkap), supaya cookie sesi tetap terkirim walau dibuka lewat localhost atau 127.0.0.1.
-    $flag = '<script>window.OPTIMA_API = '.json_encode($request->getBaseUrl().'/api').';</script>';
+    // Skrip inline ini satu-satunya yang diizinkan Content-Security-Policy, lewat nonce acak per permintaan.
+    $nonce = base64_encode(random_bytes(18));
+    $request->attributes->set('csp_nonce', $nonce);
+    $flag = '<script nonce="'.$nonce.'">window.OPTIMA_API = '.json_encode($request->getBaseUrl().'/api').';</script>';
     // Aset tanpa penanda versi (saat pengembangan) diberi ?v=<waktu ubah file>, supaya browser tidak memakai file lama.
     // Paket produksi dari optima:build-frontend sudah membawa ?v=<hash> sendiri, jadi tidak diubah.
     $assets = public_path();

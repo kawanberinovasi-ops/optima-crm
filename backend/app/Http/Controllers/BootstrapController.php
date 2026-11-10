@@ -16,6 +16,7 @@ use App\Services\Access;
 use App\Services\ChangeHistory;
 use App\Services\Trash;
 use App\Support\FrontShape;
+use App\Support\LocalRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,7 +26,7 @@ class BootstrapController extends Controller
     /** Publik: apa saja cara login yang tersedia. Daftar akun uji hanya ada di APP_ENV=local. */
     public function session(Request $request): JsonResponse
     {
-        $dev = (bool) config('optima.dev_login');
+        $dev = LocalRequest::devLoginAllowed($request);
 
         return response()->json([
             'authenticated' => $request->user() !== null,
@@ -81,7 +82,8 @@ class BootstrapController extends Controller
             'trash' => app(Trash::class)->listFor($me),
             // Pengaturan pipeline per divisi dan per pengguna, untuk halaman Akses & Audit.
             'pipelineAccess' => $access->canViewAdmin($me) ? AdminController::pipelineAccessShape() : ['departments' => [], 'users' => []],
-            'users' => User::with('department')->orderBy('id')->get()->map(fn (User $u) => FrontShape::user($u))->values(),
+            // Email pengguna lain hanya untuk Super Admin (kelola akun); yang lain cukup nama, divisi, dan role.
+            'users' => User::with('department')->orderBy('id')->get()->map(fn (User $u) => FrontShape::user($u, $u->id === $me->id || $access->canViewAdmin($me)))->values(),
             'departments' => Department::orderBy('id')->get()->map(fn (Department $d) => ['id' => (string) $d->id, 'name' => $d->name, 'seesAll' => $d->sees_all])->values(),
             'services' => AdminController::servicesShape(),
             'access' => $access_,
@@ -99,7 +101,7 @@ class BootstrapController extends Controller
                 'idleMinutes' => (int) config('session.lifetime'),
                 'maxHours' => (int) config('optima.session_absolute_hours'),
             ],
-            'devLogin' => (bool) config('optima.dev_login'),
+            'devLogin' => LocalRequest::devLoginAllowed($request),
         ]);
     }
 }
