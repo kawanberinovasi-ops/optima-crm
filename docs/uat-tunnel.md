@@ -5,6 +5,9 @@ tunnel berjalan; setiap tunnel di-restart, link-nya berganti.
 
 ## Menjalankan
 
+Cara cepat: `./start-uat.sh` (menyalakan server kalau belum, membuka tunnel, dan mengisi `APP_URL` serta
+`GOOGLE_REDIRECT_URI` otomatis). Setelah itu tinggal langkah 5 (redirect di Google Cloud). Langkah manualnya:
+
 1. Server lokal jalan: `./start-backend.sh` (PostgreSQL + `php artisan serve` di 127.0.0.1:8000).
 2. Login uji dan halaman debug otomatis terkunci ke laptop (host dan IP `127.0.0.1`), jadi aman walaupun
    `OPTIMA_DEV_LOGIN=true` atau `APP_DEBUG=true`. Lewat link tunnel login hanya bisa dengan Google. Lihat
